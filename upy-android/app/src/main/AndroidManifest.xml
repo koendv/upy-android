@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Used by the csi (camera) module inside :engine, not the main
+         process - see project memory / SESSION_STATE.yaml. required
+         false: most Android devices have a camera, but this app should
+         not refuse to install on one that genuinely lacks any. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <application
+        android:label="upy-android"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="false"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- Separate process for crash isolation (see project memory:
+             single-APK, engine in a separate process). exported="false"
+             is correct and sufficient here: same-app-only binding,
+             no cross-app signature permission needed. -->
+        <service
+            android:name=".EngineService"
+            android:process=":engine"
+            android:exported="false" />
+    </application>
+
+</manifest>

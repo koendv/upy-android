@@ -1,0 +1,24 @@
+# External reference clones (micropython, termux-app, micro-repl) — not
+# this project's own source. Re-clone via the commands documented in
+# SESSION_STATE.yaml (upstream_sources section).
+upstream/
+
+# Build outputs / caches
+build/
+app/build/
+app/.cxx/
+.gradle/
+.kotlin/
+native-bringup/build-embed/
+native-bringup/micropython_embed/
+native-bringup/embed-arm64
+
+# Machine-specific (contains a local absolute SDK path)
+local.properties
+
+# Claude Code session-local tooling artifacts, not project source
+.claude/
+resumes
+
+# Loose demo artifact, not source (re-add explicitly if you want it kept)
+upy_version_banner.png

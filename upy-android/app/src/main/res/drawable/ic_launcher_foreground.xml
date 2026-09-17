@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- MicroPython logo (https://commons.wikimedia.org/wiki/File:MicroPython_new_logo.svg),
+     Copyright micropython.org, MIT License. Used here as a community
+     datapoint/prototype icon, not an official MicroPython release;
+     see forum post context (see also NOTICE.md at repo root).
+
+     Original artwork is a 342x342 path with no margin (bleeds edge to
+     edge). The mandatory Android safe zone is a centered 66dp box within
+     the 108dp canvas, but OEM launchers (confirmed on Xiaomi/MIUI/
+     HyperOS) mask noticeably more aggressively than that nominal spec in
+     practice, clipping content sized right at the 66dp limit. Sized to
+     match F-Droid's actual shipped icon as a real-world-tested reference
+     (extracted from its installed APK via aapt2 dump xmltree; its
+     foreground content occupies an ~50dp box within the same 108dp
+     canvas): the group below scales the untouched original path data by
+     50/342 around the origin, then translates by (108-50)/2 = 29 in both
+     axes to center it. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:pivotX="0"
+        android:pivotY="0"
+        android:scaleX="0.146199"
+        android:scaleY="0.146199"
+        android:translateX="29"
+        android:translateY="29">
+        <path
+            android:fillColor="#000000"
+            android:pathData="m 0,0 h 164 v 267 h 14 V 0 H 342 V 342 H 267 V 75 H 253 V 342 H 89 V 75 L 75,75.5 V 342 H 0 Z m 317,278 h -20 v 34 h 20 z" />
+    </group>
+</vector>

@@ -1,0 +1,99 @@
+# workflow to build upy-android's app-debug.apk (or a debug-key-signed
+# app-release.apk), modeled on arm_can_tool's own build.yml
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        type: choice
+        options:
+          - debug
+          - release
+        default: debug
+      release:
+        description: 'Publish a GitHub release from this build'
+        type: boolean
+        default: false
+      release_name:
+        description: 'Release title/tag (optional, defaults to <build_type>-build-<run number>)'
+        type: string
+        default: ''
+
+name: upy-android
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: build upy-android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: checkout upy-android-docker sources
+        uses: actions/checkout@v7
+
+      - name: docker build
+        run: |
+          docker build --target build \
+            --build-arg BUILD_TYPE=${{ inputs.build_type || 'debug' }} \
+            -t upy-android \
+            -f tools/docker/Dockerfile .
+
+      - name: extract apk
+        run: |
+          id=$(docker create upy-android)
+          docker cp "$id":/output ~/upy-android_apk
+          docker rm "$id"
+
+      - name: upload apk
+        uses: actions/upload-artifact@v7
+        with:
+          name: upy-android_apk
+          path: ~/upy-android_apk
+          retention-days: 7
+
+  release:
+    name: release upy-android
+    runs-on: ubuntu-24.04
+    needs: build
+    if: ${{ inputs.release }}
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+
+      - name: download apk
+        uses: actions/download-artifact@v8
+        with:
+          name: upy-android_apk
+          path: artifacts
+
+      - name: set release vars
+        id: vars
+        run: |
+          echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "title=${RELEASE_NAME:-${BUILD_TYPE}-build-$GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+        env:
+          RELEASE_NAME: ${{ inputs.release_name }}
+          BUILD_TYPE: ${{ inputs.build_type || 'debug' }}
+
+      - name: release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "artifacts/*"
+          body: >-
+            upy-android ${{ inputs.build_type || 'debug' }} build, from
+            ${{ steps.vars.outputs.short_sha }}.
+            ${{ inputs.build_type == 'release' && 'Debug-key-signed -- not a production signing identity, see app/build.gradle.kts.' || '' }}
+          tag: ${{ steps.vars.outputs.title }}
+          name: ${{ steps.vars.outputs.title }}
+          commit: ${{ github.sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+# not truncated
