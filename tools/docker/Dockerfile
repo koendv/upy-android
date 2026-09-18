@@ -59,7 +59,7 @@ ENV ULAB_SHA=01ad8a5fff89d7aeb68ef1827d1ba8f83f6462a7
 ARG DEST_DIR=/root
 WORKDIR ${DEST_DIR}
 
-RUN apt-get update && apt-get upgrade -y
+RUN apt-get update
 
 RUN apt-get install -y apt-utils
 

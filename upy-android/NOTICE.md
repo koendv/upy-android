@@ -4,8 +4,8 @@
 
 This project embeds MicroPython and parts of OpenMV's `imlib` machine-vision
 library, both regenerated/copied in via `native-bringup/micropython_embed.mk`
-and `native-bringup/apply-overrides.sh` (see SESSION_STATE.yaml). These
-files are unmodified upstream copies, not patched.
+and `native-bringup/apply-overrides.sh`.
+These files are unmodified upstream copies, not patched.
 
 ### MicroPython
 
@@ -42,8 +42,7 @@ The LGPL-2.1 license text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.ht
 - Source: https://github.com/v923z/micropython-ulab
 - Copyright: 2019-2021 Zoltán Vörös and contributors
 - License: MIT
-- Vendored at commit 01ad8a5 (see SESSION_STATE.yaml), `code/` subdirectory
-  only.
+- Vendored at commit 01ad8a5, `code/` subdirectory only.
 
 ## App icon
 
