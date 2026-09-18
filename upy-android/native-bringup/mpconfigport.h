@@ -176,6 +176,31 @@ unsigned long mp_android_random_seed_init(void);
 #define MICROPY_PY_BINASCII                      (1)
 #define MICROPY_PY_BUILTINS_BYTES_HEX            (1)
 
+// heapq module: off by default at CORE_FEATURES (needs EXTRA_FEATURES).
+// extmod/modheapq.c has zero further dependencies (no vendored lib,
+// unlike binascii's crc32/hashlib/deflate) -- a genuinely free add,
+// same tier as errno/cmath below.
+#define MICROPY_PY_HEAPQ                         (1)
+
+// uctypes module: off by default at CORE_FEATURES (needs
+// EXTRA_FEATURES). extmod/moductypes.c has zero further dependencies,
+// same "genuinely free" tier as heapq above.
+#define MICROPY_PY_UCTYPES                       (1)
+
+// select module: off by default at CORE_FEATURES (needs
+// EXTRA_FEATURES). extmod/modselect.c uses real POSIX <poll.h>
+// directly -- no vendored lib. MICROPY_PY_SELECT_SELECT (the classic
+// select.select() call, not just poll()-based objects) defaults to the
+// same tier as the parent flag and is turned on explicitly here for
+// consistency with re's MATCH_GROUPS/SPAN_START_END above (basic,
+// expected usage, not a rarely-needed extra).
+// MICROPY_PY_SELECT_POSIX_OPTIMISATIONS is left at its explicit
+// off-by-default (regardless of rom level) -- an internal
+// implementation-detail optimization, not investigated, no evidence
+// it's needed.
+#define MICROPY_PY_SELECT                        (1)
+#define MICROPY_PY_SELECT_SELECT                 (1)
+
 // cmath module: off by default at CORE_FEATURES (needs EXTRA_FEATURES),
 // but py/modcmath.c is core (unconditionally compiled, like py/moderrno.c)
 // and MICROPY_PY_BUILTINS_COMPLEX already defaults to on (it just mirrors

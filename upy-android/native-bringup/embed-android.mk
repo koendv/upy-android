@@ -25,12 +25,15 @@
 ANDROID_EXTMOD_FILES = \
 	misc.h \
 	modbinascii.c \
+	modheapq.c \
 	modjson.c \
 	modos.c \
 	modrandom.c \
 	modre.c \
+	modselect.c \
 	modtime.c \
 	modtime.h \
+	moductypes.c \
 	vfs.c \
 	vfs.h \
 	vfs_posix.c \
