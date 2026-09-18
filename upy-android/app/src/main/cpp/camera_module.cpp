@@ -261,9 +261,17 @@ void convert_to_rgb565(AImage *image, image_t *out) {
             int u = (int) u_row_ptr[(col / 2) * u_pixel_stride] - 128;
             int v = (int) v_row_ptr[(col / 2) * v_pixel_stride] - 128;
 
-            int ry = (179 * u) >> 7;
-            int gy = ((44 * v) + (91 * u)) >> 7;
-            int by = (227 * v) >> 7;
+            // BT.601: R = Y + 1.402*Cr, B = Y + 1.772*Cb, G = Y -
+            // 0.344*Cb - 0.714*Cr (179/128=1.402, 227/128=1.772,
+            // 44/128=0.344, 91/128=0.714 -- the constants were already
+            // right, u/v were swapped against them: R was getting Cb's
+            // coefficient and B was getting Cr's, a clean red<->blue
+            // swap. u=Cb (plane 1), v=Cr (plane 2), per AImage's
+            // documented YUV_420_888 plane order -- confirmed real bug,
+            // not a plane-index mixup, see SESSION_STATE.yaml.
+            int ry = (179 * v) >> 7;
+            int gy = ((44 * u) + (91 * v)) >> 7;
+            int by = (227 * u) >> 7;
 
             int r = __USAT(y + ry, 8);
             int g = __USAT(y - gy, 8);
