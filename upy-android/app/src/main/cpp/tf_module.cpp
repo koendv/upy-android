@@ -166,6 +166,26 @@ struct tf_model_obj_t {
     // model pointers above are left dangling-but-unused after close(),
     // this is the field everything actually checks).
     TfModelRegistryNode *node;
+    // Phase 1 zero-copy tensor aliasing (input index 0 only -- see
+    // tf_model_set_input()'s own comment for why). input_aliased is
+    // monotonic once true: once a tensor is handed to LiteRT via
+    // TfLiteInterpreterSetCustomAllocationForTensor, there is no public
+    // API to un-alias it (confirmed by reading subgraph.cc directly --
+    // custom_allocations_ is a std::map nothing in the C API clears),
+    // so every later set_input() call for that index MUST also alias or
+    // it raises -- silently falling back to a plain copy would write
+    // through whatever buffer is STILL the tensor's backing memory,
+    // which could by then be a stale/reused GC block. aliased_input_ref
+    // is the GC-visible reference keeping that backing buffer's block
+    // alive for as long as the interpreter might still hold a raw
+    // pointer into it (i.e. for the Model's whole remaining lifetime
+    // once aliased, not just for the duration of one call) -- a plain
+    // mp_obj_t field inside this GC-allocated struct is enough, MicroPython's
+    // GC scans the whole block, same mechanism that already makes
+    // image_t._raw safe (see camera_module.cpp's image_alloc_tf_aligned()
+    // comment).
+    bool input_aliased;
+    mp_obj_t aliased_input_ref;
 };
 
 // Shared by close() and the finaliser (__del__) -- idempotent, safe to
@@ -183,6 +203,11 @@ void tf_model_close_impl(tf_model_obj_t *self) {
     TfLiteModelDelete(self->model);
     self->interpreter = nullptr;
     self->model = nullptr;
+    // Drop the aliased-buffer reference too -- otherwise a closed Model
+    // keeps a frame buffer alive indefinitely (a real leak: 76800 bytes
+    // per snapshot on a 32MB heap adds up fast, not theoretical).
+    self->input_aliased = false;
+    self->aliased_input_ref = mp_const_none;
 }
 
 // android.tf.Model(path) -- path is the only argument, a plain required
@@ -259,6 +284,8 @@ mp_obj_t tf_model_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw
     self->interpreter = interpreter;
     self->model = model;
     self->node = registry_add(interpreter, model);
+    self->input_aliased = false;
+    self->aliased_input_ref = mp_const_none;
     return MP_OBJ_FROM_PTR(self);
 }
 
@@ -269,11 +296,45 @@ void raise_if_closed(tf_model_obj_t *self) {
 }
 
 // set_input(data, index=0) -- data must match the input tensor's exact
-// byte size (TfLiteTensorByteSize), checked explicitly before the copy
-// rather than trusting TfLiteTensorCopyFromBuffer's own bounds handling
-// -- a deliberate boundary check, not redundant (advisor review flagged
-// this specifically: script-supplied bytes reaching a native memcpy-
-// shaped call without a length check first is a real overflow risk).
+// byte size (TfLiteTensorByteSize), checked explicitly before either
+// path below -- a deliberate boundary check, not redundant (advisor
+// review flagged this specifically: script-supplied bytes reaching a
+// native memcpy-shaped call without a length check first is a real
+// overflow risk). Assumes a static-shaped model -- TfLiteTensorByteSize
+// is read once, before any AllocateTensors() call the alias path below
+// might make; a genuinely dynamic-shape model could in principle make
+// that read stale, not handled here.
+//
+// Phase 1 zero-copy tensor aliasing (see SESSION_STATE.yaml's design
+// discussion, and camera_module.cpp's image_alloc_tf_aligned() --
+// prerequisite work making every csi.snapshot() result 64-byte
+// aligned): attempted ONLY for index 0 (the common single-input-model
+// case -- a model with multiple inputs would need independent per-index
+// alias state this struct doesn't track; a deliberate scope limit, not
+// an oversight) and ONLY via TfLiteInterpreterSetCustomAllocationForTensor,
+// which needs a real TENSOR index (TfLiteInterpreterGetInputTensorIndex),
+// not the input-relative index set_input() itself takes.
+//
+// MP_BUFFER_READ, not RW -- not a shortcut. c_api_experimental.h's own
+// doc comment on TfLiteInterpreterSetCustomAllocationForTensor says
+// read-only is the CORRECT permission for input tensors ("Read-only for
+// inputs, Read-Write for others"), not just what happens to be
+// convenient. It matters concretely too: py_image_obj_t (camera_
+// module.cpp/vendored py_image.c) -- the actual motivating use case for
+// this whole feature -- hard-rejects any non-read buffer request
+// ("Can't write to an image!", pristine vendored code, confirmed by
+// reading it directly). Gating on MP_BUFFER_RW instead, as an earlier
+// design pass considered, would have silently excluded the one buffer
+// type this was built for.
+//
+// Monotonic once aliased (see tf_model_obj_t's own comment for why: no
+// public API un-aliases a tensor once SetCustomAllocationForTensor
+// succeeds on it) -- a later set_input() call for the same (aliased)
+// index that can't also alias RAISES rather than silently falling back
+// to a copy, which would write through whatever buffer is still the
+// tensor's backing memory (possibly a stale, already-reclaimed GC block
+// by then). The fix for that error is exactly what the message says:
+// construct a new Model().
 mp_obj_t tf_model_set_input(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     tf_model_obj_t *self = (tf_model_obj_t *) MP_OBJ_TO_PTR(pos_args[0]);
     raise_if_closed(self);
@@ -285,8 +346,9 @@ mp_obj_t tf_model_set_input(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
     };
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    mp_int_t index = args[ARG_index].u_int;
 
-    TfLiteTensor *tensor = TfLiteInterpreterGetInputTensor(self->interpreter, args[ARG_index].u_int);
+    TfLiteTensor *tensor = TfLiteInterpreterGetInputTensor(self->interpreter, index);
     if (!tensor) {
         raise_os_error(MP_EINVAL, "android.tf: no input tensor at that index");
     }
@@ -297,8 +359,61 @@ mp_obj_t tf_model_set_input(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
         raise_os_error(MP_EINVAL, "android.tf: input data size does not match the tensor's byte size");
     }
 
-    if (TfLiteTensorCopyFromBuffer(tensor, bufinfo.buf, bufinfo.len) != kTfLiteOk) {
-        raise_os_error(MP_EIO, "android.tf: failed to copy input data into tensor");
+    bool aligned = index == 0 && (((uintptr_t) bufinfo.buf) % 64) == 0;
+
+    if (self->input_aliased && !aligned) {
+        raise_os_error(MP_EINVAL,
+            "android.tf: model is in zero-copy mode -- once aliased, every "
+            "set_input() call must provide a 64-byte-aligned buffer at index 0; "
+            "construct a new Model() to go back to copying");
+    }
+
+    if (!self->input_aliased && !aligned) {
+        // Ordinary case: not aliased, buffer doesn't qualify -- plain copy.
+        if (TfLiteTensorCopyFromBuffer(tensor, bufinfo.buf, bufinfo.len) != kTfLiteOk) {
+            raise_os_error(MP_EIO, "android.tf: failed to copy input data into tensor");
+        }
+        return mp_const_none;
+    }
+
+    // Aligned -- attempt the zero-copy path (either entering alias mode
+    // for the first time, or maintaining it). Store the GC reference
+    // BEFORE the call, not after: if SetCustomAllocationForTensor
+    // succeeds but the AllocateTensors() re-plan below fails, the tensor
+    // is already kTfLiteCustom pointing at this buffer regardless -- the
+    // reference must already be rooted at that point, not only once the
+    // whole sequence is known to have succeeded.
+    self->aliased_input_ref = args[ARG_data].u_obj;
+
+    int32_t tensor_index = TfLiteInterpreterGetInputTensorIndex(self->interpreter, index);
+    TfLiteCustomAllocation allocation = {(void *) bufinfo.buf, bufinfo.len};
+    if (TfLiteInterpreterSetCustomAllocationForTensor(self->interpreter, tensor_index, &allocation, kTfLiteCustomAllocationFlagsNone) != kTfLiteOk) {
+        // Tensor untouched -- the real C++ implementation ENSUREs
+        // (allocation_type, alignment) before committing anything to
+        // custom_allocations_ (confirmed by reading subgraph.cc
+        // directly, not assumed) -- NOT in alias mode, safe to fall
+        // back to a plain copy this one time. self->input_aliased is
+        // guaranteed false here (the raise above already handled the
+        // "was aliased, can't alias again" case), so there is nothing
+        // to preserve.
+        self->aliased_input_ref = mp_const_none;
+        if (TfLiteTensorCopyFromBuffer(tensor, bufinfo.buf, bufinfo.len) != kTfLiteOk) {
+            raise_os_error(MP_EIO, "android.tf: failed to copy input data into tensor");
+        }
+        return mp_const_none;
+    }
+
+    // Must re-run AllocateTensors() after SetCustomAllocationForTensor
+    // (c_api_experimental.h's own documented requirement).
+    self->input_aliased = true;
+    if (TfLiteInterpreterAllocateTensors(self->interpreter) != kTfLiteOk) {
+        // The tensor IS kTfLiteCustom now regardless (the call above
+        // already committed it) -- this model is broken, don't try to
+        // recover or fall back to copying.
+        raise_os_error(MP_EIO,
+            "android.tf: zero-copy alias succeeded but reallocating tensors "
+            "afterward failed -- this model is no longer usable, construct a "
+            "new Model()");
     }
     return mp_const_none;
 }
@@ -416,13 +531,13 @@ mp_obj_t tf_tensor_info_dict(const TfLiteTensor *tensor) {
     return dict;
 }
 
-// model.info() -- {'inputs': [...], 'outputs': [...]}, one dict per
-// tensor from tf_tensor_info_dict() above. input_aliased (Phase 1 zero-
-// copy tensor aliasing) deliberately NOT included yet -- there's no
-// alias path implemented at all right now, so it would only ever report
-// False, same reasoning that dropped the unimplementable nnapi-usage
-// field earlier (see SESSION_STATE.yaml) -- add it once Phase 1 exists
-// and there's something real to report.
+// model.info() -- {'inputs': [...], 'outputs': [...], 'input_aliased':
+// bool}, one dict per tensor from tf_tensor_info_dict() above.
+// input_aliased reports whether the LAST set_input() call took the
+// Phase 1 zero-copy alias path (see tf_model_set_input()'s own
+// comment) -- True iff self->input_aliased, which starts False at
+// construction, so a fresh Model with no set_input() call yet correctly
+// reports False rather than being absent or stale.
 mp_obj_t tf_model_info(mp_obj_t self_in) {
     tf_model_obj_t *self = (tf_model_obj_t *) MP_OBJ_TO_PTR(self_in);
     raise_if_closed(self);
@@ -439,9 +554,10 @@ mp_obj_t tf_model_info(mp_obj_t self_in) {
         mp_obj_list_append(outputs, tf_tensor_info_dict(TfLiteInterpreterGetOutputTensor(self->interpreter, i)));
     }
 
-    mp_obj_t dict = mp_obj_new_dict(2);
+    mp_obj_t dict = mp_obj_new_dict(3);
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_inputs), inputs);
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_outputs), outputs);
+    mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_input_aliased), self->input_aliased ? mp_const_true : mp_const_false);
     return dict;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(tf_model_info_obj, tf_model_info);
