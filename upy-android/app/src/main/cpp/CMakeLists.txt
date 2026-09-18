@@ -51,6 +51,7 @@ add_library(upy_engine SHARED
     display_module.cpp
     imu_module.cpp
     android_module.cpp
+    tf_module.cpp
     ${MPY_PY_SOURCES}
     ${MPY_PORT_SOURCES}
     ${MPY_SHARED_SOURCES}
@@ -66,6 +67,7 @@ target_include_directories(upy_engine PRIVATE
     micropython_embed/ulab
     micropython_embed/openmv
     micropython_embed/openmv/ulab-shim
+    litert/include
 )
 
 # CMSIS_MCU_H: see my-overrides/openmv/board_config.h -- must be a command-
@@ -87,6 +89,18 @@ target_compile_options(upy_engine PRIVATE
     -fno-common
 )
 
+# LiteRT (android.tf module, see SESSION_STATE.yaml's design discussion)
+# -- this project's first PREBUILT BINARY dependency (see NOTICE.md),
+# fetched by native-bringup/fetch-litert.sh (run it before building if
+# app/src/main/cpp/litert/ doesn't exist -- same "populate before build"
+# step as micropython_embed/'s own apply-overrides.sh, not auto-run by
+# CMake itself). IMPORTED SHARED, not a source target: libLiteRt.so is a
+# real prebuilt .so, not something this project compiles.
+add_library(litert SHARED IMPORTED)
+set_target_properties(litert PROPERTIES
+    IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/litert/lib/libLiteRt.so
+)
+
 # camera2ndk/mediandk: NDK Camera2 API used by camera_module.cpp (stable
 # public NDK libs since API 24, no vendoring needed -- same libs the
 # earlier camera probe already confirmed link/work, see SESSION_STATE.yaml).
@@ -94,4 +108,4 @@ target_compile_options(upy_engine PRIVATE
 # ANativeWindow_* API (display_module.cpp), and ASensorManager_*/
 # ASensorEventQueue_*/ALooper_* (imu_module.cpp) -- all exported from
 # libandroid.so, no separate library needed for the sensor API.
-target_link_libraries(upy_engine log m camera2ndk mediandk android)
+target_link_libraries(upy_engine log m camera2ndk mediandk android litert)

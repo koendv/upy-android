@@ -56,6 +56,22 @@ android {
         aidl = true
         compose = true
     }
+
+    packaging {
+        jniLibs {
+            // libLiteRtClGlAccelerator.so: a GPU/OpenCL-GL delegate from
+            // the litert AAR's own jni/arm64-v8a/ folder -- AGP packages
+            // every .so an AAR ships there regardless of whether our
+            // code links against it (confirmed directly: it showed up
+            // in a real assembled APK although CMakeLists.txt only
+            // links libLiteRt.so). android.tf's design scoped
+            // acceleration to NNAPI only (best-effort, CPU fallback,
+            // see SESSION_STATE.yaml) -- nothing uses a GPU/CL delegate,
+            // so this 3.1MB is dead weight, same tier of issue as the
+            // litert-api exclusion in this file's dependencies block.
+            excludes += "lib/arm64-v8a/libLiteRtClGlAccelerator.so"
+        }
+    }
 }
 
 dependencyLocking {
@@ -78,4 +94,35 @@ dependencies {
     // same author as micro-repl, same version they depend on. Verified
     // MIT-licensed before adding (see NOTICE.md).
     implementation("io.github.ma7moud3ly:nemo-editor:1.0.4")
+    // LiteRT (TensorFlow Lite's successor, Apache 2.0) -- pulled in for
+    // its native libLiteRt.so + C API only (android.tf module, see
+    // SESSION_STATE.yaml's "android.tf" design discussion); nothing from
+    // its Java/Kotlin API surface is used. NOT com.google.ai.edge.litert:
+    // litert-api -- that AAR's own liblitert_jni.so was checked directly
+    // (nm -D) and exports zero TfLite* symbols, it's a different-purpose
+    // artifact. This is the project's first prebuilt-binary native
+    // dependency (see NOTICE.md) -- everything else vendored is compiled
+    // from source. The AAR ships no C headers (confirmed empty by
+    // extracting it directly) -- headers come from a separate LiteRT
+    // source checkout instead, see native-bringup's own LiteRT header
+    // vendoring for exactly which files and why.
+    //
+    // litert-api excluded: a transitive dependency of litert (not
+    // declared directly, never used -- confirmed via classes.jar/
+    // AndroidManifest.xml inspection it's LiteRT's optional Java "AI
+    // Pack" dynamic model-download-from-Play-Store feature, not the
+    // inference engine itself). Pulls in real weight for a feature this
+    // project has no use for (android.tf loads models from the VFS, same
+    // as every other resource here, never from Play): Guava 3.08MB,
+    // WorkManager 1.84MB, Play Services basement/tasks, Play Core asset-
+    // delivery/ai-delivery, AndroidX Room/SQLite -- ~7MB raw, genuinely
+    // shipped in the APK since release's isMinifyEnabled=false strips
+    // nothing. Also brings its own FOREGROUND_SERVICE/
+    // FOREGROUND_SERVICE_DATA_SYNC manifest permissions ("Required for
+    // downloading AiPack models") -- unwanted surface for an offline,
+    // script-driven app with no other Play Services dependency anywhere
+    // in this project.
+    implementation("com.google.ai.edge.litert:litert:2.2.0") {
+        exclude(group = "com.google.ai.edge.litert", module = "litert-api")
+    }
 }

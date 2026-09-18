@@ -189,5 +189,18 @@ SRC_QSTR += ../app/src/main/cpp/imu_module.cpp
 # py/obj.h, both already resolved by every other module's scan).
 SRC_QSTR += ../app/src/main/cpp/android_module.cpp
 
+# tf_module.cpp -- OUR OWN native module (android.tf MOCKUP, see that
+# file's own header comment), first file to #include LiteRT's C API
+# (app/src/main/cpp/litert/include/, populated by fetch-litert.sh --
+# run it first if that directory doesn't exist yet). Unlike camera_
+# module.cpp's NDK headers (<camera/...>, needed a qstr-stub -- see this
+# file's own comment above), LiteRT's C API headers only reach plain
+# portable standard-library headers (<stdint.h>, <vector>, <memory>,
+# etc, confirmed by grep before relying on this) -- the same tier
+# camera_module.cpp's own <vector>/<algorithm> already prove this exact
+# scan handles, so a real -I is enough, no stub needed.
+SRC_QSTR += ../app/src/main/cpp/tf_module.cpp
+CFLAGS += -I../app/src/main/cpp/litert/include
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk

@@ -44,6 +44,12 @@ extern const mp_obj_fun_builtin_fixed_t android_light_off_obj;
 extern const mp_obj_fun_builtin_fixed_t android_zoom_set_obj;
 extern const mp_obj_fun_builtin_fixed_t android_zoom_range_obj;
 
+// android.tf.version() -- implemented in tf_module.cpp (see that file's
+// own header comment: a MOCKUP proving the LiteRT CMake wiring actually
+// links and runs on-device, not the real android.tf API surface yet).
+// Same ordinary-C++-extern reasoning as proximity/light/zoom above.
+extern const mp_obj_fun_builtin_fixed_t android_tf_version_obj;
+
 namespace {
 
 const mp_rom_map_elem_t android_proximity_globals_table[] = {
@@ -66,9 +72,19 @@ const mp_rom_map_elem_t android_zoom_globals_table[] = {
 };
 MP_DEFINE_CONST_DICT(android_zoom_globals, android_zoom_globals_table);
 
+// android.tf -- MOCKUP, one function only (version()), see tf_module.cpp's
+// own header comment. Same nested-submodule shape as proximity/light/zoom
+// above, not the real android.tf API surface yet.
+const mp_rom_map_elem_t android_tf_globals_table[] = {
+    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_tf)},
+    {MP_ROM_QSTR(MP_QSTR_version), MP_ROM_PTR(&android_tf_version_obj)},
+};
+MP_DEFINE_CONST_DICT(android_tf_globals, android_tf_globals_table);
+
 // Plain mp_obj_module_t, same as imu_module -- none of these are
 // registered via MP_REGISTER_MODULE (no top-level `import proximity`/
-// `import light`/`import zoom`), only ever reached as android.*.
+// `import light`/`import zoom`/`import tf`), only ever reached as
+// android.*.
 const mp_obj_module_t android_proximity_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &android_proximity_globals,
@@ -81,6 +97,10 @@ const mp_obj_module_t android_zoom_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &android_zoom_globals,
 };
+const mp_obj_module_t android_tf_module = {
+    .base = {&mp_type_module},
+    .globals = (mp_obj_dict_t *) &android_tf_globals,
+};
 
 const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_android)},
@@ -88,6 +108,7 @@ const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_proximity), MP_ROM_PTR(&android_proximity_module)},
     {MP_ROM_QSTR(MP_QSTR_light), MP_ROM_PTR(&android_light_module)},
     {MP_ROM_QSTR(MP_QSTR_zoom), MP_ROM_PTR(&android_zoom_module)},
+    {MP_ROM_QSTR(MP_QSTR_tf), MP_ROM_PTR(&android_tf_module)},
 };
 MP_DEFINE_CONST_DICT(android_module_globals, android_module_globals_table);
 
