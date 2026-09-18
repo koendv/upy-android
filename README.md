@@ -19,7 +19,7 @@ No USB/hardware board required.
 - MicroPython REPL with output streaming and interrupt
 - File explorer, text editor, REPL.
 - Camera and display modules (`csi`, `display`) backed by Camera2/NDK and `ANativeWindow`; camera screen in-app
-- accelerometer/gyro module (`imu`) via NDK sensor API
+- `android` module for phone API
 - VFS rooted at app-private storage
 - Bundled modules: `ulab`, `image` (OpenMV imlib subset)
 - 32 MB micropython heap, settable.
@@ -71,6 +71,18 @@ CAMERA permission is requested on first launch. Camera permission errors surface
 ## OpenMV
 
 Compiles. Measured ~25 FPS on a Xiaomi Redmi Note 15 device running [`lcd_shield.py`](https://github.com/openmv/openmv/blob/master/scripts/examples/50-OpenMV-Boards/60-Shields/60-LCD-Shield/lcd_shield.py)
+
+## Android
+
+`csi.CSI().framesize_list()` returns a list of image resolutions the Android phone camera supports.  When setting `framesize()` use a resolution in this list.
+
+In micropython, the `android` module gives access to android devices:
+
+- motion sensor
+- torch
+- proximity sensor
+- zoom
+- camera, front or back
 
 ## Repo Layout
 
