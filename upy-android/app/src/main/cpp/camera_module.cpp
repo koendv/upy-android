@@ -37,6 +37,8 @@
 #include <errno.h>
 #include <vector>
 #include <algorithm>
+#include <string>
+#include <cstdlib>
 
 extern "C" {
 #include "py/runtime.h"
@@ -84,6 +86,26 @@ struct CameraState {
     int32_t width;
     int32_t height;
     pixformat_t pixfmt;
+    // Resolved at reset() time (see csi_reset()), consumed by
+    // csi_framesize_list()/android_light_set()/android_zoom_* instead
+    // of each re-fetching ids->cameraIds[0] independently (three
+    // separate copies of that fetch before this field existed) --
+    // owns its own copy since ACameraIdList's strings are freed by
+    // ACameraManager_deleteCameraIdList() right after reset() reads
+    // them, they don't outlive the call the way this field needs to.
+    std::string camera_id;
+    // Requested camera ID (raw, as returned by csi.CSI().camera_list()
+    // -- see that function's own comment), or -1 for "unspecified" --
+    // matches OpenMV's own py_csi_ng.c cid default exactly. Set by
+    // csi_make_new()'s cid= kwarg, consumed by csi_reset(). -1
+    // preserves this port's original, pre-cid behavior byte-for-byte
+    // (ids->cameraIds[0], whatever the device lists first) rather than
+    // silently changing existing scripts' behavior. Deliberately NOT
+    // resolved by facing/semantics (no FRONT/BACK constant on this
+    // module) -- user's own call: mirror Android's own raw camera IDs
+    // directly, a script builds its own FRONT/BACK naming from
+    // camera_list()'s facing info if it wants that.
+    int32_t requested_cid;
     // Set only while a snapshot() call is actively waiting for a frame --
     // camera_interrupt_active_wait() (called from nativeInterrupt(), any
     // thread) posts into this if non-null. Written only from the worker
@@ -93,7 +115,7 @@ struct CameraState {
 
 CameraState g_cam = {
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-    kDefaultWidth, kDefaultHeight, PIXFORMAT_GRAYSCALE, nullptr,
+    kDefaultWidth, kDefaultHeight, PIXFORMAT_GRAYSCALE, "", -1, nullptr,
 };
 
 typedef struct _csi_obj_t {
@@ -445,8 +467,19 @@ mp_obj_t csi_reset(mp_obj_t self_in) {
         raise_os_error(MP_ENODEV, "camera: no camera available");
     }
 
+    // requested_cid == -1 (default, no cid= given): preserves this
+    // port's original behavior byte-for-byte, ids->cameraIds[0]
+    // unconditionally -- whatever the device lists first, same as
+    // before csi.CSI(cid=...) existed at all. Otherwise: the raw ID is
+    // used directly (stringified), deliberately unvalidated against
+    // the ids list here -- mirrors framesize()'s own established
+    // "silently accepts, real failure surfaces naturally" precedent; a
+    // bad cid= surfaces as the ordinary ACameraManager_openCamera()
+    // failure path just below, not a separate up-front check.
+    g_cam.camera_id = (g_cam.requested_cid == -1) ? ids->cameraIds[0] : std::to_string(g_cam.requested_cid);
+
     ACameraDevice_stateCallbacks device_cb = {nullptr, on_device_disconnected, on_device_error};
-    camera_status_t st = ACameraManager_openCamera(g_cam.manager, ids->cameraIds[0], &device_cb, &g_cam.device);
+    camera_status_t st = ACameraManager_openCamera(g_cam.manager, g_cam.camera_id.c_str(), &device_cb, &g_cam.device);
     ACameraManager_deleteCameraIdList(ids);
 
     if (st != ACAMERA_OK) {
@@ -542,13 +575,11 @@ mp_obj_t csi_framesize_list(mp_obj_t self_in) {
         raise_os_error(MP_EINVAL, "camera not reset -- call reset() first");
     }
 
-    ACameraIdList *ids = nullptr;
-    if (ACameraManager_getCameraIdList(g_cam.manager, &ids) != ACAMERA_OK || !ids || ids->numCameras == 0) {
-        raise_os_error(MP_ENODEV, "camera: no camera available");
-    }
+    // g_cam.camera_id (resolved by csi_reset(), see CameraState's own
+    // comment) -- the currently-open camera, not necessarily
+    // cameraIds[0] anymore now that cid= selection exists.
     ACameraMetadata *metadata = nullptr;
-    camera_status_t st = ACameraManager_getCameraCharacteristics(g_cam.manager, ids->cameraIds[0], &metadata);
-    ACameraManager_deleteCameraIdList(ids);
+    camera_status_t st = ACameraManager_getCameraCharacteristics(g_cam.manager, g_cam.camera_id.c_str(), &metadata);
     if (st != ACAMERA_OK || !metadata) {
         raise_os_error(MP_EIO, "camera: failed to read characteristics");
     }
@@ -591,10 +622,86 @@ mp_obj_t csi_framesize_list(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(csi_framesize_list_obj, csi_framesize_list);
 
+// csi.CSI().camera_list() -- real per-device camera enumeration, same
+// discovery-API pattern as framesize_list() (paired with the raw cid=
+// selection csi_make_new() accepts, same way framesize_list() pairs
+// with framesize()). Returns [(id, facing, has_flash), ...] for every
+// camera ACameraManager_getCameraIdList() reports -- facing is the raw
+// ACAMERA_LENS_FACING value (0=front, 1=back, 2=external -- Android's
+// own real enum, not a label this module invents; -1 if the query
+// itself fails for a given camera), has_flash is a bool. Deliberately
+// no FRONT/BACK naming here either -- user's own call: a script builds
+// its own naming from this data if it wants that. Uses its own
+// throwaway ACameraManager rather than g_cam.manager, so it works
+// whether or not reset() has ever been called -- the whole point is
+// letting a script decide which cid= to reset() with in the first
+// place, so requiring an existing session would be circular.
+mp_obj_t csi_camera_list(mp_obj_t self_in) {
+    (void) self_in;
+    ACameraManager *manager = ACameraManager_create();
+    if (!manager) {
+        raise_os_error(MP_EIO, "camera: failed to create manager");
+    }
+    ACameraIdList *ids = nullptr;
+    if (ACameraManager_getCameraIdList(manager, &ids) != ACAMERA_OK || !ids) {
+        ACameraManager_delete(manager);
+        raise_os_error(MP_ENODEV, "camera: no camera available");
+    }
+
+    mp_obj_t list = mp_obj_new_list(0, nullptr);
+    for (int i = 0; i < ids->numCameras; i++) {
+        ACameraMetadata *metadata = nullptr;
+        if (ACameraManager_getCameraCharacteristics(manager, ids->cameraIds[i], &metadata) != ACAMERA_OK || !metadata) {
+            continue;
+        }
+
+        ACameraMetadata_const_entry facing_entry = {};
+        camera_status_t fst = ACameraMetadata_getConstEntry(metadata, ACAMERA_LENS_FACING, &facing_entry);
+        int32_t facing = (fst == ACAMERA_OK && facing_entry.count > 0) ? facing_entry.data.u8[0] : -1;
+
+        ACameraMetadata_const_entry flash_entry = {};
+        camera_status_t hst = ACameraMetadata_getConstEntry(metadata, ACAMERA_FLASH_INFO_AVAILABLE, &flash_entry);
+        bool has_flash = (hst == ACAMERA_OK && flash_entry.count > 0 && flash_entry.data.u8[0] != 0);
+        ACameraMetadata_free(metadata);
+
+        mp_obj_t tuple[3] = {
+            mp_obj_new_int(atoi(ids->cameraIds[i])),
+            mp_obj_new_int(facing),
+            has_flash ? mp_const_true : mp_const_false,
+        };
+        mp_obj_list_append(list, mp_obj_new_tuple(3, tuple));
+    }
+    ACameraManager_deleteCameraIdList(ids);
+    ACameraManager_delete(manager);
+    return list;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(csi_camera_list_obj, csi_camera_list);
+
+// cid= matches OpenMV's own py_csi_ng.c constructor kwarg exactly (name
+// and -1 "unspecified" default) -- real precedent for camera selection
+// on boards with more than one sensor (csi.CSI(cid=csi.LEPTON) for a
+// FLIR thermal camera alongside the visible one, csi.CSI(cid=
+// csi.GENX320) for an event camera). Unlike OpenMV's own fixed,
+// compile-time-known board hardware, this is a raw camera ID (as
+// returned by csi.CSI().camera_list(), see that function's own
+// comment) -- deliberately NOT a semantic FRONT/BACK constant: user's
+// own call, mirror Android's own camera IDs directly rather than
+// impose a labeling scheme here; a script builds its own FRONT/BACK
+// naming from camera_list()'s facing info if it wants that. See
+// SESSION_STATE.yaml's "android module" design discussion.
 mp_obj_t csi_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
-    (void) n_args;
-    (void) n_kw;
-    (void) args;
+    enum { ARG_cid };
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_cid, MP_ARG_INT | MP_ARG_KW_ONLY, {.u_int = -1}},
+    };
+    // make_new()'s own calling convention (n_args/n_kw/args, kwargs
+    // interleaved into args rather than a separate mp_map_t) needs
+    // mp_arg_parse_all_kw_array specifically -- same call shape
+    // display_make_new() already uses in display_module.cpp.
+    mp_arg_val_t kw_args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, kw_args);
+    g_cam.requested_cid = kw_args[ARG_cid].u_int;
+
     csi_obj_t *self = m_new_obj(csi_obj_t);
     self->base.type = type;
     return MP_OBJ_FROM_PTR(self);
@@ -605,6 +712,7 @@ const mp_rom_map_elem_t csi_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_pixformat), MP_ROM_PTR(&csi_pixformat_obj)},
     {MP_ROM_QSTR(MP_QSTR_framesize), MP_ROM_PTR(&csi_framesize_obj)},
     {MP_ROM_QSTR(MP_QSTR_framesize_list), MP_ROM_PTR(&csi_framesize_list_obj)},
+    {MP_ROM_QSTR(MP_QSTR_camera_list), MP_ROM_PTR(&csi_camera_list_obj)},
     {MP_ROM_QSTR(MP_QSTR_snapshot), MP_ROM_PTR(&csi_snapshot_obj)},
 };
 MP_DEFINE_CONST_DICT(csi_locals_dict, csi_locals_dict_table);
@@ -631,6 +739,139 @@ const mp_rom_map_elem_t csi_module_globals_table[] = {
 MP_DEFINE_CONST_DICT(csi_module_globals, csi_module_globals_table);
 
 } // namespace
+
+// android.light.on()/off() -- torch, tied to the active csi capture
+// session rather than a standalone flashlight (user's own call: the
+// light shield's real purpose is illuminating a scene FOR the camera,
+// same device the shield is physically mounted on, so this constraint
+// matches actual use rather than costing real capability -- see
+// SESSION_STATE.yaml's "android module" design discussion). No
+// standalone NDK path exists for torch outside an active capture
+// session, checked directly against the newest installed NDK
+// (30.0.16248370, API annotations up to 36, the current one as of this
+// writing): NdkCameraMetadataTags.h's own ACAMERA_FLASH_TORCH_STRENGTH_
+// MAX_LEVEL doc comment points at Java's CameraManager#
+// turnOnTorchWithStrengthLevel as the real standalone API -- there is
+// no NDK equivalent, at any API level. ACAMERA_FLASH_MODE=TORCH on the
+// existing repeating request is the only native mechanism.
+//
+// Declared outside the anonymous namespace above (unlike every other
+// function in this file except camera_close_all()/
+// camera_interrupt_active_wait()) so android_module.cpp can reference
+// the function objects by extern -- and, specifically, `extern
+// MP_DEFINE_CONST_FUN_OBJ_0(...)` rather than the plain `static
+// MP_DEFINE_CONST_FUN_OBJ_0(...)` every csi.* function here uses: in
+// C++, a `const` global has INTERNAL linkage by default (unlike C), so
+// without the explicit `extern` the object would silently fail to link
+// from another translation unit (hit this for real building
+// android.proximity.distance_cm() in imu_module.cpp, see its own
+// comment there).
+mp_obj_t android_light_set(bool on) {
+    if (!g_cam.device) {
+        raise_os_error(MP_EINVAL, "android.light: camera not reset -- call csi.CSI().reset() first");
+    }
+    ensure_session();
+
+    // g_cam.camera_id (resolved by csi_reset()) -- whichever camera is
+    // actually active right now (front or back, if cid= was used) --
+    // best-effort, per-call: does NOT try to remember torch state
+    // across a later reset()/camera switch, and never verifies the LED
+    // actually illuminated (ACAMERA_FLASH_STATE, the only signal for
+    // that, is only reported asynchronously in capture RESULTS, which
+    // this port doesn't read back at all) -- see SESSION_STATE.yaml's
+    // "android module" design discussion.
+    ACameraMetadata *metadata = nullptr;
+    camera_status_t cst = ACameraManager_getCameraCharacteristics(g_cam.manager, g_cam.camera_id.c_str(), &metadata);
+    if (cst != ACAMERA_OK || !metadata) {
+        raise_os_error(MP_EIO, "android.light: failed to read camera characteristics");
+    }
+    ACameraMetadata_const_entry entry = {};
+    camera_status_t st = ACameraMetadata_getConstEntry(metadata, ACAMERA_FLASH_INFO_AVAILABLE, &entry);
+    bool has_flash = (st == ACAMERA_OK && entry.count > 0 && entry.data.u8[0] != 0);
+    ACameraMetadata_free(metadata);
+    if (!has_flash) {
+        raise_os_error(MP_ENODEV, "android.light: no flash unit on this device's camera");
+    }
+
+    // Observed on real hardware (this device's HAL, user's own
+    // diagnosis, confirmed live): turning the torch ON this way worked
+    // and was visually confirmed; turning it back OFF the same way did
+    // NOT -- the physical LED stayed lit until a full csi.CSI().reset()
+    // (closing and reopening the camera device) forced it off. Likely
+    // cause: this HAL only re-evaluates ACAMERA_FLASH_MODE at the start
+    // of a repeating request, not on a live in-place update. Left
+    // exactly as the plain NDK call sequence anyway -- user's own call:
+    // this module mirrors the real Android NDK API directly rather than
+    // working around individual HAL quirks in code; a script that hits
+    // this can always fall back to csi.CSI().reset() itself.
+    uint8_t mode = on ? ACAMERA_FLASH_MODE_TORCH : ACAMERA_FLASH_MODE_OFF;
+    if (ACaptureRequest_setEntry_u8(g_cam.request, ACAMERA_FLASH_MODE, 1, &mode) != ACAMERA_OK) {
+        raise_os_error(MP_EIO, "android.light: failed to set flash mode");
+    }
+    if (ACameraCaptureSession_setRepeatingRequest(g_cam.session, nullptr, 1, &g_cam.request, nullptr) != ACAMERA_OK) {
+        raise_os_error(MP_EIO, "android.light: failed to apply flash mode");
+    }
+    return mp_const_none;
+}
+
+mp_obj_t android_light_on() {
+    return android_light_set(true);
+}
+extern MP_DEFINE_CONST_FUN_OBJ_0(android_light_on_obj, android_light_on);
+
+mp_obj_t android_light_off() {
+    return android_light_set(false);
+}
+extern MP_DEFINE_CONST_FUN_OBJ_0(android_light_off_obj, android_light_off);
+
+// android.zoom.set(ratio)/range() -- tied to the active csi capture
+// session, same reasoning/constraint as android.light (a zoom ratio is
+// meaningless without an open camera device to apply it to). set()
+// is deliberately unvalidated -- mirrors csi.CSI().framesize()'s own
+// established "silently accepts, hardware clamps/ignores out-of-range"
+// precedent exactly, not a new design choice. range() is the discovery
+// half, same framesize()/framesize_list() split -- queries
+// ACAMERA_CONTROL_ZOOM_RATIO_RANGE on the currently-open camera
+// (g_cam.camera_id) and returns (1.0, 1.0), not an error, if the tag
+// is absent (some cameras/devices only support the older crop-region-
+// based digital zoom, not ratio-based zoom at all -- "no zoom range"
+// is a valid, honest answer here, not a malfunction).
+mp_obj_t android_zoom_set(mp_obj_t ratio_in) {
+    if (!g_cam.device) {
+        raise_os_error(MP_EINVAL, "android.zoom: camera not reset -- call csi.CSI().reset() first");
+    }
+    ensure_session();
+    float ratio = mp_obj_get_float(ratio_in);
+    if (ACaptureRequest_setEntry_float(g_cam.request, ACAMERA_CONTROL_ZOOM_RATIO, 1, &ratio) != ACAMERA_OK) {
+        raise_os_error(MP_EIO, "android.zoom: failed to set zoom ratio");
+    }
+    if (ACameraCaptureSession_setRepeatingRequest(g_cam.session, nullptr, 1, &g_cam.request, nullptr) != ACAMERA_OK) {
+        raise_os_error(MP_EIO, "android.zoom: failed to apply zoom ratio");
+    }
+    return mp_const_none;
+}
+extern MP_DEFINE_CONST_FUN_OBJ_1(android_zoom_set_obj, android_zoom_set);
+
+mp_obj_t android_zoom_range() {
+    if (!g_cam.device) {
+        raise_os_error(MP_EINVAL, "android.zoom: camera not reset -- call csi.CSI().reset() first");
+    }
+    ACameraMetadata *metadata = nullptr;
+    if (ACameraManager_getCameraCharacteristics(g_cam.manager, g_cam.camera_id.c_str(), &metadata) != ACAMERA_OK || !metadata) {
+        raise_os_error(MP_EIO, "android.zoom: failed to read camera characteristics");
+    }
+    ACameraMetadata_const_entry entry = {};
+    camera_status_t st = ACameraMetadata_getConstEntry(metadata, ACAMERA_CONTROL_ZOOM_RATIO_RANGE, &entry);
+    float min_ratio = 1.0f, max_ratio = 1.0f;
+    if (st == ACAMERA_OK && entry.count >= 2) {
+        min_ratio = entry.data.f[0];
+        max_ratio = entry.data.f[1];
+    }
+    ACameraMetadata_free(metadata);
+    mp_obj_t tuple[2] = {mp_obj_new_float(min_ratio), mp_obj_new_float(max_ratio)};
+    return mp_obj_new_tuple(2, tuple);
+}
+extern MP_DEFINE_CONST_FUN_OBJ_0(android_zoom_range_obj, android_zoom_range);
 
 // extern "C" (not inside the anonymous namespace above, unlike
 // everything else in this file) -- the generated genhdr/moduledefs.h

@@ -182,5 +182,12 @@ SRC_QSTR += ../app/src/main/cpp/display_module.cpp
 # as the existing android/log.h and android/native_window.h stubs.
 SRC_QSTR += ../app/src/main/cpp/imu_module.cpp
 
+# android_module.cpp -- OUR OWN native module nesting imu_module.cpp's
+# module struct (and, over time, proximity/light/touch) under a single
+# top-level `android` module -- see android_module.cpp's own header
+# comment. No new qstr-stub headers needed (only #includes py/runtime.h/
+# py/obj.h, both already resolved by every other module's scan).
+SRC_QSTR += ../app/src/main/cpp/android_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk

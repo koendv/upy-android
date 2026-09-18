@@ -36,16 +36,21 @@ file(GLOB_RECURSE MPY_ULAB_SOURCES micropython_embed/ulab/*.c)
 # a .c file this glob would need to reach.
 file(GLOB MPY_OPENMV_SOURCES micropython_embed/openmv/*.c)
 
-# camera_module.cpp/display_module.cpp/imu_module.cpp -- OUR OWN native
-# modules, NOT vendored OpenMV source, so they live here directly rather
-# than under micropython_embed/openmv/ (see SESSION_STATE.yaml's camera/
-# display native-code-location scoping discussion, and the py_imu.c
-# entries for why imu_module.cpp is a from-scratch module too).
+# camera_module.cpp/display_module.cpp/imu_module.cpp/android_module.cpp
+# -- OUR OWN native modules, NOT vendored OpenMV source, so they live
+# here directly rather than under micropython_embed/openmv/ (see
+# SESSION_STATE.yaml's camera/display native-code-location scoping
+# discussion, and the py_imu.c entries for why imu_module.cpp is a
+# from-scratch module too). android_module.cpp nests imu_module.cpp's
+# module struct (and, over time, proximity/light/touch) under a single
+# top-level `android` module -- see android_module.cpp's own header
+# comment.
 add_library(upy_engine SHARED
     engine_jni.cpp
     camera_module.cpp
     display_module.cpp
     imu_module.cpp
+    android_module.cpp
     ${MPY_PY_SOURCES}
     ${MPY_PORT_SOURCES}
     ${MPY_SHARED_SOURCES}
