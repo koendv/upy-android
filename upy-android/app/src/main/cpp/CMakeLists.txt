@@ -66,8 +66,14 @@ target_include_directories(upy_engine PRIVATE
 # CMSIS_MCU_H: see my-overrides/openmv/board_config.h -- must be a command-
 # line define, not a #define inside board_config.h itself (imlib.h
 # includes fmath.h, which needs it, BEFORE including board_config.h).
+#
+# ULAB_CONFIG_FILE: see my-overrides/ulab/ulab_config.h -- ulab.h
+# `#include`s it under `#if defined(ULAB_CONFIG_FILE)`, so, same as
+# CMSIS_MCU_H, it must be a command-line define (ulab.h has no
+# built-in ULAB_CONFIG_FILE fallback to redefine).
 target_compile_definitions(upy_engine PRIVATE
     CMSIS_MCU_H="cmsis_mcu_stub.h"
+    ULAB_CONFIG_FILE="ulab_config.h"
 )
 
 target_compile_options(upy_engine PRIVATE
