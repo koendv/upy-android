@@ -180,6 +180,11 @@ RUN echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
 RUN chmod +x ./gradlew
 
+# ONE-TIME: generate app/gradle.lockfile to pin down dependencies
+#RUN ./gradlew :app:dependencies --write-locks && \
+#    find . -name 'gradle.lockfile' -o -name '*gradle.lockfile*' && \
+#    cp app/gradle.lockfile /output/gradle.lockfile
+
 RUN if [ "$BUILD_TYPE" = "release" ]; then \
         ./gradlew :app:assembleRelease; \
     else \
