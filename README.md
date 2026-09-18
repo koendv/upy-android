@@ -46,6 +46,9 @@ fork, run the upy-android workflow, download the APK artifact.
 
 ```bash
 docker build --no-cache --target build --build-arg BUILD_TYPE=debug -t upy-android -f tools/docker/Dockerfile .
+id=$(docker create upy-android)
+docker cp "$id":/output/upy-debug.apk ~/Downloads/
+docker rm "$id"
 ```
 
 ### Local build
