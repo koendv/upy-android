@@ -306,12 +306,51 @@ void convert_to_rgb565(AImage *image, image_t *out) {
     }
 }
 
+// Mirrors imlib's own image_alloc() (lib/imlib/imlib.c, pristine
+// vendored -- see NOTICE.md, never patched) exactly: same over-allocate
+// + round-up-the-pointer technique, same m_malloc() backing allocator
+// -- deliberately NOT posix_memalign/plain malloc. image_t._raw's own
+// struct comment (imlib.h) says it "keeps a reference to the GC block
+// when used with image_alloc/image_alloc0" -- switching to a libc-heap
+// allocator here would silently break that (the GC would never see or
+// reclaim the buffer), needing a whole new finalizer-based lifecycle to
+// fix correctly. Confirmed by reading image_alloc()'s real body
+// directly, not assumed -- an earlier pass this session had incorrectly
+// inferred a plain-malloc chain without checking this (see
+// SESSION_STATE.yaml).
+//
+// Only alignment target differs: 64 bytes (TfLiteInterpreterSetCustom
+// AllocationForTensor's own documented requirement, see SESSION_STATE.
+// yaml's android.tf design discussion), not OMV_CACHE_LINE_SIZE (32 on
+// this port, confirmed -- __DCACHE_PRESENT is never defined in this
+// port's own CMSIS stub headers, so omv_common.h's plain 32-byte branch
+// is the one actually compiled in). A stricter alignment than the
+// pristine default is harmless for every other use of a captured image,
+// so this replaces image_alloc() for ALL csi.snapshot() results here,
+// not a separate ML-only capture path -- every snapshot becomes usable
+// for future zero-copy tensor aliasing with no new API surface.
+constexpr size_t kTfAlignment = 64;
+
+void image_alloc_tf_aligned(image_t *img, size_t size) {
+    size_t aligned_size = (size + kTfAlignment - 1) & ~(kTfAlignment - 1);
+    img->_raw = (uint8_t *) m_malloc(aligned_size + kTfAlignment - 1);
+    img->data = (uint8_t *) (((uintptr_t) img->_raw + kTfAlignment - 1) & ~((uintptr_t) (kTfAlignment - 1)));
+    // Permanent, cheap sanity check on the alignment math above --
+    // silent when correct, LOGW's if the invariant this whole function
+    // exists for is ever actually violated (would mean a real bug here,
+    // not something to discover only later as a mysterious
+    // TfLiteInterpreterSetCustomAllocationForTensor failure downstream).
+    if (((uintptr_t) img->data) % kTfAlignment != 0) {
+        LOGW("image_alloc_tf_aligned: data=%p is NOT %zu-byte aligned (bug)", img->data, kTfAlignment);
+    }
+}
+
 mp_obj_t convert_image(AImage *image) {
     image_t img = {0};
     img.w = g_cam.width;
     img.h = g_cam.height;
     img.pixfmt = g_cam.pixfmt;
-    image_alloc(&img, image_size(&img));
+    image_alloc_tf_aligned(&img, image_size(&img));
 
     if (g_cam.pixfmt == PIXFORMAT_RGB565) {
         convert_to_rgb565(image, &img);
