@@ -85,6 +85,13 @@ extern "C" {
 #include "py/runtime.h"
 #include "py/obj.h"
 #include "py/mperrno.h"
+// ulab's ndarray -- micropython_embed/ulab is already on this file's
+// include path (CMakeLists.txt target_include_directories), and this
+// project's own vendoring flattens ulab's upstream code/ subdirectory
+// (see SESSION_STATE.yaml), so the bare "ndarray.h" spelling resolves
+// directly -- no shim needed (unlike py_image.c's "ulab/code/ndarray.h",
+// which needs one for OpenMV's own different expected layout).
+#include "ndarray.h"
 }
 
 #include "tf_module.h"
@@ -455,6 +462,188 @@ mp_obj_t tf_model_get_output(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(tf_model_get_output_obj, 1, tf_model_get_output);
 
+// TfLiteType -> ulab NDARRAY_* dtype char, for set_input_ndarray()/
+// get_output_ndarray() below -- deliberately narrower than
+// tf_dtype_name()'s full 24-value mapping: ulab only HAS four numeric
+// dtypes (NDARRAY_UINT8/INT8/UINT16/INT16/FLOAT), so int32/int64/bool/
+// string/etc tensors have no ulab representation at all, not a gap
+// worth working around. -1 (not a valid uint8_t dtype value) signals
+// unsupported.
+int tf_ulab_dtype_for_tflite(TfLiteType type) {
+    switch (type) {
+        case kTfLiteFloat32: return NDARRAY_FLOAT;
+        case kTfLiteInt8: return NDARRAY_INT8;
+        case kTfLiteUInt8: return NDARRAY_UINT8;
+        case kTfLiteInt16: return NDARRAY_INT16;
+        case kTfLiteUInt16: return NDARRAY_UINT16;
+        default: return -1;
+    }
+}
+
+// set_input_ndarray(data, index=0) -- ulab-ndarray-typed sibling of
+// set_input(), matching OpenMV's py_ml_process_input() conversion
+// (github.com/openmv/openmv modules/py_ml.c, read directly this
+// session): quantizes real_value -> raw per element
+// (raw = value * (1/scale) + zero_point, cast to the tensor's dtype)
+// for int8/uint8/int16/uint16 tensors, a plain per-element cast for
+// float32. A SEPARATE method, not a type-check inside set_input()
+// itself (user's own call) -- keeps set_input()'s existing plain-copy/
+// zero-copy-alias logic and invariants completely untouched; this
+// method always writes a freshly-converted value, never aliases, and
+// works at any index (unlike the 64-byte-alignment zero-copy path,
+// which is index-0-only).
+mp_obj_t tf_model_set_input_ndarray(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    tf_model_obj_t *self = (tf_model_obj_t *) MP_OBJ_TO_PTR(pos_args[0]);
+    raise_if_closed(self);
+
+    enum { ARG_data, ARG_index };
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_data, MP_ARG_OBJ | MP_ARG_REQUIRED, {.u_obj = MP_OBJ_NULL}},
+        {MP_QSTR_index, MP_ARG_INT, {.u_int = 0}},
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    mp_int_t index = args[ARG_index].u_int;
+
+    if (!mp_obj_is_type(args[ARG_data].u_obj, &ulab_ndarray_type)) {
+        raise_os_error(MP_EINVAL, "android.tf: set_input_ndarray() requires a ulab ndarray");
+    }
+    ndarray_obj_t *src = (ndarray_obj_t *) MP_OBJ_TO_PTR(args[ARG_data].u_obj);
+
+    TfLiteTensor *tensor = TfLiteInterpreterGetInputTensor(self->interpreter, index);
+    if (!tensor) {
+        raise_os_error(MP_EINVAL, "android.tf: no input tensor at that index");
+    }
+
+    // Can't satisfy the zero-copy-alias monotonic invariant (set_input()'s
+    // own comment) with a converted write -- the tensor's backing memory
+    // would no longer BE this ndarray's buffer, just values copied from it.
+    if (self->input_aliased && index == 0) {
+        raise_os_error(MP_EINVAL,
+            "android.tf: model is in zero-copy mode -- set_input_ndarray() "
+            "can't alias, construct a new Model() to go back to copying");
+    }
+
+    size_t expected_len = 1;
+    int32_t ndim = TfLiteTensorNumDims(tensor);
+    for (int32_t i = 0; i < ndim; i++) {
+        expected_len *= TfLiteTensorDim(tensor, i);
+    }
+    if (src->len != expected_len) {
+        raise_os_error(MP_EINVAL, "android.tf: ndarray length does not match the tensor's element count");
+    }
+
+    TfLiteType tensor_type = TfLiteTensorType(tensor);
+    void *dst = TfLiteTensorData(tensor);
+    size_t len = src->len;
+
+    if (tensor_type == kTfLiteFloat32) {
+        float *dst_f = (float *) dst;
+        for (size_t i = 0; i < len; i++) {
+            dst_f[i] = (float) ndarray_get_float_index(src->array, src->dtype, i);
+        }
+        return mp_const_none;
+    }
+
+    if (tensor_type == kTfLiteInt8 || tensor_type == kTfLiteUInt8 ||
+        tensor_type == kTfLiteInt16 || tensor_type == kTfLiteUInt16) {
+        TfLiteQuantizationParams quant = TfLiteTensorQuantizationParams(tensor);
+        float inv_scale = quant.scale != 0.0f ? (1.0f / quant.scale) : 1.0f;
+        for (size_t i = 0; i < len; i++) {
+            float v = (float) ndarray_get_float_index(src->array, src->dtype, i);
+            float raw = v * inv_scale + quant.zero_point;
+            switch (tensor_type) {
+                case kTfLiteInt8: ((int8_t *) dst)[i] = (int8_t) raw; break;
+                case kTfLiteUInt8: ((uint8_t *) dst)[i] = (uint8_t) raw; break;
+                case kTfLiteInt16: ((int16_t *) dst)[i] = (int16_t) raw; break;
+                case kTfLiteUInt16: ((uint16_t *) dst)[i] = (uint16_t) raw; break;
+                default: break;
+            }
+        }
+        return mp_const_none;
+    }
+
+    raise_os_error(MP_EINVAL,
+        "android.tf: set_input_ndarray() only supports float32/int8/uint8/int16/uint16 tensors");
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(tf_model_set_input_ndarray_obj, 1, tf_model_set_input_ndarray);
+
+// get_output_ndarray(index=0) -- ulab-ndarray-typed sibling of
+// get_output(), matching OpenMV's py_ml_process_output() dequantize
+// behavior (deep_copy=True path -- always a fresh, safe copy, same
+// reasoning as get_output()'s own "never a view into the tensor arena"
+// comment, no zero-copy option offered here either): int8/uint8/int16/
+// uint16 tensors auto-dequantize to a float ndarray
+// (real = (raw - zero_point) * scale, OpenMV's own formula) -- user's
+// own call, matching OpenMV's actual behavior rather than this
+// project's usual raw-facts-only default, since scale/zero_point alone
+// (model.info()) already covers the "give me the raw facts" case.
+// float32 tensors copy straight across -- ulab's NDARRAY_FLOAT is
+// FLOAT_TYPECODE, which IS mp_float_t/float now that MICROPY_FLOAT_IMPL
+// is FLOAT (see mpconfigport.h), byte-identical to TfLite's float32, so
+// this is a real memcpy, not a per-element convert loop.
+mp_obj_t tf_model_get_output_ndarray(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    tf_model_obj_t *self = (tf_model_obj_t *) MP_OBJ_TO_PTR(pos_args[0]);
+    raise_if_closed(self);
+
+    enum { ARG_index };
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_index, MP_ARG_INT, {.u_int = 0}},
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+
+    const TfLiteTensor *tensor = TfLiteInterpreterGetOutputTensor(self->interpreter, args[ARG_index].u_int);
+    if (!tensor) {
+        raise_os_error(MP_EINVAL, "android.tf: no output tensor at that index");
+    }
+
+    TfLiteType tensor_type = TfLiteTensorType(tensor);
+    int ulab_dtype = tf_ulab_dtype_for_tflite(tensor_type);
+    if (ulab_dtype < 0) {
+        raise_os_error(MP_EINVAL,
+            "android.tf: get_output_ndarray() only supports float32/int8/uint8/int16/uint16 tensors");
+    }
+
+    int32_t ndim = TfLiteTensorNumDims(tensor);
+    if (ndim > ULAB_MAX_DIMS) {
+        raise_os_error(MP_EINVAL, "android.tf: tensor has more dimensions than ulab supports");
+    }
+    size_t shape[ULAB_MAX_DIMS] = {};
+    for (int32_t i = 0; i < ndim; i++) {
+        shape[ULAB_MAX_DIMS - ndim + i] = (size_t) TfLiteTensorDim(tensor, i);
+    }
+
+    const void *src = TfLiteTensorData(tensor);
+
+    if (tensor_type == kTfLiteFloat32) {
+        ndarray_obj_t *out = ndarray_new_dense_ndarray(ndim, shape, NDARRAY_FLOAT);
+        memcpy(out->array, src, out->len * sizeof(float));
+        return MP_OBJ_FROM_PTR(out);
+    }
+
+    // Quantized -- always dequantize to a float ndarray (OpenMV-style,
+    // user's own call), never a raw-typed ndarray of the quantized
+    // dtype -- see this function's own header comment.
+    TfLiteQuantizationParams quant = TfLiteTensorQuantizationParams(tensor);
+    ndarray_obj_t *out = ndarray_new_dense_ndarray(ndim, shape, NDARRAY_FLOAT);
+    float *dst_f = (float *) out->array;
+    for (size_t i = 0; i < out->len; i++) {
+        float raw;
+        switch (tensor_type) {
+            case kTfLiteInt8: raw = ((const int8_t *) src)[i]; break;
+            case kTfLiteUInt8: raw = ((const uint8_t *) src)[i]; break;
+            case kTfLiteInt16: raw = ((const int16_t *) src)[i]; break;
+            case kTfLiteUInt16: raw = ((const uint16_t *) src)[i]; break;
+            default: raw = 0; break;
+        }
+        dst_f[i] = (raw - quant.zero_point) * quant.scale;
+    }
+    return MP_OBJ_FROM_PTR(out);
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(tf_model_get_output_ndarray_obj, 1, tf_model_get_output_ndarray);
+
 // TfLiteType -> canonical dtype name string. NOT an invented label like
 // the camera module's deliberately-raw facing ints (see
 // SESSION_STATE.yaml's android.tf design discussion for why that
@@ -598,8 +787,10 @@ static MP_DEFINE_CONST_FUN_OBJ_1(tf_model_del_obj, tf_model_del);
 
 const mp_rom_map_elem_t tf_model_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_set_input), MP_ROM_PTR(&tf_model_set_input_obj)},
+    {MP_ROM_QSTR(MP_QSTR_set_input_ndarray), MP_ROM_PTR(&tf_model_set_input_ndarray_obj)},
     {MP_ROM_QSTR(MP_QSTR_invoke), MP_ROM_PTR(&tf_model_invoke_obj)},
     {MP_ROM_QSTR(MP_QSTR_get_output), MP_ROM_PTR(&tf_model_get_output_obj)},
+    {MP_ROM_QSTR(MP_QSTR_get_output_ndarray), MP_ROM_PTR(&tf_model_get_output_ndarray_obj)},
     {MP_ROM_QSTR(MP_QSTR_info), MP_ROM_PTR(&tf_model_info_obj)},
     {MP_ROM_QSTR(MP_QSTR_close), MP_ROM_PTR(&tf_model_close_obj)},
     {MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&tf_model_del_obj)},
