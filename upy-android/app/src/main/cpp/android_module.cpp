@@ -44,11 +44,14 @@ extern const mp_obj_fun_builtin_fixed_t android_light_off_obj;
 extern const mp_obj_fun_builtin_fixed_t android_zoom_set_obj;
 extern const mp_obj_fun_builtin_fixed_t android_zoom_range_obj;
 
-// android.tf.version() -- implemented in tf_module.cpp (see that file's
-// own header comment: a MOCKUP proving the LiteRT CMake wiring actually
-// links and runs on-device, not the real android.tf API surface yet).
-// Same ordinary-C++-extern reasoning as proximity/light/zoom above.
-extern const mp_obj_fun_builtin_fixed_t android_tf_version_obj;
+// android.tf.info() and android.tf.Model -- both implemented in
+// tf_module.cpp (see that file's own header comment for the full
+// design). Same ordinary-C++-extern reasoning as proximity/light/zoom
+// above for the function object; tf_model_type is a real mp_obj_type_t
+// (like csi_type in camera_module.cpp), not a plain function object --
+// android.tf.Model(path) constructs real instances of it.
+extern const mp_obj_fun_builtin_fixed_t android_tf_info_obj;
+extern const mp_obj_type_t tf_model_type;
 
 namespace {
 
@@ -72,12 +75,14 @@ const mp_rom_map_elem_t android_zoom_globals_table[] = {
 };
 MP_DEFINE_CONST_DICT(android_zoom_globals, android_zoom_globals_table);
 
-// android.tf -- MOCKUP, one function only (version()), see tf_module.cpp's
-// own header comment. Same nested-submodule shape as proximity/light/zoom
-// above, not the real android.tf API surface yet.
+// android.tf -- see tf_module.cpp's own header comment for the full
+// Model design (multi-instance, split set_input()/invoke()/
+// get_output() calls, native-only close-all registry). Same nested-
+// submodule shape as proximity/light/zoom above.
 const mp_rom_map_elem_t android_tf_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_tf)},
-    {MP_ROM_QSTR(MP_QSTR_version), MP_ROM_PTR(&android_tf_version_obj)},
+    {MP_ROM_QSTR(MP_QSTR_info), MP_ROM_PTR(&android_tf_info_obj)},
+    {MP_ROM_QSTR(MP_QSTR_Model), MP_ROM_PTR(&tf_model_type)},
 };
 MP_DEFINE_CONST_DICT(android_tf_globals, android_tf_globals_table);
 

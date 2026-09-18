@@ -44,6 +44,32 @@ The LGPL-2.1 license text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.ht
 - License: MIT
 - Vendored at commit 01ad8a5, `code/` subdirectory only.
 
+### LiteRT (android.tf module) — PREBUILT BINARY, not compiled from source
+
+Unlike everything else in this section, `libLiteRt.so` is a prebuilt
+binary dependency (`com.google.ai.edge.litert:litert:2.2.0`, resolved via
+Gradle from Google's own Maven repository), not vendored source compiled
+by this project's own build. C headers are fetched separately from a
+pinned LiteRT source tag by `native-bringup/fetch-litert.sh`, since the
+published AAR ships none.
+
+- Source: https://github.com/google-ai-edge/LiteRT
+- License: Apache License 2.0
+- `libLiteRtClGlAccelerator.so` (an unused GPU/OpenCL-GL delegate the same
+  AAR also ships) and `litert-api`'s Java "AI Pack" layer (an unused
+  Play Store model-delivery feature, transitively pulled in by the Maven
+  dependency) are both excluded from the build — see `app/build.gradle.kts`.
+
+## Example / test data
+
+`examples/tf_selftest/add_simple.tflite` is LiteRT's own test fixture
+(not a real model — one op, doubles a 4-element float32 input), used by
+`examples/tf_selftest/tf_selftest.py` as a confidence test for the
+android.tf module:
+
+- Source: https://github.com/google-ai-edge/LiteRT, `litert/test/testdata/add_simple.tflite`
+- License: Apache License 2.0
+
 ## App icon
 
 `app/src/main/res/drawable/ic_launcher_foreground.xml` is derived from the

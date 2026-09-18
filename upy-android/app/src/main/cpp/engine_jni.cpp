@@ -24,6 +24,7 @@ extern "C" {
 #include "camera_module.h"
 #include "display_module.h"
 #include "imu_module.h"
+#include "tf_module.h"
 
 namespace {
 // 32MB, up from an initial 4MB -- chosen after a ulab load test (see
@@ -132,6 +133,15 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint 
     // accelerometer/gyroscope is native/JNI-layer state, not touched by
     // mp_embed_deinit()/mp_embed_init() below.
     imu_close_all();
+    // Same reasoning again -- any open android.tf.Model's native LiteRT
+    // interpreter/model memory (a real tensor arena, potentially tens
+    // of MB) is native/JNI-layer state too, not touched by
+    // mp_embed_deinit()/mp_embed_init() below. See tf_module.h/
+    // tf_module.cpp's own comments for why this one walks a registry
+    // rather than tearing down a single global, and why it's safe to
+    // call here specifically (right before the GC heap those Model
+    // objects lived on is discarded).
+    tf_close_all();
 
     if (g_initialized) {
         mp_embed_deinit();
@@ -151,6 +161,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
     // on that assumption rather than leaving it unverified.
     camera_close_all();
     imu_close_all();
+    tf_close_all();
     if (g_initialized) {
         mp_embed_deinit();
         g_initialized = false;

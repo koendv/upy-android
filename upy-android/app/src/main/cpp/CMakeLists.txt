@@ -81,6 +81,20 @@ target_include_directories(upy_engine PRIVATE
 target_compile_definitions(upy_engine PRIVATE
     CMSIS_MCU_H="cmsis_mcu_stub.h"
     ULAB_CONFIG_FILE="ulab_config.h"
+    # tf_module.cpp's hw_nnapi check (android.tf.info()) calls NNAPI
+    # device-enumeration functions that need API 29, guarded by
+    # __builtin_available -- but without this define, Bionic's headers
+    # use "strict" availability mode (android/versioning.h, confirmed
+    # by reading it directly, not guessed) where calling any above-
+    # minSdk API is a hard BUILD ERROR regardless of any runtime guard.
+    # This is the NDK's own documented mechanism for exactly this case
+    # (https://developer.android.com/ndk/guides/using-newer-apis) --
+    # switches to weak-linked symbols + __builtin_available-checked
+    # calls actually compiling. Project-wide, not scoped to tf_module.cpp
+    # specifically, matching this file's existing CMSIS_MCU_H/
+    # ULAB_CONFIG_FILE pattern -- harmless for every other file, none of
+    # which reference any API-level-gated symbol.
+    __ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__
 )
 
 target_compile_options(upy_engine PRIVATE
@@ -108,7 +122,15 @@ set_target_properties(litert PROPERTIES
 # ANativeWindow_* API (display_module.cpp), and ASensorManager_*/
 # ASensorEventQueue_*/ALooper_* (imu_module.cpp) -- all exported from
 # libandroid.so, no separate library needed for the sensor API.
-target_link_libraries(upy_engine log m camera2ndk mediandk android litert)
+# neuralnetworks: android.tf.info()'s hw_nnapi field (tf_module.cpp) --
+# libneuralnetworks.so needs API 27 (confirmed by reading
+# NeuralNetworks.h directly, not assumed), which is why minSdk was
+# bumped 26->27 (see build.gradle.kts's own comment) specifically to
+# make this a safe, eager, direct link -- the library is guaranteed
+# present on every device this app can install on. The specific
+# device-enumeration functions used are still API 29-only regardless,
+# guarded by a runtime check in tf_module.cpp, not a build-time one.
+target_link_libraries(upy_engine log m camera2ndk mediandk android litert neuralnetworks)
 
 # Linker map for libupy_engine.so -- static-link internals only (which
 # MicroPython/ulab/openmv/our own object files pulled in, section sizes,

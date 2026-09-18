@@ -10,7 +10,15 @@ android {
 
     defaultConfig {
         applicationId = "eu.kdvelectronics.upyandroid"
-        minSdk = 26
+        // Bumped 26 -> 27 for android.tf.info()'s hw_nnapi field --
+        // libneuralnetworks.so itself needs API 27 (checked
+        // ANeuralNetworksModel_create's own __NNAPI_INTRODUCED_IN
+        // annotation directly, not assumed). Lets tf_module.cpp link
+        // against it directly instead of dlopen/dlsym -- the actual
+        // device-enumeration functions still need API 29, still gated
+        // by a runtime android_get_device_api_level() check (that part
+        // doesn't change with minSdk, see tf_module.cpp's own comment).
+        minSdk = 27
         targetSdk = 37
         versionCode = 1
         versionName = "0.1"

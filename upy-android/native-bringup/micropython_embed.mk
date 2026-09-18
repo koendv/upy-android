@@ -189,8 +189,8 @@ SRC_QSTR += ../app/src/main/cpp/imu_module.cpp
 # py/obj.h, both already resolved by every other module's scan).
 SRC_QSTR += ../app/src/main/cpp/android_module.cpp
 
-# tf_module.cpp -- OUR OWN native module (android.tf MOCKUP, see that
-# file's own header comment), first file to #include LiteRT's C API
+# tf_module.cpp -- OUR OWN native module (android.tf, see that file's
+# own header comment), first file to #include LiteRT's C API
 # (app/src/main/cpp/litert/include/, populated by fetch-litert.sh --
 # run it first if that directory doesn't exist yet). Unlike camera_
 # module.cpp's NDK headers (<camera/...>, needed a qstr-stub -- see this
@@ -198,7 +198,18 @@ SRC_QSTR += ../app/src/main/cpp/android_module.cpp
 # portable standard-library headers (<stdint.h>, <vector>, <memory>,
 # etc, confirmed by grep before relying on this) -- the same tier
 # camera_module.cpp's own <vector>/<algorithm> already prove this exact
-# scan handles, so a real -I is enough, no stub needed.
+# scan handles, so a real -I is enough, no stub needed for LiteRT itself.
+# <android/NeuralNetworks.h> (added later, for android.tf.info()'s
+# hw_nnapi field) is a genuine NDK sysroot header though, same tier as
+# camera_module.cpp's <camera/...> ones -- DOES need a qstr-stub, and
+# its own transitive #include chain (walked by hand from the real
+# header, not guessed) needed three more:
+# qstr-stub/android/{NeuralNetworks,NeuralNetworksTypes,hardware_buffer,
+# rect,data_space}.h. android/api-level.h is NOT needed -- the actual
+# API-29 guard ended up needing __builtin_available (a compiler
+# intrinsic, see tf_module.cpp's own comment for why a plain
+# android_get_device_api_level() runtime check wasn't enough), not that
+# header at all.
 SRC_QSTR += ../app/src/main/cpp/tf_module.cpp
 CFLAGS += -I../app/src/main/cpp/litert/include
 
