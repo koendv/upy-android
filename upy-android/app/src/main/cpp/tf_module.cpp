@@ -499,7 +499,8 @@ const char *tf_dtype_name(TfLiteType type, char *fallback_buf, size_t fallback_b
     }
 }
 
-// One dict per tensor: {'name':..., 'shape':[...], 'dtype':..., 'bytes':...}.
+// One dict per tensor: {'name':..., 'shape':[...], 'dtype':..., 'bytes':...,
+// 'scale':..., 'zero_point':...}.
 // Real gap this closes (see SESSION_STATE.yaml): writing
 // examples/tf_selftest/tf_selftest.py needed a whole separate
 // standalone NDK probe just to discover add_simple.tflite's input
@@ -509,8 +510,20 @@ const char *tf_dtype_name(TfLiteType type, char *fallback_buf, size_t fallback_b
 // same mp_obj_new_list()/mp_obj_list_append() idiom already used for
 // inputs/outputs below and camera_list() in camera_module.cpp, not a
 // new pattern.
+//
+// scale/zero_point: without these, get_output()'s raw bytes are
+// uninterpretable for any int8/uint8-quantized model (the norm for
+// on-device inference, not the exception -- add_simple.tflite, this
+// project's only test fixture so far, happens to be float32, which is
+// why this gap wasn't caught by tf_selftest.py). Real value is
+// `scale * (quantized_value - zero_point)` (TfLiteTensorQuantizationParams's
+// own doc comment, c_api.h). Raw pass-through, same philosophy as
+// dtype/shape above -- not an opinionated "is this quantized" bool.
+// scale == 0.0 is the C API's own documented signal that the tensor
+// isn't (legacy-style, per-tensor) quantized, so a script can check
+// that itself rather than this dict inventing a redundant flag.
 mp_obj_t tf_tensor_info_dict(const TfLiteTensor *tensor) {
-    mp_obj_t dict = mp_obj_new_dict(4);
+    mp_obj_t dict = mp_obj_new_dict(6);
 
     const char *name = TfLiteTensorName(tensor);
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_name), mp_obj_new_str(name, strlen(name)));
@@ -527,6 +540,10 @@ mp_obj_t tf_tensor_info_dict(const TfLiteTensor *tensor) {
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_dtype), mp_obj_new_str(dtype, strlen(dtype)));
 
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_bytes), mp_obj_new_int_from_uint(TfLiteTensorByteSize(tensor)));
+
+    TfLiteQuantizationParams quant = TfLiteTensorQuantizationParams(tensor);
+    mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_scale), mp_obj_new_float(quant.scale));
+    mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_zero_point), mp_obj_new_int(quant.zero_point));
 
     return dict;
 }
