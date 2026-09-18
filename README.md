@@ -70,7 +70,7 @@ CAMERA permission is requested on first launch. Camera permission errors surface
 
 ## OpenMV
 
-Compiles. Measured ~25 FPS on a Xiaomi Redmi Note 15 device running [`lcd_shield.py`](https://github.com/openmv/openmv/blob/master/scripts/examples/50-OpenMV-Boards/60-Shields/60-LCD-Shield/lcd_shield.py)
+Compiles. Measured ~25 FPS at resolution (320, 240) on a Xiaomi Redmi Note 15 device running [`lcd_shield.py`](https://github.com/openmv/openmv/blob/master/scripts/examples/50-OpenMV-Boards/60-Shields/60-LCD-Shield/lcd_shield.py)
 
 ## Android
 
