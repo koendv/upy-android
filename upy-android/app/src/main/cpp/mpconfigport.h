@@ -32,10 +32,32 @@
 // unconditionally (py/mpconfig.h) -- not gated by MICROPY_CONFIG_ROM_LEVEL
 // at all, a genuinely opt-in port decision, not a "raise the ROM level"
 // one. Without it, float literals are a SyntaxError ("decimal numbers not
-// supported") and the math module links but is largely useless. DOUBLE
-// (not FLOAT) since this is a full 64-bit Android target with no memory
-// constraint forcing single-precision -- matches CPython's own semantics.
-#define MICROPY_FLOAT_IMPL                      (MICROPY_FLOAT_IMPL_DOUBLE)
+// supported") and the math module links but is largely useless.
+//
+// FLOAT (not DOUBLE), matching every real OpenMV board (github.com/openmv/
+// micropython, checked directly: ports/stm32/boards/OPENMV_N6/
+// mpconfigboard.mk and ports/alif/boards/OPENMV_AE3/mpconfigboard.mk both
+// set MICROPY_FLOAT_IMPL = float, and both ports' own defaults are FLOAT
+// unless a board overrides them) -- same domain (camera/IMU/light sensors,
+// on-device ML) has run single-precision VM-wide across OpenMV's entire
+// real user base for years, real evidence float precision is sufficient
+// here, not just a theoretical claim. Directly unblocks a byte-identical
+// ulab ndarray<->TfLiteFloat32 mapping for android.tf's future ndarray-
+// typed set_input()/get_output() path (see SESSION_STATE.yaml) -- ulab's
+// NDARRAY_FLOAT typecode is defined AS whatever MICROPY_FLOAT_IMPL is
+// (ulab's own ndarray.h: FLOAT_TYPECODE 'f' under FLOAT, 'd' under
+// DOUBLE), so this was a real byte-size mismatch under DOUBLE, not
+// resolved by this flag alone (int8/uint8/int16/uint16 quantized models
+// still need an explicit per-element scale/zero_point convert loop
+// either way -- ulab has no "quantized" dtype concept regardless of this
+// setting). No representation/performance upside from this switch on its
+// own irrespective of domain, though -- confirmed via py/obj.h: this
+// port uses the default MICROPY_OBJ_REPR_A, where mp_obj_new_float()/
+// mp_obj_float_get() are plain heap-allocating functions for BOTH FLOAT
+// and DOUBLE (the inline-float-in-pointer nan-boxing trick only exists
+// under MICROPY_OBJ_REPR_C) -- this is a pure precision tradeoff, not a
+// memory/perf one, on this specific 64-bit target.
+#define MICROPY_FLOAT_IMPL                      (MICROPY_FLOAT_IMPL_FLOAT)
 
 // Real VFS, rooted at the app's own private storage (path passed in at
 // runtime -- see engine_jni.cpp's nativeInit()/nativeReset(), which mount
