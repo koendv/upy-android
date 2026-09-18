@@ -109,3 +109,17 @@ set_target_properties(litert PROPERTIES
 # ASensorEventQueue_*/ALooper_* (imu_module.cpp) -- all exported from
 # libandroid.so, no separate library needed for the sensor API.
 target_link_libraries(upy_engine log m camera2ndk mediandk android litert)
+
+# Linker map for libupy_engine.so -- static-link internals only (which
+# MicroPython/ulab/openmv/our own object files pulled in, section sizes,
+# confirms prebuilt deps like libLiteRt.so show up as NEEDED). Does NOT
+# cover what's inside a prebuilt dependency itself, or what AGP packages
+# into the final APK from an AAR's jni/ folder (that's a Gradle/AGP
+# packaging concern, not a link-map one -- see SESSION_STATE.yaml's
+# litert-api/libLiteRtClGlAccelerator.so findings, both caught via
+# `unzip -l`/`nm -D` on the real APK, not a map file). Generated fresh
+# per build under app/.cxx/ (already gitignored, not committed), same
+# ephemeral treatment as every other build artifact.
+target_link_options(upy_engine PRIVATE
+    -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/upy_engine.map
+)
