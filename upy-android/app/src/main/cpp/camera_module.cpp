@@ -28,12 +28,15 @@
 #include <camera/NdkCameraCaptureSession.h>
 #include <camera/NdkCaptureRequest.h>
 #include <camera/NdkCameraError.h>
+#include <camera/NdkCameraMetadata.h>
 #include <media/NdkImageReader.h>
 #include <media/NdkImage.h>
 #include <android/log.h>
 #include <semaphore.h>
 #include <time.h>
 #include <errno.h>
+#include <vector>
+#include <algorithm>
 
 extern "C" {
 #include "py/runtime.h"
@@ -472,6 +475,25 @@ mp_obj_t csi_pixformat(mp_obj_t self_in, mp_obj_t fmt_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(csi_pixformat_obj, csi_pixformat);
 
+// Deliberately does NOT validate w/h against the camera's real
+// supported sizes (see csi_framesize_list() below) -- an unsupported
+// size is silently passed straight to AImageReader_new()/the capture
+// session. On real hardware this does not fail outright; it can
+// deliver a frame that doesn't fully populate the requested buffer,
+// which (fed through the YUV->RGB conversion) reads as a solid green
+// band wherever the unwritten rows/planes land. Confirmed on-device
+// (device kunzite_eea): requesting csi.CSI().framesize((128, 160)) --
+// not a supported size on that camera -- produced exactly this artifact
+// at a fixed position every frame; switching to (176, 144), a size
+// confirmed present in that camera's own StreamConfigurationMap, made
+// it disappear completely. Deliberately not turned into a raised error
+// here (unlike, e.g., py_imu.c's temperature_c() omission) -- Android
+// camera hardware varies per device in a way OpenMV's own fixed,
+// known-at-build-time sensor never does, so silently accepting
+// whatever a script asks for and letting csi_framesize_list() answer
+// "what's actually valid on THIS device" was judged more useful than a
+// hardcoded validation table here. Scripts that want the safety net
+// should check against framesize_list() themselves before calling this.
 mp_obj_t csi_framesize(mp_obj_t self_in, mp_obj_t size_in) {
     (void) self_in;
     int32_t w, h;
@@ -503,6 +525,72 @@ mp_obj_t csi_framesize(mp_obj_t self_in, mp_obj_t size_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(csi_framesize_obj, csi_framesize);
 
+// Returns [(w, h), ...] -- every YUV_420_888 OUTPUT size this specific
+// device's camera 0 actually supports (ACAMERA_SCALER_
+// AVAILABLE_STREAM_CONFIGURATIONS, filtered to the one format this
+// port ever captures), sorted smallest-first by pixel count. Exists
+// because Android camera hardware varies per device in a way OpenMV's
+// own fixed sensor never does -- there's no compile-time list of valid
+// sizes to hardcode, so a script has to ask the actual device. See
+// csi_framesize()'s own comment for what happens if an unsupported
+// size is used anyway (accepted silently, can corrupt part of the
+// frame -- this method is how a script avoids that, not a requirement
+// enforced here).
+mp_obj_t csi_framesize_list(mp_obj_t self_in) {
+    (void) self_in;
+    if (!g_cam.device) {
+        raise_os_error(MP_EINVAL, "camera not reset -- call reset() first");
+    }
+
+    ACameraIdList *ids = nullptr;
+    if (ACameraManager_getCameraIdList(g_cam.manager, &ids) != ACAMERA_OK || !ids || ids->numCameras == 0) {
+        raise_os_error(MP_ENODEV, "camera: no camera available");
+    }
+    ACameraMetadata *metadata = nullptr;
+    camera_status_t st = ACameraManager_getCameraCharacteristics(g_cam.manager, ids->cameraIds[0], &metadata);
+    ACameraManager_deleteCameraIdList(ids);
+    if (st != ACAMERA_OK || !metadata) {
+        raise_os_error(MP_EIO, "camera: failed to read characteristics");
+    }
+
+    ACameraMetadata_const_entry entry = {};
+    st = ACameraMetadata_getConstEntry(metadata, ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, &entry);
+    if (st != ACAMERA_OK) {
+        ACameraMetadata_free(metadata);
+        raise_os_error(MP_EIO, "camera: no stream configuration info");
+    }
+
+    // Each group of 4 int32s: format, width, height, input(1)/output(0).
+    std::vector<std::pair<int32_t, int32_t>> sizes;
+    for (uint32_t i = 0; i + 3 < entry.count; i += 4) {
+        int32_t format = entry.data.i32[i];
+        int32_t width = entry.data.i32[i + 1];
+        int32_t height = entry.data.i32[i + 2];
+        int32_t io = entry.data.i32[i + 3];
+        if (format == AIMAGE_FORMAT_YUV_420_888 && io == ACAMERA_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT) {
+            sizes.emplace_back(width, height);
+        }
+    }
+    ACameraMetadata_free(metadata);
+
+    std::sort(sizes.begin(), sizes.end(), [](const std::pair<int32_t, int32_t> &a, const std::pair<int32_t, int32_t> &b) {
+        int64_t area_a = (int64_t) a.first * a.second;
+        int64_t area_b = (int64_t) b.first * b.second;
+        if (area_a != area_b) {
+            return area_a < area_b;
+        }
+        return a.first < b.first;
+    });
+
+    mp_obj_t list = mp_obj_new_list(0, nullptr);
+    for (const auto &wh : sizes) {
+        mp_obj_t tuple[2] = {MP_OBJ_NEW_SMALL_INT(wh.first), MP_OBJ_NEW_SMALL_INT(wh.second)};
+        mp_obj_list_append(list, mp_obj_new_tuple(2, tuple));
+    }
+    return list;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(csi_framesize_list_obj, csi_framesize_list);
+
 mp_obj_t csi_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     (void) n_args;
     (void) n_kw;
@@ -516,6 +604,7 @@ const mp_rom_map_elem_t csi_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&csi_reset_obj)},
     {MP_ROM_QSTR(MP_QSTR_pixformat), MP_ROM_PTR(&csi_pixformat_obj)},
     {MP_ROM_QSTR(MP_QSTR_framesize), MP_ROM_PTR(&csi_framesize_obj)},
+    {MP_ROM_QSTR(MP_QSTR_framesize_list), MP_ROM_PTR(&csi_framesize_list_obj)},
     {MP_ROM_QSTR(MP_QSTR_snapshot), MP_ROM_PTR(&csi_snapshot_obj)},
 };
 MP_DEFINE_CONST_DICT(csi_locals_dict, csi_locals_dict_table);
