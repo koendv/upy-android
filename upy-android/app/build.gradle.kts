@@ -65,21 +65,11 @@ android {
         compose = true
     }
 
-    packaging {
-        jniLibs {
-            // libLiteRtClGlAccelerator.so: a GPU/OpenCL-GL delegate from
-            // the litert AAR's own jni/arm64-v8a/ folder -- AGP packages
-            // every .so an AAR ships there regardless of whether our
-            // code links against it (confirmed directly: it showed up
-            // in a real assembled APK although CMakeLists.txt only
-            // links libLiteRt.so). android.tf's design scoped
-            // acceleration to NNAPI only (best-effort, CPU fallback,
-            // see SESSION_STATE.yaml) -- nothing uses a GPU/CL delegate,
-            // so this 3.1MB is dead weight, same tier of issue as the
-            // litert-api exclusion in this file's dependencies block.
-            excludes += "lib/arm64-v8a/libLiteRtClGlAccelerator.so"
-        }
-    }
+    // libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate from the
+    // litert AAR's own jni/arm64-v8a/ folder) used to be excluded from
+    // packaging here. android.rt's LiteRtEnvironment auto-discovers and
+    // dlopen()s it by name at runtime, see rt_module.cpp, so it must
+    // actually ship in the APK now. See NOTICE.md for licensing.
 }
 
 dependencyLocking {
