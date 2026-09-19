@@ -20,19 +20,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import eu.kdvelectronics.upyandroid.managers.BoardManager
 
-// Passive viewport, not a "run" screen -- vision scripts are written/
-// launched through the existing Terminal/Explorer/Editor "Run" flow like
-// any other script (they're ordinary MicroPython scripts that happen to
-// call csi0.snapshot()/lcd.write()); this screen just shows whatever
-// :engine is currently drawing, with no "Run" input of its own. See
-// SESSION_STATE.yaml's fourth-screen-UI-design decision.
+// Passive viewport, not a "run" screen. Vision scripts are written and
+// launched through the existing Terminal/Explorer/Editor "Run" flow
+// like any other script; this screen just shows whatever :engine is
+// currently drawing, with no "Run" input of its own.
+// see session-state: CameraScreen.kt#CameraScreen
 //
-// The SurfaceView HAS to be a real View-backed Surface (AndroidView, not
-// Compose-drawn) -- :engine writes to it natively via ANativeWindow, see
-// display_module.cpp. surfaceCreated()/surfaceDestroyed() are the actual
-// trigger points for the surface-lifecycle decision (silent no-op while
-// gone, re-attach on return -- the running script is never interrupted
-// by navigating off this screen).
+// The SurfaceView must be a real View-backed Surface (AndroidView, not
+// Compose-drawn): :engine writes to it natively via ANativeWindow. See
+// display_module.cpp. surfaceCreated()/surfaceDestroyed() are the
+// trigger points for the surface-lifecycle decision: a silent no-op
+// while gone, re-attach on return, with the running script never
+// interrupted by navigating off this screen.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CameraScreen(
@@ -41,11 +40,12 @@ fun CameraScreen(
 ) {
     val activity = LocalContext.current as Activity
 
-    // Lock to one orientation while this screen is visible, restore on
-    // exit -- removes device rotation as a recurring surface-teardown
-    // trigger for free (see SESSION_STATE.yaml). Single-Activity app, so
-    // this means saving/restoring requestedOrientation directly, not a
-    // manifest flag (which would lock the whole app, not just this screen).
+    // Locks to one orientation while this screen is visible, restores
+    // on exit. This removes device rotation as a recurring
+    // surface-teardown trigger. Single-Activity app, so this means
+    // saving and restoring requestedOrientation directly, not a
+    // manifest flag, which would lock the whole app rather than just
+    // this screen.
     DisposableEffect(Unit) {
         val previousOrientation = activity.requestedOrientation
         activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT

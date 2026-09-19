@@ -58,7 +58,7 @@ fun TerminalScreen(
         output += "\n>>> $code\n"
         input = ""
         // Output arrives live via the output listener registered once in
-        // MainActivity, not from eval()'s return value -- see BoardManager.
+        // MainActivity, not from eval()'s return value. See BoardManager.kt.
         coroutineScope.launch(Dispatchers.IO) {
             terminalManager.eval(code)
         }
@@ -138,14 +138,13 @@ fun TerminalScreen(
                     onValueChange = { input = it },
                     modifier = Modifier.weight(1f),
                     textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
-                    // Code input, not prose: the on-screen keyboard's autocorrect
-                    // (on by default) silently mangles valid Python identifiers --
-                    // e.g. typing "gc" got autocorrected to "GC" mid-entry, breaking
-                    // `import gc` with a NameError, discovered while load-testing
-                    // ulab through this exact field. autoCorrectEnabled = false
-                    // stops the substitution; capitalization = None (the default,
-                    // set explicitly for clarity) stops auto-capitalizing the first
-                    // letter of each line.
+                    // Code input, not prose. The on-screen keyboard's autocorrect
+                    // (on by default) silently mangles valid Python identifiers:
+                    // typing "gc" can autocorrect to "GC" mid-entry, breaking
+                    // `import gc` with a NameError. autoCorrectEnabled = false
+                    // stops the substitution. capitalization = None (the default,
+                    // set explicitly for clarity) stops auto-capitalizing the
+                    // first letter of each line.
                     keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Send,
                         autoCorrectEnabled = false,

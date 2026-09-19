@@ -28,17 +28,14 @@ import eu.kdvelectronics.upyandroid.ui.TerminalScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-// Real architecture, not the earlier smoke-test scaffold: binds to
-// EngineService (separate :engine process) via BoardManager, talks to it
-// only through TerminalManager -- never touches Engine/JNI directly (the
-// :engine process is the only one that loads the native .so).
-//
-// Three screens (terminal/explorer/editor), Navigation Compose. The
-// explorer/editor never touch the engine process directly either --
-// FilesManager does plain local java.io.File I/O rooted at the same
-// filesDir the :engine process mounts as VFS "/", so browsing/editing
-// never needs to go through AIDL. Only "Run" does, via the same
-// terminalManager.eval() the terminal screen itself uses.
+// Binds to EngineService (a separate :engine process) via BoardManager
+// and talks to it only through TerminalManager, never touching
+// Engine/JNI directly. Three screens (terminal, explorer, editor) via
+// Navigation Compose. Explorer and editor never touch the engine
+// process directly either: FilesManager does plain local java.io.File
+// I/O rooted at the same filesDir the :engine process mounts as VFS
+// "/", so browsing and editing never need AIDL. Only "Run" does, via
+// the same terminalManager.eval() the terminal screen itself uses.
 class MainActivity : ComponentActivity() {
     private lateinit var boardManager: BoardManager
     private lateinit var terminalManager: TerminalManager
@@ -51,7 +48,7 @@ class MainActivity : ComponentActivity() {
     // something created lazily inside onCreate. The callback is a no-op:
     // whether the user granted or denied, camera_module.cpp's own
     // OSError("camera access denied...") remains the actual runtime
-    // signal a script sees on next csi.reset() -- this launcher only
+    // signal a script sees on next csi.reset(). This launcher only
     // covers surfacing the OS's real grant dialog once, automatically.
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -82,8 +79,8 @@ class MainActivity : ComponentActivity() {
                 val navController = rememberNavController()
                 val coroutineScope = rememberCoroutineScope()
 
-                // Routes carry no script data -- handed over through these,
-                // same reasoning as micro-repl's own AppRoutes comment.
+                // Routes carry no script data; it is handed over through
+                // these variables instead.
                 var pendingFile = remember { mutableStateOf<MicroFile?>(null) }
                 var pendingPath = remember { mutableStateOf("") }
 
@@ -147,15 +144,13 @@ class MainActivity : ComponentActivity() {
         boardManager.disconnect()
     }
 
-    // Android has no built-in way to tell "never asked" apart from
-    // "permanently denied" -- shouldShowRequestPermissionRationale() is
-    // false in both cases. Rather than lean on that (MIUI, this app's
-    // real test device, already has non-standard permission/process
-    // behavior -- see BoardManager.kt's BIND_ABOVE_CLIENT comment), we
-    // track "have we ever asked" ourselves and prompt exactly once ever.
-    // If denied (or never granted), camera_module.cpp's own OSError
-    // remains the fallback signal -- unchanged, still tells the user to
-    // grant it manually via Settings.
+    // Android cannot distinguish "never asked" from "permanently
+    // denied": shouldShowRequestPermissionRationale() is false in both
+    // cases. This tracks "has this app ever asked" itself and prompts
+    // exactly once ever. camera_module.cpp's own OSError remains the
+    // fallback signal on denial, telling the user to grant access
+    // manually via Settings.
+    // see session-state: MainActivity.kt#maybeRequestCameraPermission
     private fun maybeRequestCameraPermission() {
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED

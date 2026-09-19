@@ -1,8 +1,8 @@
 package eu.kdvelectronics.upyandroid.model
 
-// Local-transport connection status -- much simpler than micro-repl's
-// USB-serial original (no device discovery/approval flow needed, since
-// there's exactly one thing to connect to: our own :engine process).
+// Local-transport connection status. No device discovery or approval
+// flow needed, since there is exactly one thing to connect to: this
+// app's own :engine process.
 sealed class ConnectionStatus {
     data object Connecting : ConnectionStatus()
     data object Connected : ConnectionStatus()

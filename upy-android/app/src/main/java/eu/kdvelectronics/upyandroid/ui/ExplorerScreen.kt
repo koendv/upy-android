@@ -50,13 +50,11 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * File explorer for the app's sandboxed storage -- same functionality as
- * micro-repl's own explorer (browse/create/rename/delete/import files and
- * folders, run/edit a script) but reading/writing locally via
- * [FilesManager] instead of a remote-board REPL round-trip, since this
- * app has no remote board. Folds micro-repl's separate "Scripts" screen
- * in here too -- board storage and local scripts are the same directory
- * for us, so there's nothing a second screen would add.
+ * File explorer for the app's sandboxed storage: browse, create, rename,
+ * delete, and import files and folders, run or edit a script. Reads and
+ * writes locally via [FilesManager], since this app has no remote board.
+ * Board storage and local scripts are the same directory, so there is no
+ * separate "Scripts" screen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -189,7 +187,7 @@ fun ExplorerScreen(
                         showOptions = false
                         // onRun (MainActivity's runAndShowTerminal) calls
                         // navController.navigate(), which requires the main
-                        // thread -- only the file read itself needs IO. Same
+                        // thread. Only the file read itself needs IO. Same
                         // pattern as EditorScreen's own Run button.
                         coroutineScope.launch {
                             val content = withContext(Dispatchers.IO) { filesManager.read(file) }

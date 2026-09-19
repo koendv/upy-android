@@ -16,17 +16,12 @@ import eu.kdvelectronics.upyandroid.model.ConnectionStatus
 /**
  * The local transport: binds to [EngineService] (running in the separate
  * `:engine` process) over AIDL and exposes exec()/interrupt()/reset().
+ * Backed by Binder, with typed call/return, not a raw-REPL byte protocol.
  *
- * This replaces micro-repl's original USB-serial `BoardManager` -- same
- * role (the one thing everything else above it talks to), but backed by
- * Binder instead of a UART, and typed call/return instead of the raw-REPL
- * byte protocol (see project memory). USB-serial support is dropped
- * entirely for v1, not kept as a second transport.
- *
- * Reconnection is NOT automatic: a MIUI-specific finding (this session)
- * is that the OS blocks auto-restart of a killed bound service, so a
- * crashed engine must be recovered by explicitly calling [connect] again
- * -- callers (the UI) decide when, this class doesn't retry on its own.
+ * Reconnection is not automatic. MIUI blocks auto-restart of a killed
+ * bound service, so a crashed engine must be recovered by explicitly
+ * calling [connect] again. Callers (the UI) decide when; this class does
+ * not retry on its own.
  */
 class BoardManager(
     private val context: Context,
@@ -39,9 +34,9 @@ class BoardManager(
     @Volatile
     private var engine: IEngine? = null
 
-    // Kept separate from the AIDL Stub below so callers can register/
-    // replace it independent of the bind lifecycle -- re-applied to the
-    // engine on every (re)connect, since a crashed :engine process starts
+    // Kept separate from the AIDL Stub below so callers can register or
+    // replace it independent of the bind lifecycle. Re-applied to the
+    // engine on every reconnect, since a crashed :engine process starts
     // a fresh EngineService with no listener registered.
     @Volatile
     private var chunkListener: ((String) -> Unit)? = null
@@ -60,9 +55,8 @@ class BoardManager(
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
-            // Crash-isolation payoff (proven working this session): a
-            // fault in the :engine process surfaces here, not as an app
-            // crash.
+            // Crash isolation payoff: a fault in the :engine process
+            // surfaces here, not as an app crash.
             Log.w(TAG, "engine process disconnected")
             engine = null
             onStatusChanges?.invoke(ConnectionStatus.Disconnected("engine process disconnected"))
@@ -71,16 +65,11 @@ class BoardManager(
 
     fun connect() {
         onStatusChanges?.invoke(ConnectionStatus.Connecting)
-        // BIND_ABOVE_CLIENT (added 2026-09-16, see SESSION_STATE.yaml's
-        // imu.py real-bug entry): plain BIND_AUTO_CREATE left :engine's
-        // process importance classified as "cached" (confirmed via
-        // `adb shell dumpsys activity processes`) even while the main UI
-        // was actively foreground -- Android's power management batches/
-        // throttles non-wakeup sensor delivery (imu_module.cpp) much more
-        // aggressively for cached processes, which is what caused
-        // reproducible ETIMEDOUT errors on real hardware. BIND_ABOVE_CLIENT
-        // keeps :engine's importance tied to (at least as high as) this
-        // client process's own, instead of the OS's default demotion.
+        // BIND_ABOVE_CLIENT keeps :engine's process importance tied to
+        // at least this client process's own, instead of the OS's
+        // default demotion while bound. Needed for reliable sensor
+        // delivery.
+        // see session-state: BoardManager.kt#connect
         val bound = context.bindService(
             Intent(context, EngineService::class.java),
             connection,
@@ -99,22 +88,21 @@ class BoardManager(
     /**
      * Registers a callback for incremental print()/traceback output
      * produced while a script is running (e.g. a `while True: print(...)`
-     * loop), delivered on a Binder thread pool thread -- never the
+     * loop), delivered on a Binder thread pool thread, never the
      * caller's own thread. Pass null to stop listening. Independent of
-     * exec()'s own return value, which still carries the full accumulated
-     * output on completion as before.
+     * exec()'s own return value, which still carries the full
+     * accumulated output on completion.
      */
     fun setOutputListener(listener: ((String) -> Unit)?) {
         chunkListener = listener
     }
 
     /**
-     * Blocks until the code has finished executing -- call off the UI
-     * thread. The "not connected"/crashed-mid-call cases are reported via
-     * onStatusChanges (like any other disconnect), not smuggled into this
-     * return value, since exec()'s own output is now expected to arrive
-     * live via the output listener rather than by re-displaying this
-     * return value.
+     * Blocks until the code has finished executing; call off the UI
+     * thread. "Not connected" and crashed-mid-call cases are reported
+     * via onStatusChanges, like any other disconnect, not smuggled into
+     * this return value. exec()'s output arrives live via the output
+     * listener; this return value is not used to display it.
      */
     fun exec(code: String): String {
         val e = engine
@@ -139,18 +127,18 @@ class BoardManager(
     }
 
     /**
-     * Hands :engine the fourth screen's SurfaceView Surface (or null when
-     * it's torn down -- navigated away, backgrounded). Called from
-     * SurfaceHolder.Callback, so a RemoteException here (engine crashed
-     * exactly during a surface attach/detach) must not propagate and
-     * crash the main process -- best-effort, silently dropped like
-     * exec()'s own RemoteException handling.
+     * Hands :engine the fourth screen's SurfaceView Surface, or null
+     * when it is torn down (navigated away, backgrounded). Called from
+     * SurfaceHolder.Callback, so a RemoteException here (the engine
+     * crashed exactly during a surface attach or detach) must not
+     * propagate and crash the main process. Best-effort, silently
+     * dropped, like exec()'s own RemoteException handling.
      */
     fun setDisplaySurface(surface: Surface?) {
         try {
             engine?.setDisplaySurface(surface)
         } catch (re: RemoteException) {
-            // Engine gone -- nothing to attach to anyway.
+            // Engine is gone; nothing to attach to.
         }
     }
 }

@@ -7,19 +7,22 @@ import android.os.RemoteException
 import android.view.Surface
 
 // Runs in the :engine process (android:process=":engine" in the
-// manifest) -- a native fault here does not take down the main app
-// process. Bind-only (no startService/foreground service): Android
+// manifest). A native fault here does not take down the main app
+// process. Bind-only: no startService or foreground service. Android
 // destroys this Service once the last client unbinds, and interpreter
-// state is expected to reset then -- that's the idle/lazy tier of the
-// two-tier reset design, not something this class needs to implement.
+// state is expected to reset then. This is the idle/lazy tier of the
+// two-tier reset design; this class does not need to implement reset
+// itself.
+// see session-state: IEngine.aidl#reset
 class EngineService : Service() {
-    // Constructed in onCreate(), not as a property initializer -- filesDir
-    // (like other Context methods) isn't safely available during a
+    // Constructed in onCreate(), not as a property initializer. filesDir,
+    // like other Context methods, is not safely available during a
     // Service's own constructor, only from onCreate() onward.
     private lateinit var worker: EngineWorker
 
-    // Set/cleared via setOutputListener() below -- written from a Binder
-    // thread pool thread, read from the worker thread inside exec().
+    // Set and cleared via setOutputListener() below. Written from a
+    // Binder thread pool thread, read from the worker thread inside
+    // exec().
     @Volatile
     private var outputListener: IEngineOutputListener? = null
 
@@ -34,9 +37,9 @@ class EngineService : Service() {
             try {
                 outputListener?.onOutputChunk(chunk)
             } catch (e: RemoteException) {
-                // Main process gone/unresponsive mid-script -- drop the
-                // chunk and keep the script running. exec()'s own return
-                // value on completion is unaffected.
+                // Main process is gone or unresponsive mid-script. Drop
+                // the chunk and keep the script running; exec()'s own
+                // return value on completion is unaffected.
             }
         }
 
@@ -47,12 +50,12 @@ class EngineService : Service() {
             outputListener = listener
         }
 
-        // Deliberately NOT queued through worker.taskQueue like every
-        // other call here -- this touches no MicroPython/GC state (the
+        // Deliberately not queued through worker.taskQueue like every
+        // other call here. This touches no MicroPython or GC state (the
         // queue exists to serialize access to that), only
-        // display_module.cpp's own mutex-protected ANativeWindow*. Called
-        // directly on this Binder thread, which is what
-        // ANativeWindow_fromSurface() needs (see Engine.kt).
+        // display_module.cpp's own mutex-protected ANativeWindow*.
+        // Called directly on this Binder thread, which is what
+        // ANativeWindow_fromSurface() needs. See Engine.kt.
         override fun setDisplaySurface(surface: Surface?) {
             Engine.nativeSetDisplaySurface(surface)
         }
@@ -60,11 +63,10 @@ class EngineService : Service() {
 
     override fun onBind(intent: Intent): IBinder = binder
 
-    // Defense-in-depth camera teardown (see SESSION_STATE.yaml's camera
-    // teardown hooks decision) -- idle-unbind should already get
-    // equivalent camera-service-side cleanup for free via process death,
-    // same mechanism proven for crash-kill, but this removes reliance on
-    // that assumption rather than leaving it unverified.
+    // Defense-in-depth camera teardown. Idle-unbind should already get
+    // equivalent cleanup for free via process death, but this removes
+    // reliance on that assumption.
+    // see session-state: EngineService.kt#onDestroy
     override fun onDestroy() {
         worker.deinit()
         super.onDestroy()
