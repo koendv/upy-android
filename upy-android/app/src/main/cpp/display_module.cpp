@@ -1,23 +1,7 @@
-// upy-android native display module -- OUR OWN bridge between
-// py_image.c's Image type and a real Android Surface, via
-// ANativeWindow_lock()/write pixels/ANativeWindow_unlockAndPost(). NOT
-// vendored OpenMV source -- see display_module.h and
-// SESSION_STATE.yaml's camera/display scoping discussion.
-//
-// Exposes display.SPIDisplay -- OpenMV's real class name, kept verbatim
-// per the API-naming decision (SESSION_STATE.yaml): the name is just a
-// Python-level symbol a script imports/constructs, not a literal
-// physical-SPI-bus claim, same reasoning as csi.CSI() not implying a
-// real camera serial interface.
-//
-// Upscale/pixel-format decisions all per SESSION_STATE.yaml, implemented
-// here: integer power-of-2 duplication (x1/x2/x4/x8, largest fitting
-// BOTH source dimensions into the buffer), centered in a buffer sized to
-// the Surface's ACTUAL dimensions (never a small buffer left to the
-// compositor to smooth-scale -- see the upscale-approach decision for
-// why that was rejected). Surface lifecycle: silent no-op when no window
-// is attached, not an error and not an auto-interrupt (see the surface-
-// lifecycle decision) -- write() just returns.
+// upy-android native display module. OUR OWN bridge between
+// py_image.c's Image type and a real Android Surface. Not vendored
+// OpenMV source.
+// see session-state: display_module.cpp#module_design
 
 #include "display_module.h"
 
@@ -39,16 +23,7 @@ extern "C" {
 
 namespace {
 
-// Guards g_window itself (the pointer swap in display_set_window()) AND
-// every lock/write/unlockAndPost sequence in write() below -- the real
-// race the "silent no-op, not stale-handle UB" decision depends on:
-// surfaceDestroyed() -> setDisplaySurface(null) can fire on a Binder
-// thread while a running script's write() is mid-blit on the worker
-// thread. Without this, display_set_window() could
-// ANativeWindow_release() the window a concurrent write() is still
-// using. The only lock this module needs (there is exactly one producer
-// -- whichever thread called setDisplaySurface -- and one consumer --
-// the worker thread inside write()).
+// see session-state: display_module.cpp#g_window_mutex
 pthread_mutex_t g_window_mutex = PTHREAD_MUTEX_INITIALIZER;
 ANativeWindow *g_window = nullptr;
 
@@ -59,9 +34,8 @@ typedef struct _display_obj_t {
 } display_obj_t;
 
 // Largest of {1,2,4,8} such that BOTH src_w*factor<=buf_w AND
-// src_h*factor<=buf_h -- not width alone (see SESSION_STATE.yaml: a
-// width-only selection could overflow available height for a portrait-
-// shaped source frame).
+// src_h*factor<=buf_h.
+// see session-state: display_module.cpp#module_design
 int upscale_factor(int32_t src_w, int32_t src_h, int32_t buf_w, int32_t buf_h) {
     int factor = 1;
     for (int candidate : {2, 4, 8}) {
@@ -88,13 +62,8 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 2, pos_args + 2, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-    // x=/y=/hint= accepted (real scripts, e.g. lcd_shield.py, pass hint=
-    // image.CENTER | image.SCALE_ASPECT_KEEP) but not yet interpreted --
-    // this module's own upscale design (SESSION_STATE.yaml) already
-    // always centers and always keeps aspect via uniform power-of-2
-    // scaling, which is what CENTER | SCALE_ASPECT_KEEP asks for. Real
-    // per-hint-flag behavior (SCALE_ASPECT_IGNORE/EXPAND, explicit x/y
-    // placement) is a later increment if a real script needs it.
+    // x=/y=/hint= accepted but not yet interpreted.
+    // see session-state: display_module.cpp#module_design
 
     pthread_mutex_lock(&g_window_mutex);
     if (!g_window) {
@@ -105,8 +74,8 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
     ANativeWindow_Buffer buffer;
     if (ANativeWindow_lock(g_window, &buffer, nullptr) != 0) {
         // Stale/torn-down window that hasn't been detached via
-        // setDisplaySurface(null) yet -- treat the same as "no window",
-        // not an error, consistent with the no-op decision.
+        // setDisplaySurface(null) yet. Treat the same as "no window",
+        // not an error.
         pthread_mutex_unlock(&g_window_mutex);
         return mp_const_none;
     }
@@ -118,9 +87,7 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
     int32_t off_y = (buffer.height - scaled_h) / 2;
 
     auto *pixels = (uint32_t *) buffer.bits;
-    // Opaque black -- fills the letterbox/pillarbox margin in one pass
-    // (see SESSION_STATE.yaml: one native write pass does both the
-    // duplication and the centering, no separate scale-then-blit step).
+    // Opaque black. Fills the letterbox/pillarbox margin in one pass.
     memset(pixels, 0, (size_t) buffer.stride * buffer.height * 4);
 
     for (int32_t sy = 0; sy < src->h; sy++) {
@@ -193,9 +160,9 @@ MP_DEFINE_CONST_DICT(display_module_globals, display_module_globals_table);
 
 } // namespace
 
-// extern "C" (not inside the anonymous namespace above) -- same linkage
-// reasoning as csi_module in camera_module.cpp: genhdr/moduledefs.h
-// declares this with C linkage.
+// extern "C", not inside the anonymous namespace above. genhdr/
+// moduledefs.h declares this with C linkage, same reasoning as
+// csi_module in camera_module.cpp.
 extern "C" const mp_obj_module_t display_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &display_module_globals,
@@ -210,11 +177,9 @@ extern "C" void display_set_window(ANativeWindow *new_window) {
     }
     g_window = new_window;
     if (g_window) {
-        // Fixed format, current (real) Surface size (0,0 keeps whatever
-        // the SurfaceView's actual layout size already is) -- write()'s
-        // own upscale math depends on the buffer being the Surface's
-        // real display size, never a small buffer left for the
-        // compositor to smooth-scale (see SESSION_STATE.yaml).
+        // Fixed format, current (real) Surface size. (0,0) keeps
+        // whatever the SurfaceView's actual layout size already is.
+        // see session-state: display_module.cpp#module_design
         ANativeWindow_setBuffersGeometry(g_window, 0, 0, WINDOW_FORMAT_RGBA_8888);
     }
     pthread_mutex_unlock(&g_window_mutex);
