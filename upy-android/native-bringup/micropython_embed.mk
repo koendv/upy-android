@@ -213,5 +213,15 @@ SRC_QSTR += ../app/src/main/cpp/android_module.cpp
 SRC_QSTR += ../app/src/main/cpp/tf_module.cpp
 CFLAGS += -I../app/src/main/cpp/litert/include
 
+# rt_module.cpp -- OUR OWN native module (android.rt, see that file's own
+# header comment). Same litert/include -I as tf_module.cpp above (both
+# link the same libLiteRt.so; rt_module.cpp just #includes litert/c/*
+# instead of tflite/c/*), so no new CFLAGS needed here, only the SRC_QSTR
+# entry itself -- same minimal case as android_module.cpp above (no new
+# qstr-stub headers, only py/runtime.h/py/obj.h/py/mperrno.h and portable
+# standard-library headers already proven fine by tf_module.cpp's own
+# <cmath>/<limits> usage).
+SRC_QSTR += ../app/src/main/cpp/rt_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk
