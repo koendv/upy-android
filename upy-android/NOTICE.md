@@ -70,6 +70,19 @@ android.tf module:
 - Source: https://github.com/google-ai-edge/LiteRT, `litert/test/testdata/add_simple.tflite`
 - License: Apache License 2.0
 
+`examples/quant/single_add_default_a8w8_recipe_quantized.tflite` is also
+LiteRT's own test fixture (a single int8-quantized add op, real
+per-tensor scale/zero_point). Deliberately not filed under a
+module-specific directory: the .tflite format works with either
+module's API, and it was actually first used through android.tf.Model
+to verify the round/clamp quantization fix in tf_module.cpp's
+set_input_ndarray(). Meant to also cover a future android.rt module
+selftest against the same fixture; not yet used by any committed
+script:
+
+- Source: https://github.com/google-ai-edge/LiteRT, `litert/test/testdata/single_add_default_a8w8_recipe_quantized.tflite`
+- License: Apache License 2.0
+
 ## App icon
 
 `app/src/main/res/drawable/ic_launcher_foreground.xml` is derived from the
