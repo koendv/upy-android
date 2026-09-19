@@ -2,7 +2,9 @@
 // android.tf.Model wraps LiteRT's classic TfLiteInterpreter C API.
 // see session-state: tf_module.cpp#module_design
 
+#include <cmath>
 #include <cstring>
+#include <limits>
 
 #include <android/NeuralNetworks.h>
 
@@ -268,6 +270,16 @@ int tf_ulab_dtype_for_tflite(TfLiteType type) {
     }
 }
 
+// round to nearest, then saturate to T's range.
+// see session-state: tf_module.cpp#tf_quantize_round_clamp
+template <typename T>
+T tf_quantize_round_clamp(float raw) {
+    float rounded = roundf(raw);
+    float lo = (float) std::numeric_limits<T>::min();
+    float hi = (float) std::numeric_limits<T>::max();
+    return (T) fmaxf(lo, fminf(hi, rounded));
+}
+
 // ulab-ndarray-typed sibling of set_input(), a separate method (not a
 // type-check inside set_input()) so set_input()'s own invariants stay
 // untouched.
@@ -334,10 +346,10 @@ mp_obj_t tf_model_set_input_ndarray(size_t n_args, const mp_obj_t *pos_args, mp_
             float v = (float) ndarray_get_float_index(src->array, src->dtype, i);
             float raw = v * inv_scale + quant.zero_point;
             switch (tensor_type) {
-                case kTfLiteInt8: ((int8_t *) dst)[i] = (int8_t) raw; break;
-                case kTfLiteUInt8: ((uint8_t *) dst)[i] = (uint8_t) raw; break;
-                case kTfLiteInt16: ((int16_t *) dst)[i] = (int16_t) raw; break;
-                case kTfLiteUInt16: ((uint16_t *) dst)[i] = (uint16_t) raw; break;
+                case kTfLiteInt8: ((int8_t *) dst)[i] = tf_quantize_round_clamp<int8_t>(raw); break;
+                case kTfLiteUInt8: ((uint8_t *) dst)[i] = tf_quantize_round_clamp<uint8_t>(raw); break;
+                case kTfLiteInt16: ((int16_t *) dst)[i] = tf_quantize_round_clamp<int16_t>(raw); break;
+                case kTfLiteUInt16: ((uint16_t *) dst)[i] = tf_quantize_round_clamp<uint16_t>(raw); break;
                 default: break;
             }
         }
