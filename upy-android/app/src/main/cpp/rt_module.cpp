@@ -615,7 +615,21 @@ mp_obj_t rt_model_get_output_ndarray(size_t n_args, const mp_obj_t *pos_args, mp
     if (elem_type == kLiteRtElementTypeFloat32) {
         memcpy(dst_f, host_ptr, out->len * sizeof(float));
     } else {
-        // Per-tensor-only, already enforced in rt_fill_tensor_info().
+        // NOT already enforced in rt_fill_tensor_info() -- that function
+        // only rejects per-channel/block-wise, it lets kLiteRtQuantizationNone
+        // through (legitimate; set_input_ndarray() explicitly rejects
+        // that case itself, below the equivalent point in that function).
+        // Without this guard, a None-quantization non-float tensor
+        // dequantized through info->quant (scale=0.0/zero_point=0,
+        // never populated for the None case) to a silently all-zero
+        // float ndarray. Caught via external code review, verified
+        // against this file directly before fixing.
+        if (info->quant_type_id != kLiteRtQuantizationPerTensor) {
+            LiteRtUnlockTensorBuffer(self->output_bufs[index]);
+            raise_os_error(MP_EINVAL,
+                "android.rt: get_output_ndarray() requires per-tensor scale/zero_point; "
+                "this tensor has none");
+        }
         for (size_t i = 0; i < out->len; i++) {
             float raw;
             switch (elem_type) {

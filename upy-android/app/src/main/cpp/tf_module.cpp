@@ -212,14 +212,19 @@ mp_obj_t tf_model_set_input(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
     }
 
     // Must re-run AllocateTensors() after SetCustomAllocationForTensor
-    // (c_api_experimental.h's own documented requirement).
-    self->input_aliased = true;
+    // (c_api_experimental.h's own documented requirement). input_aliased
+    // is only set on success -- if reallocation fails, the object must
+    // not look like it's in a valid aliased state (a subsequent
+    // set_input() call would otherwise take the "must be 64-byte-aligned"
+    // branch instead of failing cleanly again). Caught via external code
+    // review, verified against this file directly before fixing.
     if (TfLiteInterpreterAllocateTensors(self->interpreter) != kTfLiteOk) {
         raise_os_error(MP_EIO,
             "android.tf: zero-copy alias succeeded but reallocating tensors "
             "afterward failed -- this model is no longer usable, construct a "
             "new Model()");
     }
+    self->input_aliased = true;
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(tf_model_set_input_obj, 1, tf_model_set_input);
@@ -252,7 +257,16 @@ mp_obj_t tf_model_get_output(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
     if (!tensor) {
         raise_os_error(MP_EINVAL, "android.tf: no output tensor at that index");
     }
-    return mp_obj_new_bytes((const byte *) TfLiteTensorData(tensor), TfLiteTensorByteSize(tensor));
+    const void *data = TfLiteTensorData(tensor);
+    if (!data) {
+        // Null for a genuinely dynamic-output-shape tensor before its
+        // first invoke() resizes/allocates it, even though
+        // AllocateTensors() already succeeded for the rest of the model
+        // at construction. Caught via external code review, verified
+        // against this file directly before fixing.
+        raise_os_error(MP_EINVAL, "android.tf: invoke() must be called before get_output()");
+    }
+    return mp_obj_new_bytes((const byte *) data, TfLiteTensorByteSize(tensor));
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(tf_model_get_output_obj, 1, tf_model_get_output);
 
@@ -407,6 +421,11 @@ mp_obj_t tf_model_get_output_ndarray(size_t n_args, const mp_obj_t *pos_args, mp
     }
 
     const void *src = TfLiteTensorData(tensor);
+    if (!src) {
+        // Same dynamic-output-shape trap as tf_model_get_output()'s own
+        // null check, see that function's comment.
+        raise_os_error(MP_EINVAL, "android.tf: invoke() must be called before get_output_ndarray()");
+    }
 
     if (tensor_type == kTfLiteFloat32) {
         ndarray_obj_t *out = ndarray_new_dense_ndarray(ndim, shape, NDARRAY_FLOAT);
