@@ -14,6 +14,7 @@ extern "C" {
 #include "camera_module.h"
 #include "display_module.h"
 #include "imu_module.h"
+#include "rt_module.h"
 #include "tf_module.h"
 
 namespace {
@@ -97,6 +98,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint 
     camera_close_all();
     imu_close_all();
     tf_close_all();
+    rt_close_all();
 
     if (g_initialized) {
         mp_embed_deinit();
@@ -117,6 +119,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
     camera_close_all();
     imu_close_all();
     tf_close_all();
+    rt_close_all();
     if (g_initialized) {
         mp_embed_deinit();
         g_initialized = false;

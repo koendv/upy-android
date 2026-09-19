@@ -33,6 +33,10 @@ extern const mp_obj_fun_builtin_fixed_t android_zoom_range_obj;
 extern const mp_obj_fun_builtin_fixed_t android_tf_info_obj;
 extern const mp_obj_type_t tf_model_type;
 
+// android.rt.Model, same reasoning as tf_model_type above.
+extern const mp_obj_fun_builtin_fixed_t android_rt_info_obj;
+extern const mp_obj_type_t rt_model_type;
+
 namespace {
 
 const mp_rom_map_elem_t android_proximity_globals_table[] = {
@@ -62,6 +66,13 @@ const mp_rom_map_elem_t android_tf_globals_table[] = {
 };
 MP_DEFINE_CONST_DICT(android_tf_globals, android_tf_globals_table);
 
+const mp_rom_map_elem_t android_rt_globals_table[] = {
+    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_rt)},
+    {MP_ROM_QSTR(MP_QSTR_info), MP_ROM_PTR(&android_rt_info_obj)},
+    {MP_ROM_QSTR(MP_QSTR_Model), MP_ROM_PTR(&rt_model_type)},
+};
+MP_DEFINE_CONST_DICT(android_rt_globals, android_rt_globals_table);
+
 // Plain mp_obj_module_t, same as imu_module.
 // see session-state: android_module.cpp#module_design
 const mp_obj_module_t android_proximity_module = {
@@ -80,6 +91,10 @@ const mp_obj_module_t android_tf_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &android_tf_globals,
 };
+const mp_obj_module_t android_rt_module = {
+    .base = {&mp_type_module},
+    .globals = (mp_obj_dict_t *) &android_rt_globals,
+};
 
 const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_android)},
@@ -88,6 +103,7 @@ const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_light), MP_ROM_PTR(&android_light_module)},
     {MP_ROM_QSTR(MP_QSTR_zoom), MP_ROM_PTR(&android_zoom_module)},
     {MP_ROM_QSTR(MP_QSTR_tf), MP_ROM_PTR(&android_tf_module)},
+    {MP_ROM_QSTR(MP_QSTR_rt), MP_ROM_PTR(&android_rt_module)},
 };
 MP_DEFINE_CONST_DICT(android_module_globals, android_module_globals_table);
 

@@ -52,6 +52,7 @@ add_library(upy_engine SHARED
     imu_module.cpp
     android_module.cpp
     tf_module.cpp
+    rt_module.cpp
     ${MPY_PY_SOURCES}
     ${MPY_PORT_SOURCES}
     ${MPY_SHARED_SOURCES}
