@@ -9,13 +9,18 @@
 # from two different places, both pinned to the same litert release
 # (2.2.0, matching the Maven coordinate in app/build.gradle.kts):
 #
-# 1. The .so itself: extracted directly from Google's own published AAR
+# 1. The .so files: extracted directly from Google's own published AAR
 #    (dl.google.com, same artifact Gradle resolves at
 #    com.google.ai.edge.litert:litert:2.2.0) -- NOT from Gradle's own
 #    module cache (unstable hash-named subdirectory, and not guaranteed
 #    downloaded yet at CMake-configure time; only :app:assembleDebug
 #    actually pulls the binary in, :app:dependencies only resolves POM
-#    metadata -- confirmed directly, not assumed).
+#    metadata -- confirmed directly, not assumed). Two .so's ship here:
+#    libLiteRt.so (the C API, linked by CMakeLists.txt) and
+#    libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate, staged for
+#    future android.rt module work only -- not linked, and excluded
+#    from the APK by Gradle's own jniLibs packaging, see
+#    app/build.gradle.kts).
 # 2. The C headers: the AAR itself ships NONE (confirmed by extracting it
 #    directly and finding zero .h files) -- pulled from a shallow, sparse
 #    clone of the upstream LiteRT source at the matching v2.2.0 tag
@@ -40,9 +45,14 @@ mkdir -p "$OUT_DIR/lib" "$OUT_DIR/include"
 echo "fetch-litert: downloading litert-${LITERT_VERSION}.aar..."
 curl -sL -o "$WORK_DIR/litert.aar" "$AAR_URL"
 
-echo "fetch-litert: extracting arm64-v8a .so (this project is arm64-v8a only, see build.gradle.kts abiFilters)..."
-unzip -oq "$WORK_DIR/litert.aar" "jni/arm64-v8a/libLiteRt.so" -d "$WORK_DIR/aar"
+echo "fetch-litert: extracting arm64-v8a .so files (this project is arm64-v8a only, see build.gradle.kts abiFilters)..."
+unzip -oq "$WORK_DIR/litert.aar" "jni/arm64-v8a/libLiteRt.so" "jni/arm64-v8a/libLiteRtClGlAccelerator.so" -d "$WORK_DIR/aar"
 cp "$WORK_DIR/aar/jni/arm64-v8a/libLiteRt.so" "$OUT_DIR/lib/libLiteRt.so"
+# GPU/OpenCL-GL delegate, staged here for future android.rt module work
+# only. NOT linked by CMakeLists.txt, and Gradle's own jniLibs packaging
+# explicitly excludes it from the APK (app/build.gradle.kts) -- nothing
+# uses it yet, so it must not silently end up in a real build.
+cp "$WORK_DIR/aar/jni/arm64-v8a/libLiteRtClGlAccelerator.so" "$OUT_DIR/lib/libLiteRtClGlAccelerator.so"
 
 echo "fetch-litert: sparse-cloning LiteRT source at v${LITERT_VERSION} for C API headers only..."
 git clone --quiet --depth 1 --branch "v${LITERT_VERSION}" \
@@ -74,4 +84,4 @@ cp -r "$WORK_DIR/LiteRT/tflite/core/async" "$OUT_DIR/include/tflite/core/async"
 mkdir -p "$OUT_DIR/include/tflite/converter"
 cp -r "$WORK_DIR/LiteRT/tflite/converter/core" "$OUT_DIR/include/tflite/converter/core"
 
-echo "fetch-litert: done -- $(du -h "$OUT_DIR/lib/libLiteRt.so" | cut -f1) .so, $(find "$OUT_DIR/include" -name '*.h' | wc -l) headers"
+echo "fetch-litert: done -- $(du -h "$OUT_DIR/lib/libLiteRt.so" | cut -f1) libLiteRt.so, $(du -h "$OUT_DIR/lib/libLiteRtClGlAccelerator.so" | cut -f1) libLiteRtClGlAccelerator.so (unused), $(find "$OUT_DIR/include" -name '*.h' | wc -l) headers"
