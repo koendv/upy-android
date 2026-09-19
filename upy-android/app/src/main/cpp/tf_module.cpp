@@ -341,7 +341,12 @@ mp_obj_t tf_model_set_input_ndarray(size_t n_args, const mp_obj_t *pos_args, mp_
         tensor_type == kTfLiteInt16 || tensor_type == kTfLiteUInt16) {
         // real = scale * (raw - zero_point), inverted: raw = value/scale + zero_point.
         TfLiteQuantizationParams quant = TfLiteTensorQuantizationParams(tensor);
-        float inv_scale = quant.scale != 0.0f ? (1.0f / quant.scale) : 1.0f;
+        if (quant.scale == 0.0f) {
+            raise_os_error(MP_EINVAL,
+                "android.tf: set_input_ndarray() requires per-tensor scale/zero_point; "
+                "this tensor has none (possibly per-channel quantized), use set_input() instead");
+        }
+        float inv_scale = 1.0f / quant.scale;
         for (size_t i = 0; i < len; i++) {
             float v = (float) ndarray_get_float_index(src->array, src->dtype, i);
             float raw = v * inv_scale + quant.zero_point;
@@ -410,6 +415,11 @@ mp_obj_t tf_model_get_output_ndarray(size_t n_args, const mp_obj_t *pos_args, mp
     }
 
     TfLiteQuantizationParams quant = TfLiteTensorQuantizationParams(tensor);
+    if (quant.scale == 0.0f) {
+        raise_os_error(MP_EINVAL,
+            "android.tf: get_output_ndarray() requires per-tensor scale/zero_point; "
+            "this tensor has none (possibly per-channel quantized), use get_output() instead");
+    }
     ndarray_obj_t *out = ndarray_new_dense_ndarray(ndim, shape, NDARRAY_FLOAT);
     float *dst_f = (float *) out->array;
     for (size_t i = 0; i < out->len; i++) {
