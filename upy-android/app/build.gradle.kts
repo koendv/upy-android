@@ -51,6 +51,13 @@ android {
             // (Android refuses to install an unsigned APK) without
             // introducing keystore/secret management. See NOTICE.md/
             // README for the "prototype/datapoint" framing this matches.
+            //
+            // If this is ever turned on: litert-api's own proguard.txt
+            // only keeps @UsedByReflection-annotated members, NOT
+            // JniHandle -- the raw-handle-extraction trick in
+            // litert_jni_bridge.cpp (GetFieldID(JniHandle, "handle",
+            // "J")) would silently break if R8 renames/removes that
+            // field. Not fixed here; inert while this stays false.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -65,11 +72,15 @@ android {
         compose = true
     }
 
-    // libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate from the
-    // litert AAR's own jni/arm64-v8a/ folder) used to be excluded from
-    // packaging here. android.rt's LiteRtEnvironment auto-discovers and
-    // dlopen()s it by name at runtime, see rt_module.cpp, so it must
-    // actually ship in the APK now. See NOTICE.md for licensing.
+    // libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate) is staged
+    // directly into src/main/jniLibs/arm64-v8a/ by native-bringup/
+    // fetch-litert.sh, not sourced from an AAR's own jni/ folder any
+    // more (see the litert-api dependency's own comment below for why)
+    // -- android.rt's/android.litert's LiteRtEnvironment auto-discovers
+    // and dlopen()s it by name at runtime, see rt_module.cpp, so it
+    // must actually ship in the APK. AGP scans jniLibs/<abi>/ by
+    // convention, no extra packaging config needed. See NOTICE.md for
+    // licensing.
 }
 
 dependencyLocking {
@@ -92,35 +103,36 @@ dependencies {
     // same author as micro-repl, same version they depend on. Verified
     // MIT-licensed before adding (see NOTICE.md).
     implementation("io.github.ma7moud3ly:nemo-editor:1.0.4")
-    // LiteRT (TensorFlow Lite's successor, Apache 2.0) -- pulled in for
-    // its native libLiteRt.so + C API only (android.tf module, see
-    // SESSION_STATE.yaml's "android.tf" design discussion); nothing from
-    // its Java/Kotlin API surface is used. NOT com.google.ai.edge.litert:
-    // litert-api -- that AAR's own liblitert_jni.so was checked directly
-    // (nm -D) and exports zero TfLite* symbols, it's a different-purpose
-    // artifact. This is the project's first prebuilt-binary native
-    // dependency (see NOTICE.md) -- everything else vendored is compiled
-    // from source. The AAR ships no C headers (confirmed empty by
-    // extracting it directly) -- headers come from a separate LiteRT
-    // source checkout instead, see native-bringup's own LiteRT header
-    // vendoring for exactly which files and why.
+    // LiteRT's Kotlin/Java API (android.litert module, see
+    // litert_module.cpp/LiteRtShim.kt) -- reuses Google's own tested
+    // setup/buffer-type-resolution/accelerator-option logic rather than
+    // re-deriving it, the way rt_module.cpp had to (and got wrong twice
+    // along the way: the dynamic-dim bug, the "options not optional"
+    // bug -- see SESSION_STATE.yaml). Real, permanent dependency now --
+    // previously added only for a throwaway diagnostic and fully
+    // reverted afterward. Accepted APK-size cost (Guava, WorkManager,
+    // Play Core classes, ~7MB raw, isMinifyEnabled=false strips
+    // nothing) -- verified this project's own use of it (Environment/
+    // CompiledModel/TensorBuffer only, never AssetPackManager/
+    // ModelProvider) cannot trigger actual Play Store network contact
+    // (see SESSION_STATE.yaml's manifest-by-manifest investigation of
+    // every transitive dependency). WorkManager's own unconditional
+    // auto-init is stripped via AndroidManifest.xml's own provider
+    // override, for cleanliness, not because it's unsafe (it's purely
+    // local/on-device).
     //
-    // litert-api excluded: a transitive dependency of litert (not
-    // declared directly, never used -- confirmed via classes.jar/
-    // AndroidManifest.xml inspection it's LiteRT's optional Java "AI
-    // Pack" dynamic model-download-from-Play-Store feature, not the
-    // inference engine itself). Pulls in real weight for a feature this
-    // project has no use for (android.tf loads models from the VFS, same
-    // as every other resource here, never from Play): Guava 3.08MB,
-    // WorkManager 1.84MB, Play Services basement/tasks, Play Core asset-
-    // delivery/ai-delivery, AndroidX Room/SQLite -- ~7MB raw, genuinely
-    // shipped in the APK since release's isMinifyEnabled=false strips
-    // nothing. Also brings its own FOREGROUND_SERVICE/
-    // FOREGROUND_SERVICE_DATA_SYNC manifest permissions ("Required for
-    // downloading AiPack models") -- unwanted surface for an offline,
-    // script-driven app with no other Play Services dependency anywhere
-    // in this project.
-    implementation("com.google.ai.edge.litert:litert:2.2.0") {
-        exclude(group = "com.google.ai.edge.litert", module = "litert-api")
-    }
+    // NOT also com.google.ai.edge.litert:litert:2.2.0 (the artifact this
+    // project used to depend on for android.tf's classic API surface,
+    // which this dependency doesn't provide) -- both AARs declare the
+    // same namespace ("com.google.ai.edge.litert"), and AGP refuses to
+    // merge two libraries sharing one namespace. Resolved by not
+    // depending on litert:2.2.0 at all: its only two .so's
+    // (libLiteRt.so, libLiteRtClGlAccelerator.so) are already covered
+    // by CMakeLists.txt's own `litert` IMPORTED target (auto-packaged
+    // by AGP, confirmed present in the built APK) and by
+    // fetch-litert.sh's jniLibs staging step, respectively -- neither
+    // needs a Gradle dependency to ship. This is still the project's
+    // first prebuilt-binary native dependency (see NOTICE.md) --
+    // everything else vendored is compiled from source.
+    implementation("com.google.ai.edge.litert:litert-api:2.2.0")
 }

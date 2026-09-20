@@ -14,6 +14,7 @@ extern "C" {
 #include "camera_module.h"
 #include "display_module.h"
 #include "imu_module.h"
+#include "litert_module.h"
 #include "rt_module.h"
 #include "tf_module.h"
 
@@ -22,6 +23,14 @@ namespace {
 constexpr size_t kHeapSize = 32 * 1024 * 1024;
 char g_heap[kHeapSize];
 bool g_initialized = false;
+
+// Cached once, on the single persistent "mp-engine-worker" thread (see
+// EngineWorker.kt), before any script runs. That thread is a real
+// java.lang.Thread from birth and stays JVM-attached for the :engine
+// process's entire lifetime, so litert_jni_bridge.cpp's GetEnv()-per-call
+// pattern (built on this JavaVM*) never needs Attach/DetachCurrentThread.
+// see session-state: litert_module.cpp#threading
+JavaVM *g_jvm = nullptr;
 
 // Bridges mp_embed's plain-C chunk callback to a JNI upcall on the sink
 // object passed into nativeExec. Lives only for the duration of one
@@ -48,6 +57,10 @@ extern "C" JNIEXPORT jboolean JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint stackSizeBytes, jstring rootPath) {
     if (g_initialized) {
         return JNI_TRUE;
+    }
+    if (!g_jvm) {
+        env->GetJavaVM(&g_jvm);
+        litert_bridge_init(env);
     }
     const char *root_path_chars = env->GetStringUTFChars(rootPath, nullptr);
     int stack_top;
@@ -99,6 +112,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint 
     imu_close_all();
     tf_close_all();
     rt_close_all();
+    litert_close_all();
 
     if (g_initialized) {
         mp_embed_deinit();
@@ -120,6 +134,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
     imu_close_all();
     tf_close_all();
     rt_close_all();
+    litert_close_all();
     if (g_initialized) {
         mp_embed_deinit();
         g_initialized = false;

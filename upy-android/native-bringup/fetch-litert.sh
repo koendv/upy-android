@@ -114,4 +114,14 @@ cat > "$OUT_DIR/include/litert/build_common/build_config.h" <<'BUILD_CONFIG_EOF'
 #endif  // LITERT_BUILD_COMMON_BUILD_CONFIG_H_
 BUILD_CONFIG_EOF
 
+# libLiteRtClGlAccelerator.so is never a CMake link target (dlopen()'d
+# by name only, see this file's own header comment) and, unlike
+# libLiteRt.so, isn't auto-packaged by AGP's CMake-IMPORTED-target
+# mechanism either -- it must be staged where AGP scans for prebuilt
+# .so's by convention (jniLibs/<abi>/) to ship in the APK at all. Used
+# to be a manual one-off copy step; folded in here so a fresh clone
+# building for the first time gets it automatically.
+mkdir -p app/src/main/jniLibs/arm64-v8a
+cp "$OUT_DIR/lib/libLiteRtClGlAccelerator.so" app/src/main/jniLibs/arm64-v8a/
+
 echo "fetch-litert: done -- $(du -h "$OUT_DIR/lib/libLiteRt.so" | cut -f1) libLiteRt.so, $(du -h "$OUT_DIR/lib/libLiteRtClGlAccelerator.so" | cut -f1) libLiteRtClGlAccelerator.so, $(find "$OUT_DIR/include" -name '*.h' | wc -l) headers"

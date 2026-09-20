@@ -223,5 +223,14 @@ CFLAGS += -I../app/src/main/cpp/litert/include
 # <cmath>/<limits> usage).
 SRC_QSTR += ../app/src/main/cpp/rt_module.cpp
 
+# litert_module.cpp -- OUR OWN native module (android.litert, see that
+# file's own header comment). Same litert/include -I as tf_module.cpp/
+# rt_module.cpp above (already global from tf_module.cpp's own CFLAGS
+# line), no new CFLAGS needed. litert_jni_bridge.cpp deliberately NOT
+# listed here -- it #includes <jni.h>, no qstr-stub exists for JNI
+# headers, same reasoning as engine_jni.cpp's own exclusion from this
+# list (and this file has no MP_QSTR_* usage of its own to scan for).
+SRC_QSTR += ../app/src/main/cpp/litert_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk

@@ -37,6 +37,16 @@ extern const mp_obj_type_t tf_model_type;
 extern const mp_obj_fun_builtin_fixed_t android_rt_info_obj;
 extern const mp_obj_type_t rt_model_type;
 
+// android.litert.{Environment,CompiledModel,TensorBuffer,Options,
+// Accelerator}, same reasoning as tf_model_type above.
+extern const mp_obj_fun_builtin_fixed_t android_litert_set_backend_obj;
+extern const mp_obj_fun_builtin_fixed_t android_litert_get_backend_obj;
+extern const mp_obj_type_t litert_environment_type;
+extern const mp_obj_type_t litert_compiled_model_type;
+extern const mp_obj_type_t litert_tensor_buffer_type;
+extern const mp_obj_type_t litert_options_type;
+extern const mp_obj_module_t litert_accelerator_module;
+
 namespace {
 
 const mp_rom_map_elem_t android_proximity_globals_table[] = {
@@ -73,6 +83,18 @@ const mp_rom_map_elem_t android_rt_globals_table[] = {
 };
 MP_DEFINE_CONST_DICT(android_rt_globals, android_rt_globals_table);
 
+const mp_rom_map_elem_t android_litert_globals_table[] = {
+    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_litert)},
+    {MP_ROM_QSTR(MP_QSTR_set_backend), MP_ROM_PTR(&android_litert_set_backend_obj)},
+    {MP_ROM_QSTR(MP_QSTR_get_backend), MP_ROM_PTR(&android_litert_get_backend_obj)},
+    {MP_ROM_QSTR(MP_QSTR_Environment), MP_ROM_PTR(&litert_environment_type)},
+    {MP_ROM_QSTR(MP_QSTR_CompiledModel), MP_ROM_PTR(&litert_compiled_model_type)},
+    {MP_ROM_QSTR(MP_QSTR_TensorBuffer), MP_ROM_PTR(&litert_tensor_buffer_type)},
+    {MP_ROM_QSTR(MP_QSTR_Options), MP_ROM_PTR(&litert_options_type)},
+    {MP_ROM_QSTR(MP_QSTR_Accelerator), MP_ROM_PTR(&litert_accelerator_module)},
+};
+MP_DEFINE_CONST_DICT(android_litert_globals, android_litert_globals_table);
+
 // Plain mp_obj_module_t, same as imu_module.
 // see session-state: android_module.cpp#module_design
 const mp_obj_module_t android_proximity_module = {
@@ -95,6 +117,10 @@ const mp_obj_module_t android_rt_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &android_rt_globals,
 };
+const mp_obj_module_t android_litert_module = {
+    .base = {&mp_type_module},
+    .globals = (mp_obj_dict_t *) &android_litert_globals,
+};
 
 const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_android)},
@@ -104,6 +130,7 @@ const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_zoom), MP_ROM_PTR(&android_zoom_module)},
     {MP_ROM_QSTR(MP_QSTR_tf), MP_ROM_PTR(&android_tf_module)},
     {MP_ROM_QSTR(MP_QSTR_rt), MP_ROM_PTR(&android_rt_module)},
+    {MP_ROM_QSTR(MP_QSTR_litert), MP_ROM_PTR(&android_litert_module)},
 };
 MP_DEFINE_CONST_DICT(android_module_globals, android_module_globals_table);
 

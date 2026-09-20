@@ -22,6 +22,11 @@ native-bringup/embed-arm64
 # rather than building it.
 app/src/main/cpp/litert/
 
+# libLiteRtClGlAccelerator.so, staged here by fetch-litert.sh (AGP scans
+# jniLibs/<abi>/ by convention) -- same ephemeral/regenerated-by-script
+# treatment as app/src/main/cpp/litert/ above.
+app/src/main/jniLibs/
+
 # Machine-specific (contains a local absolute SDK path)
 local.properties
 
