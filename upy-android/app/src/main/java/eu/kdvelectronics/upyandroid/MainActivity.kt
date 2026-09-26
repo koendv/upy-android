@@ -9,7 +9,6 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
@@ -44,6 +43,7 @@ import eu.kdvelectronics.upyandroid.ui.SettingsScreen
 import eu.kdvelectronics.upyandroid.ui.Symbol
 import eu.kdvelectronics.upyandroid.ui.SymbolIcon
 import eu.kdvelectronics.upyandroid.ui.TerminalScreen
+import eu.kdvelectronics.upyandroid.ui.UpyTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
         maybeRequestCameraPermission()
 
         setContent {
-            MaterialTheme {
+            UpyTheme {
                 val status by viewModel.status.collectAsState()
                 val vm = remember { viewModel }
                 val navController = rememberNavController()

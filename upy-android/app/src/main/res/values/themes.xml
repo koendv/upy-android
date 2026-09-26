@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Light variant. values-night/themes.xml defines the same style
+         name against the dark platform base, so Android's own -night
+         resource qualifier picks whichever matches the system setting,
+         no MaterialComponents/DayNight library dependency needed for a
+         single-Activity Compose app. Only affects the window background
+         shown briefly before Compose renders and default system-bar
+         icon contrast; Compose's own UpyTheme (Theme.kt) is what
+         actually themes every screen's own content. -->
+    <style name="Theme.Upy" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
