@@ -12,8 +12,10 @@ object Engine {
     }
 
     // rootPath: app-private storage dir (Context.filesDir.absolutePath),
-    // mounted as a jailed VfsPosix at "/".
-    external fun nativeInit(stackSizeBytes: Int, rootPath: String): Boolean
+    // mounted as a jailed VfsPosix at "/". heapSizeMb is fixed for this
+    // :engine process's entire lifetime -- changing it needs a real app
+    // restart, not just Reset. See EngineWorker.kt#start.
+    external fun nativeInit(stackSizeBytes: Int, heapSizeMb: Int, rootPath: String): Boolean
 
     // sink: optional, invoked synchronously on this same call/thread once
     // per print()/traceback write during execution. See EngineOutputSink
@@ -31,4 +33,17 @@ object Engine {
     // thread. Hands the resulting plain pointer to display_module.cpp
     // under its own lock. Pass null to detach.
     external fun nativeSetDisplaySurface(surface: Surface?)
+
+    // Writes directly into a mutex-protected native struct on the
+    // calling thread -- safe from any thread, same as
+    // nativeSetDisplaySurface. No heapSizeMb parameter here -- that is
+    // read once, in nativeInit() only; see this file's own comment on
+    // nativeInit and engine_jni.cpp#nativeSetSettings for why.
+    external fun nativeSetSettings(
+        sshEnabled: Boolean,
+        httpServerEnabled: Boolean,
+        httpPrivateFilesEnabled: Boolean,
+        litertPlaystoreEnabled: Boolean,
+        adbExecEnabled: Boolean,
+    )
 }

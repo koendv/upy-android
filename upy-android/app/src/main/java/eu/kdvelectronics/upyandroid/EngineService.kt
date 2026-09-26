@@ -2,9 +2,11 @@ package eu.kdvelectronics.upyandroid
 
 import android.app.Service
 import android.content.Intent
+import android.os.Bundle
 import android.os.IBinder
 import android.os.RemoteException
 import android.view.Surface
+import eu.kdvelectronics.upyandroid.managers.SettingsManager
 
 // Runs in the :engine process (android:process=":engine" in the
 // manifest). A native fault here does not take down the main app
@@ -13,6 +15,8 @@ import android.view.Surface
 // state is expected to reset then. This is the idle/lazy tier of the
 // two-tier reset design; this class does not need to implement reset
 // itself.
+// Exception: AdbExecProvider never unbinds. Not a leak.
+// see session-state: EngineService.kt#EngineService
 // see session-state: IEngine.aidl#reset
 class EngineService : Service() {
     // Constructed in onCreate(), not as a property initializer. filesDir,
@@ -28,7 +32,11 @@ class EngineService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        worker = EngineWorker(filesDir.absolutePath)
+        // Plain synchronous local read -- no AIDL round-trip needed.
+        // heap_size_mb is fixed for this process's whole lifetime;
+        // see EngineWorker.kt#start.
+        val heapSizeMb = SettingsManager(applicationContext).heapSizeMb
+        worker = EngineWorker(filesDir.absolutePath, heapSizeMb)
         worker.start()
     }
 
@@ -58,6 +66,22 @@ class EngineService : Service() {
         // ANativeWindow_fromSurface() needs. See Engine.kt.
         override fun setDisplaySurface(surface: Surface?) {
             Engine.nativeSetDisplaySurface(surface)
+        }
+
+        // Deliberately not queued, same reasoning as setDisplaySurface
+        // above: touches only a mutex-protected native struct, not
+        // MicroPython/GC state, so it must not wait behind a running
+        // script. See IEngine.aidl#setSettings.
+        override fun setSettings(settings: Bundle) {
+            // No heap_size_mb here -- that is read once, locally, in
+            // onCreate() above. See Engine.kt#nativeSetSettings.
+            Engine.nativeSetSettings(
+                settings.getBoolean("ssh_enabled", false),
+                settings.getBoolean("http_server_enabled", false),
+                settings.getBoolean("http_private_files_enabled", false),
+                settings.getBoolean("litert_playstore_enabled", false),
+                settings.getBoolean("adb_exec_enabled", false),
+            )
         }
     }
 

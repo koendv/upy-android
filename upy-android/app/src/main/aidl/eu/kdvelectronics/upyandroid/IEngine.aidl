@@ -1,5 +1,6 @@
 package eu.kdvelectronics.upyandroid;
 
+import android.os.Bundle;
 import android.view.Surface;
 import eu.kdvelectronics.upyandroid.IEngineOutputListener;
 
@@ -36,4 +37,14 @@ interface IEngine {
     // script itself is never interrupted by this.
     // see session-state: IEngine.aidl#setDisplaySurface
     void setDisplaySurface(in Surface surface);
+
+    // Pushes the current, non-secret settings snapshot (see
+    // SettingsManager.kt) into :engine -- never ssh_password/
+    // http_password. Written directly into a native struct on this
+    // calling Binder thread, mirroring setDisplaySurface, not queued
+    // through the worker thread. Called on every successful connect
+    // (before the caller sees Connected) and again whenever the user
+    // changes a setting while connected.
+    // see session-state: IEngine.aidl#setSettings
+    void setSettings(in Bundle settings);
 }

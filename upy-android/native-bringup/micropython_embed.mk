@@ -232,5 +232,12 @@ SRC_QSTR += ../app/src/main/cpp/rt_module.cpp
 # list (and this file has no MP_QSTR_* usage of its own to scan for).
 SRC_QSTR += ../app/src/main/cpp/litert_module.cpp
 
+# settings_module.cpp -- OUR OWN native module (android.settings, see
+# that file's own header comment). Same minimal case as android_module.cpp
+# above (no new qstr-stub headers, only py/runtime.h/py/obj.h and
+# settings_state.h, which is plain C++ with no system headers of its
+# own).
+SRC_QSTR += ../app/src/main/cpp/settings_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk

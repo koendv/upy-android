@@ -45,6 +45,7 @@ fun TerminalScreen(
     onReconnect: () -> Unit,
     onOpenFiles: () -> Unit,
     onOpenCamera: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
     var input by viewModel.terminalInput
@@ -83,6 +84,7 @@ fun TerminalScreen(
                     )
                     TextButton(onClick = onOpenFiles) { Text("Files") }
                     TextButton(onClick = onOpenCamera) { Text("Camera") }
+                    TextButton(onClick = onOpenSettings) { Text("Settings") }
                 }
             )
         }

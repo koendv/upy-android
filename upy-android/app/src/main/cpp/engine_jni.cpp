@@ -3,6 +3,8 @@
 // see session-state: engine_jni.cpp#threading_contract
 
 #include <jni.h>
+#include <cstdlib>
+#include <mutex>
 #include <string>
 #include <android/native_window_jni.h>
 
@@ -16,20 +18,36 @@ extern "C" {
 #include "imu_module.h"
 #include "litert_module.h"
 #include "rt_module.h"
+#include "settings_state.h"
 #include "tf_module.h"
 
 namespace {
-// see session-state: engine_jni.cpp#kHeapSize
-constexpr size_t kHeapSize = 32 * 1024 * 1024;
-char g_heap[kHeapSize];
+constexpr int kDefaultHeapSizeMb = 32;
+char *g_heap = nullptr;
+size_t g_heap_size = 0;
 bool g_initialized = false;
+
+std::mutex g_settings_mutex;
+SettingsSnapshot g_settings_snapshot = {kDefaultHeapSizeMb, false, false, false, false, false};
+
+// see session-state: engine_jni.cpp#allocate_heap
+void allocate_heap(int heap_size_mb) {
+    size_t requested = static_cast<size_t>(heap_size_mb) * 1024 * 1024;
+    char *buf = static_cast<char *>(malloc(requested));
+    if (!buf) {
+        requested = static_cast<size_t>(kDefaultHeapSizeMb) * 1024 * 1024;
+        buf = static_cast<char *>(malloc(requested));
+    }
+    g_heap = buf;
+    g_heap_size = requested;
+}
 
 // Cached once, on the single persistent "mp-engine-worker" thread (see
 // EngineWorker.kt), before any script runs. That thread is a real
 // java.lang.Thread from birth and stays JVM-attached for the :engine
 // process's entire lifetime, so litert_jni_bridge.cpp's GetEnv()-per-call
 // pattern (built on this JavaVM*) never needs Attach/DetachCurrentThread.
-// see session-state: litert_module.cpp#threading
+// see session-state: litert_jni_bridge.cpp#threading
 JavaVM *g_jvm = nullptr;
 
 // Bridges mp_embed's plain-C chunk callback to a JNI upcall on the sink
@@ -53,8 +71,20 @@ void chunk_cb_trampoline(const char *str, size_t len, void *context) {
 }
 }
 
+SettingsSnapshot settings_snapshot_get() {
+    std::lock_guard<std::mutex> lock(g_settings_mutex);
+    return g_settings_snapshot;
+}
+
+// heapSizeMb: read once here, from EngineWorker's own constructor arg
+// (itself read synchronously from SettingsManager in
+// EngineService.onCreate(), no AIDL involved) -- see
+// EngineWorker.kt#start for why this must NOT depend on anything
+// pushed over IEngine.aidl#setSettings. Fixed for this :engine
+// process's entire lifetime; changing it needs a real app restart, not
+// just Reset -- see nativeReset below.
 extern "C" JNIEXPORT jboolean JNICALL
-Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint stackSizeBytes, jstring rootPath) {
+Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint stackSizeBytes, jint heapSizeMb, jstring rootPath) {
     if (g_initialized) {
         return JNI_TRUE;
     }
@@ -63,8 +93,13 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint s
         litert_bridge_init(env);
     }
     const char *root_path_chars = env->GetStringUTFChars(rootPath, nullptr);
+    allocate_heap(static_cast<int>(heapSizeMb));
+    {
+        std::lock_guard<std::mutex> lock(g_settings_mutex);
+        g_settings_snapshot.heap_size_mb = static_cast<int>(heapSizeMb);
+    }
     int stack_top;
-    mp_embed_init(g_heap, kHeapSize, &stack_top, static_cast<size_t>(stackSizeBytes), root_path_chars);
+    mp_embed_init(g_heap, g_heap_size, &stack_top, static_cast<size_t>(stackSizeBytes), root_path_chars);
     env->ReleaseStringUTFChars(rootPath, root_path_chars);
     g_initialized = true;
     return JNI_TRUE;
@@ -104,7 +139,11 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInterrupt(JNIEnv *, jobject) {
     camera_interrupt_active_wait();
 }
 
-// Must be called on the worker thread, like nativeExec.
+// Must be called on the worker thread, like nativeExec. Reuses the
+// SAME g_heap buffer nativeInit() allocated -- heap size is fixed for
+// this :engine process's whole lifetime (set once at nativeInit(),
+// changed only by a real app restart, not by Reset -- see
+// nativeInit's own comment); no free/realloc here.
 // see session-state: engine_jni.cpp#nativeReset
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint stackSizeBytes, jstring rootPath) {
@@ -119,7 +158,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint 
     }
     const char *root_path_chars = env->GetStringUTFChars(rootPath, nullptr);
     int stack_top;
-    mp_embed_init(g_heap, kHeapSize, &stack_top, static_cast<size_t>(stackSizeBytes), root_path_chars);
+    mp_embed_init(g_heap, g_heap_size, &stack_top, static_cast<size_t>(stackSizeBytes), root_path_chars);
     env->ReleaseStringUTFChars(rootPath, root_path_chars);
     g_initialized = true;
 }
@@ -139,6 +178,30 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
         mp_embed_deinit();
         g_initialized = false;
     }
+    free(g_heap);
+    g_heap = nullptr;
+    g_heap_size = 0;
+}
+
+// nativeSetSettings: safe from any thread, same as nativeSetDisplaySurface.
+// heap_size_mb is deliberately NOT a parameter here -- it is read once,
+// at nativeInit() time only, and is immutable for this :engine
+// process's lifetime (see nativeInit's own comment); this call must
+// not overwrite g_settings_snapshot's own heap_size_mb field with a
+// not-yet-applied edit, or android.settings() would misreport it.
+// see session-state: engine_jni.cpp#nativeSetSettings
+extern "C" JNIEXPORT void JNICALL
+Java_eu_kdvelectronics_upyandroid_Engine_nativeSetSettings(
+    JNIEnv *, jobject,
+    jboolean sshEnabled, jboolean httpServerEnabled,
+    jboolean httpPrivateFilesEnabled, jboolean litertPlaystoreEnabled,
+    jboolean adbExecEnabled) {
+    std::lock_guard<std::mutex> lock(g_settings_mutex);
+    g_settings_snapshot.ssh_enabled = sshEnabled;
+    g_settings_snapshot.http_server_enabled = httpServerEnabled;
+    g_settings_snapshot.http_private_files_enabled = httpPrivateFilesEnabled;
+    g_settings_snapshot.litert_playstore_enabled = litertPlaystoreEnabled;
+    g_settings_snapshot.adb_exec_enabled = adbExecEnabled;
 }
 
 // see session-state: engine_jni.cpp#nativeSetDisplaySurface

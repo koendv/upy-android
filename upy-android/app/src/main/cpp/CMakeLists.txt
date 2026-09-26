@@ -51,6 +51,7 @@ add_library(upy_engine SHARED
     display_module.cpp
     imu_module.cpp
     android_module.cpp
+    settings_module.cpp
     tf_module.cpp
     rt_module.cpp
     litert_module.cpp

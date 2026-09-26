@@ -24,6 +24,7 @@ import eu.kdvelectronics.upyandroid.model.MicroFile
 import eu.kdvelectronics.upyandroid.ui.CameraScreen
 import eu.kdvelectronics.upyandroid.ui.EditorScreen
 import eu.kdvelectronics.upyandroid.ui.ExplorerScreen
+import eu.kdvelectronics.upyandroid.ui.SettingsScreen
 import eu.kdvelectronics.upyandroid.ui.TerminalScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -104,7 +105,15 @@ class MainActivity : ComponentActivity() {
                             status = status,
                             onReconnect = { boardManager.connect() },
                             onOpenFiles = { navController.navigate("explorer") },
-                            onOpenCamera = { navController.navigate("camera") }
+                            onOpenCamera = { navController.navigate("camera") },
+                            onOpenSettings = { navController.navigate("settings") }
+                        )
+                    }
+                    composable("settings") {
+                        SettingsScreen(
+                            settingsManager = settingsManager,
+                            onSettingsChanged = { boardManager.pushSettings() },
+                            onBack = { navController.popBackStack() }
                         )
                     }
                     composable("camera") {
