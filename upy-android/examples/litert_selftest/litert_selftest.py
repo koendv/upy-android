@@ -1,29 +1,24 @@
-# android.litert confidence test (v0: 'kotlin' backend only -- the 'c'
-# backend is designed but not yet enabled, see litert_module.cpp's own
-# header comment for why. This script does not exercise set_backend('c')
-# at all in v0).
+# litert confidence test (top-level `litert`, see Part 4 of the
+# dev-workflow-speedups plan -- was android.litert). litert deliberately
+# stays a faithful, literal mirror of litert-api's own Kotlin
+# TensorBuffer surface -- write_int8/read_int8 (raw bytes) plus
+# write_float/read_float/write_int/read_int/write_bool/read_bool/
+# write_long/read_long (typed arrays, one real Kotlin method each) --
+# with no ndarray/auto-quantize convenience layer of its own (that was
+# tried and dropped; see litert_module.cpp's own header comment).
+# android.rt already covers that use case.
 #
-# Same fixture and same 3 (in1, in2, expected) cases as rt_selftest.py
-# (examples/quant/single_add_default_a8w8_recipe_quantized.tflite,
-# TOLERANCE=0.02) -- but android.litert's surface is raw int8
-# (write_int8/read_int8), matching litert-api's own Kotlin interface
-# literally: there is no ndarray auto-quantize/dequantize convenience
-# layer here the way android.rt's set_input_ndarray/get_output_ndarray
-# has. So this script does its own quantize/dequantize arithmetic,
-# using the fixture's REAL per-tensor scale/zero_point, extracted
-# directly from the .tflite flatbuffer (not guessed, not copied from
-# rt_selftest.py, which never needed to state them since android.rt's
-# ndarray layer hides them).
-#
-# Setup: same as rt_selftest.py -- copy
-# single_add_default_a8w8_recipe_quantized.tflite onto the device as
-# /single_add_quant.tflite alongside this script, e.g.
+# Setup: same two fixtures as rt_selftest.py/tf_selftest.py --
 #   adb push examples/quant/single_add_default_a8w8_recipe_quantized.tflite /data/local/tmp/single_add_quant.tflite
-#   adb shell run-as eu.kdvelectronics.upyandroid cp /data/local/tmp/single_add_quant.tflite files/single_add_quant.tflite
+#   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
+#       'cat /data/local/tmp/single_add_quant.tflite > files/single_add_quant.tflite'
+#   adb push examples/tf_selftest/add_simple.tflite /data/local/tmp/add_simple.tflite
+#   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
+#       'cat /data/local/tmp/add_simple.tflite > files/add_simple.tflite'
 
-import android
+import litert
 
-MODEL_PATH = "/single_add_quant.tflite"
+QUANT_MODEL_PATH = "/single_add_quant.tflite"
 N = 32 * 32
 TOLERANCE = 0.02
 
@@ -41,10 +36,10 @@ def dequantize(raw, scale, zp):
     return (raw - zp) * scale
 
 
-def run_case(label, in1, in2, expected):
-    env = android.litert.Environment()
-    options = android.litert.Options(android.litert.Accelerator.CPU)
-    model = android.litert.CompiledModel(env, MODEL_PATH, options)
+def run_case_int8(label, in1, in2, expected):
+    env = litert.Environment()
+    options = litert.Options(litert.Accelerator.CPU)
+    model = litert.CompiledModel(env, QUANT_MODEL_PATH, options)
     inputs = model.create_input_buffers()
     outputs = model.create_output_buffers()
 
@@ -70,16 +65,44 @@ def run_case(label, in1, in2, expected):
     return ok
 
 
+def run_case_float():
+    # add_simple.tflite: real typed write_float()/read_float(), not
+    # write_int8()/read_int8() -- exercises the new typed pair directly,
+    # matching litert-api's own TensorBuffer.writeFloat()/readFloat().
+    env = litert.Environment()
+    options = litert.Options(litert.Accelerator.CPU)
+    model = litert.CompiledModel(env, "/add_simple.tflite", options)
+    inputs = model.create_input_buffers()
+    outputs = model.create_output_buffers()
+
+    values = (1.0, 2.0, 3.0, 4.0)
+    expected = (2.0, 4.0, 6.0, 8.0)
+    inputs[0].write_float(values)
+
+    model.run(inputs, outputs)
+    actual = outputs[0].read_float()
+
+    for buf in inputs + outputs:
+        buf.close()
+    model.close()
+    env.close()
+
+    ok = len(actual) == len(expected) and all(abs(a - b) <= 1e-5 for a, b in zip(actual, expected))
+    print(("PASS" if ok else "FAIL"), "write_float/read_float",
+          "input=%r expected=%r actual=%r" % (values, expected, tuple(actual)))
+    return ok
+
+
 def main():
-    print("android.litert selftest (v0, 'kotlin' backend)")
-    print("backend:", android.litert.get_backend())
+    print("litert selftest")
     cases = [
         ("sanity", 0.3, 0.0, 0.29954508),
         ("saturate", 1.25, 0.0, 0.99848368),
         ("round", 0.7002365218400001, 0.0, 0.69893852),
     ]
 
-    results = [run_case(label, in1, in2, expected) for label, in1, in2, expected in cases]
+    results = [run_case_int8(label, in1, in2, expected) for label, in1, in2, expected in cases]
+    results.append(run_case_float())
     print("PASS" if all(results) else "FAIL")
 
 

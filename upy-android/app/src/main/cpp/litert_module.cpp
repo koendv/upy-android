@@ -1,51 +1,63 @@
-// upy-android native litert module. OUR OWN code, NOT vendored OpenMV
-// source.
-// android.litert matches com.google.ai.edge.litert:litert-api's own
-// Kotlin interface with literal method-name parity (light style
-// adaptation: Python snake_case, not a redesign) -- Environment,
-// CompiledModel, TensorBuffer, Options, Accelerator, each exposed
-// separately, not folded into one Model god-object the way android.tf/
-// android.rt are. Deliberately additive: android.tf and android.rt stay
-// exactly as they are, untouched. Eventually android.litert replaces
-// both, but not atomically -- android.tf is the only path to NNAPI
-// hardware (the newer C API has zero NNAPI code anywhere, confirmed
-// against LiteRT's own source), so android.tf stays alive until
-// android.litert is proven on real hardware, deleted only afterward as
-// its own separate step.
+// upy-android native litert module (top-level `litert`, matching a
+// real/expected module name -- see Part 4 of the dev-workflow-speedups
+// plan). OUR OWN code, NOT vendored OpenMV source.
+// litert matches com.google.ai.edge.litert:litert-api's own Kotlin
+// interface with literal method-name parity (Python snake_case, not a
+// redesign, and not extended with a convenience layer of our own --
+// see this file's own header comment on why an ndarray convenience
+// layer was tried and dropped) -- Environment, CompiledModel,
+// TensorBuffer, Options, Accelerator, each exposed separately, not
+// folded into one Model god-object the way android.tf/android.rt are.
+// Deliberately additive: android.tf and android.rt stay exactly as
+// they are, untouched. Eventually litert replaces both, but not
+// atomically -- android.tf is the only path to NNAPI hardware (the
+// newer C API has zero NNAPI code anywhere, confirmed against LiteRT's
+// own source), so android.tf stays alive until litert is proven on
+// real hardware, deleted only afterward as its own separate step.
 //
-// Two genuinely separate mechanisms, not one -- though v0 only actually
-// USES one of them:
-// - Setup (Environment/CompiledModel/create_input_buffers/
-//   create_output_buffers) always goes through LiteRtShim.kt (two JNI
-//   crossings, unavoidable -- that logic only exists as Kotlin
-//   bytecode, reusing Google's own tested buffer-type/accelerator-
-//   option handling rather than re-deriving it, the way rt_module.cpp
-//   had to and got wrong twice along the way).
-// - The hot path (write_int8/read_int8/run) is DESIGNED around a
-//   GLOBAL runtime-switchable backend toggle (set_backend('c'|'kotlin')):
-//   'c' would call libLiteRt.so directly on a raw handle extracted via
-//   JNI field access (zero further JNI, same approach rt_module.cpp
-//   already uses); 'kotlin' calls through the shim (one JNI hop each
-//   time). v0 ONLY implements 'kotlin' -- set_backend('c') raises
-//   clearly rather than reaching the (already-written, not-yet-enabled)
-//   'c' code in litert_jni_bridge.cpp, because learning a Kotlin-
-//   created buffer's real byte size via the C API
-//   (LiteRtGetTensorBufferPackedSize) returned inconsistent garbage
-//   during v0 development despite the extracted handle itself being
-//   confirmed genuine -- a real, unresolved issue needing its own
-//   investigation, not a design gap. See session-state.
-// - close()/__del__ ALWAYS goes through the shim regardless of which
-//   hot-path backend was active -- the underlying native object has
-//   exactly one owner (Kotlin's own AutoCloseable), so bypassing it for
-//   destroy would desync Kotlin's own `destroyed` sentinel from
-//   reality. Only read/write/run are toggle-governed.
+// TensorBuffer exposes all five of the real litert-api's own typed
+// read/write pairs (int8, float, int, bool, long -- matching
+// TensorBuffer.writeInt8/writeFloat/writeInt/writeBoolean/writeLong
+// and their reads exactly, confirmed via javap against the real
+// litert-api-2.2.0 jar), all going through LiteRtShim.kt (JNI hops,
+// unavoidable -- that logic only exists as Kotlin bytecode, reusing
+// Google's own tested buffer-type/accelerator-option handling rather
+// than re-deriving it, the way rt_module.cpp had to and got wrong
+// twice along the way). There is no 'c' backend (v0 designed one;
+// dropped, not merely disabled). close()/__del__ likewise always goes
+// through the shim -- the underlying native object has exactly one
+// owner (Kotlin's own AutoCloseable).
 //
-// This file is qstr-scanned (SRC_QSTR in micropython_embed.mk) and
-// therefore must NOT #include <jni.h> (no qstr-stub exists for it,
-// same reason engine_jni.cpp is excluded from that list) -- all JNI
-// calls live in litert_jni_bridge.cpp, reached only through
-// litert_jni_bridge.h's primitive-typed (void*/long) boundary.
+// An ndarray convenience layer (write_ndarray/read_ndarray, auto-
+// quantizing against ulab.numpy.ndarray, matching android.rt's own
+// set_input_ndarray/get_output_ndarray) was designed and partially
+// built, then dropped: it needs per-tensor scale/zero_point, which
+// litert-api's own Kotlin surface does not expose at all (TensorType
+// has only ElementType+Layout, confirmed via javap -- no quantization
+// fields anywhere), and a Kotlin JniHandle's numeric `handle` field is
+// NOT a directly usable LiteRt C-API pointer (confirmed the hard way:
+// casting a Kotlin-extracted CompiledModel handle and calling
+// LiteRtGetCompiledModelInputBufferRequirements on it segfaulted on
+// real hardware -- almost certainly the same underlying fact as v0's
+// own LiteRtGetTensorBufferPackedSize-returns-garbage finding on
+// TensorBuffer handles, which in hindsight explains why the 'c'
+// backend could never have worked either). Recovering that
+// information would have needed a second, fully independent native
+// Environment/Model/Options/CompiledModel per CompiledModel construction,
+// purely for introspection -- real complexity and real risk for a
+// convenience layer this module's own design philosophy ("literal
+// method-name parity... not a redesign") argues against anyway.
+// android.rt already has a proven, working ndarray convenience layer
+// for exactly this numeric-workload use case and stays alive in this
+// codebase for that reason -- scripts wanting it should use that
+// module instead of expecting litert to grow one.
 // see session-state: litert_module.cpp#module_design
+//
+// This file is qstr-scanned (SRC_QSTR in micropython_embed.mk).
+// #include <jni.h> is banned (no qstr-stub for it, same reason
+// engine_jni.cpp is excluded from that list) -- all JNI calls live in
+// litert_jni_bridge.cpp, reached only through litert_jni_bridge.h's
+// primitive-typed (void*/long) boundary.
 
 #include <cstdlib>
 #include <cstring>
@@ -70,6 +82,7 @@ extern "C" {
 // while building this file (ld.lld: undefined symbol
 // "(anonymous namespace)::litert_tensor_buffer_type").
 extern const mp_obj_type_t litert_environment_type;
+extern const mp_obj_type_t litert_compiled_model_type;
 extern const mp_obj_type_t litert_tensor_buffer_type;
 extern const mp_obj_type_t litert_options_type;
 
@@ -95,25 +108,12 @@ void raise_os_error_free(int errno_, char *msg) {
     nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
 }
 
-// 'c' is part of the design (see this file's own header comment) but
-// not yet implemented -- defaults to, and in v0 can only be, kKotlin.
-enum class LitertBackend { kC, kKotlin };
-LitertBackend g_litert_backend = LitertBackend::kKotlin;
-
-void raise_c_backend_not_implemented() {
-    raise_os_error(MP_EINVAL,
-        "android.litert: the 'c' backend is not yet implemented in this "
-        "build -- see session-state for why; use 'kotlin'");
-}
-
 // Native-only registry node, deliberately never holds an mp_obj_t
 // pointer, same reasoning as tf_module.cpp#registry_design/
 // rt_module.cpp#registry_design. global_ref is a JNI global reference
-// to the backing Kotlin object (Environment/CompiledModel/TensorBuffer)
-// -- needed for the 'kotlin' backend AND for close(), which always goes
-// through the Kotlin object regardless of which hot-path backend was
-// active. Three separate lists (not one) so litert_close_all() can
-// order teardown correctly: buffers and models first (independently
+// to the backing Kotlin object (Environment/CompiledModel/TensorBuffer).
+// Three separate lists (not one) so litert_close_all() can order
+// teardown correctly: buffers and models first (independently
 // script-visible, closed in any order), environments last -- mirrors
 // rt_close_all()'s own environment-outlives-everything ordering.
 struct LitertHandleNode {
@@ -163,11 +163,6 @@ struct litert_compiled_model_obj_t {
 struct litert_tensor_buffer_obj_t {
     mp_obj_base_t base;
     LitertHandleNode *node;
-    // No cached byte-size field in v0 -- see this file's own header
-    // comment. write_int8() passes data straight through and relies on
-    // Kotlin's own writeInt8() to validate length (raising its own
-    // exception on mismatch, already surfaced as an OSError); read_int8()
-    // learns its length from the real bridge call's own out-param.
 };
 
 struct litert_options_obj_t {
@@ -243,7 +238,7 @@ mp_obj_t litert_options_make_new(const mp_obj_type_t *type, size_t n_args, size_
 
 void raise_if_model_closed(litert_compiled_model_obj_t *self) {
     if (!self->node) {
-        raise_os_error(MP_EINVAL, "android.litert: CompiledModel closed -- construct a new one");
+        raise_os_error(MP_EINVAL, "litert: CompiledModel closed -- construct a new one");
     }
 }
 
@@ -258,11 +253,11 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, parsed);
 
     if (!mp_obj_is_type(parsed[ARG_environment].u_obj, &litert_environment_type)) {
-        raise_os_error(MP_EINVAL, "android.litert: environment must be an android.litert.Environment");
+        raise_os_error(MP_EINVAL, "litert: environment must be a litert.Environment");
     }
     auto *env_obj = (litert_environment_obj_t *) MP_OBJ_TO_PTR(parsed[ARG_environment].u_obj);
     if (!env_obj->node) {
-        raise_os_error(MP_EINVAL, "android.litert: environment is closed");
+        raise_os_error(MP_EINVAL, "litert: environment is closed");
     }
 
     const char *path = mp_obj_str_get_str(parsed[ARG_path].u_obj);
@@ -278,7 +273,7 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
     mp_int_t accelerator_value = 1;  // Accelerator.CPU
     if (parsed[ARG_options].u_obj != MP_OBJ_NULL) {
         if (!mp_obj_is_type(parsed[ARG_options].u_obj, &litert_options_type)) {
-            raise_os_error(MP_EINVAL, "android.litert: options must be an android.litert.Options");
+            raise_os_error(MP_EINVAL, "litert: options must be a litert.Options");
         }
         accelerator_value = ((litert_options_obj_t *) MP_OBJ_TO_PTR(parsed[ARG_options].u_obj))->accelerator;
     }
@@ -350,13 +345,13 @@ void unpack_tensor_buffers(mp_obj_t seq, long **out_handles, void ***out_global_
         if (!mp_obj_is_type(items[i], &litert_tensor_buffer_type)) {
             free(handles);
             free(global_refs);
-            raise_os_error(MP_EINVAL, "android.litert: run() requires a sequence of TensorBuffer");
+            raise_os_error(MP_EINVAL, "litert: run() requires a sequence of TensorBuffer");
         }
         auto *buf = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(items[i]);
         if (!buf->node) {
             free(handles);
             free(global_refs);
-            raise_os_error(MP_EINVAL, "android.litert: run() argument TensorBuffer is closed");
+            raise_os_error(MP_EINVAL, "litert: run() argument TensorBuffer is closed");
         }
         handles[i] = buf->node->raw_handle;
         global_refs[i] = buf->node->global_ref;
@@ -369,9 +364,6 @@ void unpack_tensor_buffers(mp_obj_t seq, long **out_handles, void ***out_global_
 mp_obj_t litert_compiled_model_run(mp_obj_t self_in, mp_obj_t inputs_in, mp_obj_t outputs_in) {
     auto *self = (litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in);
     raise_if_model_closed(self);
-    if (g_litert_backend == LitertBackend::kC) {
-        raise_c_backend_not_implemented();
-    }
 
     long *input_handles = nullptr, *output_handles = nullptr;
     void **input_refs = nullptr, **output_refs = nullptr;
@@ -438,20 +430,17 @@ MP_DEFINE_CONST_DICT(litert_compiled_model_locals_dict, litert_compiled_model_lo
 
 void raise_if_buffer_closed(litert_tensor_buffer_obj_t *self) {
     if (!self->node) {
-        raise_os_error(MP_EINVAL, "android.litert: TensorBuffer closed");
+        raise_os_error(MP_EINVAL, "litert: TensorBuffer closed");
     }
 }
 
 mp_obj_t litert_tensor_buffer_write_int8(mp_obj_t self_in, mp_obj_t data_in) {
     auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
     raise_if_buffer_closed(self);
-    if (g_litert_backend == LitertBackend::kC) {
-        raise_c_backend_not_implemented();
-    }
 
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(data_in, &bufinfo, MP_BUFFER_READ);
-    // No pre-check against a cached size here in v0 -- litert-api's own
+    // No pre-check against a cached size here -- litert-api's own
     // TensorBuffer.writeInt8() validates length itself and raises its
     // own LiteRtException on mismatch, which the bridge's exception
     // handling already surfaces as an OSError below.
@@ -468,9 +457,6 @@ static MP_DEFINE_CONST_FUN_OBJ_2(litert_tensor_buffer_write_int8_obj, litert_ten
 mp_obj_t litert_tensor_buffer_read_int8(mp_obj_t self_in) {
     auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
     raise_if_buffer_closed(self);
-    if (g_litert_backend == LitertBackend::kC) {
-        raise_c_backend_not_implemented();
-    }
 
     int8_t *out = nullptr;
     size_t len = 0;
@@ -483,6 +469,182 @@ mp_obj_t litert_tensor_buffer_read_int8(mp_obj_t self_in) {
     return result;
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(litert_tensor_buffer_read_int8_obj, litert_tensor_buffer_read_int8);
+
+// write_float/read_float, write_int/read_int, write_bool/read_bool,
+// write_long/read_long: same shape as write_int8/read_int8 above, one
+// real typed TensorBuffer method each (writeFloat/readFloat/writeInt/
+// readInt/writeBoolean/readBoolean/writeLong/readLong -- confirmed via
+// javap, see this file's own header comment). Takes/returns a plain
+// MicroPython sequence/tuple of the matching Python type, not bytes --
+// these are typed arrays on the Kotlin side, not raw byte buffers.
+
+mp_obj_t litert_tensor_buffer_write_float(mp_obj_t self_in, mp_obj_t data_in) {
+    auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_buffer_closed(self);
+
+    size_t count;
+    mp_obj_t *items;
+    mp_obj_get_array(data_in, &count, &items);
+    auto *raw = (float *) malloc(sizeof(float) * count);
+    for (size_t i = 0; i < count; i++) {
+        raw[i] = (float) mp_obj_get_float(items[i]);
+    }
+    char *err = nullptr;
+    bool ok = litert_bridge_kotlin_write_float(self->node->global_ref, raw, count, &err);
+    free(raw);
+    if (!ok) {
+        raise_os_error_free(MP_EIO, err);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_tensor_buffer_write_float_obj, litert_tensor_buffer_write_float);
+
+mp_obj_t litert_tensor_buffer_read_float(mp_obj_t self_in) {
+    auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_buffer_closed(self);
+
+    float *out = nullptr;
+    size_t len = 0;
+    char *err = nullptr;
+    if (!litert_bridge_kotlin_read_float(self->node->global_ref, &out, &len, &err)) {
+        raise_os_error_free(MP_EIO, err);
+    }
+    mp_obj_t *items = (mp_obj_t *) malloc(sizeof(mp_obj_t) * len);
+    for (size_t i = 0; i < len; i++) {
+        items[i] = mp_obj_new_float(out[i]);
+    }
+    mp_obj_t result = mp_obj_new_tuple(len, items);
+    free(items);
+    free(out);
+    return result;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(litert_tensor_buffer_read_float_obj, litert_tensor_buffer_read_float);
+
+mp_obj_t litert_tensor_buffer_write_int(mp_obj_t self_in, mp_obj_t data_in) {
+    auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_buffer_closed(self);
+
+    size_t count;
+    mp_obj_t *items;
+    mp_obj_get_array(data_in, &count, &items);
+    auto *raw = (int32_t *) malloc(sizeof(int32_t) * count);
+    for (size_t i = 0; i < count; i++) {
+        raw[i] = (int32_t) mp_obj_get_int(items[i]);
+    }
+    char *err = nullptr;
+    bool ok = litert_bridge_kotlin_write_int(self->node->global_ref, raw, count, &err);
+    free(raw);
+    if (!ok) {
+        raise_os_error_free(MP_EIO, err);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_tensor_buffer_write_int_obj, litert_tensor_buffer_write_int);
+
+mp_obj_t litert_tensor_buffer_read_int(mp_obj_t self_in) {
+    auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_buffer_closed(self);
+
+    int32_t *out = nullptr;
+    size_t len = 0;
+    char *err = nullptr;
+    if (!litert_bridge_kotlin_read_int(self->node->global_ref, &out, &len, &err)) {
+        raise_os_error_free(MP_EIO, err);
+    }
+    mp_obj_t *items = (mp_obj_t *) malloc(sizeof(mp_obj_t) * len);
+    for (size_t i = 0; i < len; i++) {
+        items[i] = mp_obj_new_int(out[i]);
+    }
+    mp_obj_t result = mp_obj_new_tuple(len, items);
+    free(items);
+    free(out);
+    return result;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(litert_tensor_buffer_read_int_obj, litert_tensor_buffer_read_int);
+
+mp_obj_t litert_tensor_buffer_write_bool(mp_obj_t self_in, mp_obj_t data_in) {
+    auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_buffer_closed(self);
+
+    size_t count;
+    mp_obj_t *items;
+    mp_obj_get_array(data_in, &count, &items);
+    auto *raw = (bool *) malloc(sizeof(bool) * count);
+    for (size_t i = 0; i < count; i++) {
+        raw[i] = mp_obj_is_true(items[i]);
+    }
+    char *err = nullptr;
+    bool ok = litert_bridge_kotlin_write_bool(self->node->global_ref, raw, count, &err);
+    free(raw);
+    if (!ok) {
+        raise_os_error_free(MP_EIO, err);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_tensor_buffer_write_bool_obj, litert_tensor_buffer_write_bool);
+
+mp_obj_t litert_tensor_buffer_read_bool(mp_obj_t self_in) {
+    auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_buffer_closed(self);
+
+    bool *out = nullptr;
+    size_t len = 0;
+    char *err = nullptr;
+    if (!litert_bridge_kotlin_read_bool(self->node->global_ref, &out, &len, &err)) {
+        raise_os_error_free(MP_EIO, err);
+    }
+    mp_obj_t *items = (mp_obj_t *) malloc(sizeof(mp_obj_t) * len);
+    for (size_t i = 0; i < len; i++) {
+        items[i] = out[i] ? mp_const_true : mp_const_false;
+    }
+    mp_obj_t result = mp_obj_new_tuple(len, items);
+    free(items);
+    free(out);
+    return result;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(litert_tensor_buffer_read_bool_obj, litert_tensor_buffer_read_bool);
+
+mp_obj_t litert_tensor_buffer_write_long(mp_obj_t self_in, mp_obj_t data_in) {
+    auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_buffer_closed(self);
+
+    size_t count;
+    mp_obj_t *items;
+    mp_obj_get_array(data_in, &count, &items);
+    auto *raw = (int64_t *) malloc(sizeof(int64_t) * count);
+    for (size_t i = 0; i < count; i++) {
+        raw[i] = (int64_t) mp_obj_get_int(items[i]);
+    }
+    char *err = nullptr;
+    bool ok = litert_bridge_kotlin_write_long(self->node->global_ref, raw, count, &err);
+    free(raw);
+    if (!ok) {
+        raise_os_error_free(MP_EIO, err);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_tensor_buffer_write_long_obj, litert_tensor_buffer_write_long);
+
+mp_obj_t litert_tensor_buffer_read_long(mp_obj_t self_in) {
+    auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_buffer_closed(self);
+
+    int64_t *out = nullptr;
+    size_t len = 0;
+    char *err = nullptr;
+    if (!litert_bridge_kotlin_read_long(self->node->global_ref, &out, &len, &err)) {
+        raise_os_error_free(MP_EIO, err);
+    }
+    mp_obj_t *items = (mp_obj_t *) malloc(sizeof(mp_obj_t) * len);
+    for (size_t i = 0; i < len; i++) {
+        items[i] = mp_obj_new_int_from_ll(out[i]);
+    }
+    mp_obj_t result = mp_obj_new_tuple(len, items);
+    free(items);
+    free(out);
+    return result;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(litert_tensor_buffer_read_long_obj, litert_tensor_buffer_read_long);
 
 void litert_tensor_buffer_close_impl(litert_tensor_buffer_obj_t *self) {
     if (!self->node) {
@@ -513,15 +675,20 @@ static MP_DEFINE_CONST_FUN_OBJ_1(litert_tensor_buffer_del_obj, litert_tensor_buf
 const mp_rom_map_elem_t litert_tensor_buffer_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_write_int8), MP_ROM_PTR(&litert_tensor_buffer_write_int8_obj)},
     {MP_ROM_QSTR(MP_QSTR_read_int8), MP_ROM_PTR(&litert_tensor_buffer_read_int8_obj)},
+    {MP_ROM_QSTR(MP_QSTR_write_float), MP_ROM_PTR(&litert_tensor_buffer_write_float_obj)},
+    {MP_ROM_QSTR(MP_QSTR_read_float), MP_ROM_PTR(&litert_tensor_buffer_read_float_obj)},
+    {MP_ROM_QSTR(MP_QSTR_write_int), MP_ROM_PTR(&litert_tensor_buffer_write_int_obj)},
+    {MP_ROM_QSTR(MP_QSTR_read_int), MP_ROM_PTR(&litert_tensor_buffer_read_int_obj)},
+    {MP_ROM_QSTR(MP_QSTR_write_bool), MP_ROM_PTR(&litert_tensor_buffer_write_bool_obj)},
+    {MP_ROM_QSTR(MP_QSTR_read_bool), MP_ROM_PTR(&litert_tensor_buffer_read_bool_obj)},
+    {MP_ROM_QSTR(MP_QSTR_write_long), MP_ROM_PTR(&litert_tensor_buffer_write_long_obj)},
+    {MP_ROM_QSTR(MP_QSTR_read_long), MP_ROM_PTR(&litert_tensor_buffer_read_long_obj)},
     {MP_ROM_QSTR(MP_QSTR_close), MP_ROM_PTR(&litert_tensor_buffer_close_obj)},
     {MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&litert_tensor_buffer_del_obj)},
 };
 MP_DEFINE_CONST_DICT(litert_tensor_buffer_locals_dict, litert_tensor_buffer_locals_dict_table);
 
 // ---------------- module-level: Accelerator ----------------
-// set_backend()/get_backend() live outside the namespace, below --
-// same "android_module.cpp needs external linkage" reasoning as the
-// type objects above.
 
 const mp_rom_map_elem_t litert_accelerator_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_Accelerator)},
@@ -532,29 +699,22 @@ const mp_rom_map_elem_t litert_accelerator_globals_table[] = {
 };
 MP_DEFINE_CONST_DICT(litert_accelerator_globals, litert_accelerator_globals_table);
 
+const mp_obj_module_t litert_accelerator_module = {
+    .base = {&mp_type_module},
+    .globals = (mp_obj_dict_t *) &litert_accelerator_globals,
+};
+
+const mp_rom_map_elem_t litert_module_globals_table[] = {
+    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_litert)},
+    {MP_ROM_QSTR(MP_QSTR_Environment), MP_ROM_PTR(&litert_environment_type)},
+    {MP_ROM_QSTR(MP_QSTR_CompiledModel), MP_ROM_PTR(&litert_compiled_model_type)},
+    {MP_ROM_QSTR(MP_QSTR_TensorBuffer), MP_ROM_PTR(&litert_tensor_buffer_type)},
+    {MP_ROM_QSTR(MP_QSTR_Options), MP_ROM_PTR(&litert_options_type)},
+    {MP_ROM_QSTR(MP_QSTR_Accelerator), MP_ROM_PTR(&litert_accelerator_module)},
+};
+MP_DEFINE_CONST_DICT(litert_module_globals, litert_module_globals_table);
+
 } // namespace
-
-// set_backend()/get_backend(): declared outside the anonymous namespace
-// so android_module.cpp can reference the function objects, same
-// linkage reasoning as android_rt_info_obj in rt_module.cpp.
-mp_obj_t android_litert_set_backend(mp_obj_t backend_in) {
-    const char *s = mp_obj_str_get_str(backend_in);
-    if (strcmp(s, "c") == 0) {
-        g_litert_backend = LitertBackend::kC;
-    } else if (strcmp(s, "kotlin") == 0) {
-        g_litert_backend = LitertBackend::kKotlin;
-    } else {
-        raise_os_error(MP_EINVAL, "android.litert: backend must be 'c' or 'kotlin'");
-    }
-    return mp_const_none;
-}
-extern MP_DEFINE_CONST_FUN_OBJ_1(android_litert_set_backend_obj, android_litert_set_backend);
-
-mp_obj_t android_litert_get_backend() {
-    const char *s = g_litert_backend == LitertBackend::kC ? "c" : "kotlin";
-    return mp_obj_new_str(s, strlen(s));
-}
-extern MP_DEFINE_CONST_FUN_OBJ_0(android_litert_get_backend_obj, android_litert_get_backend);
 
 extern MP_DEFINE_CONST_OBJ_TYPE(
     litert_options_type,
@@ -586,11 +746,15 @@ extern MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &litert_tensor_buffer_locals_dict
     );
 
-// android_module.cpp nests this under android.litert.Accelerator.
-extern const mp_obj_module_t litert_accelerator_module = {
+// Top-level module -- see this file's own header comment for why
+// (matches a real/expected module name, same tier as ulab/image, not
+// android-specific glue).
+extern "C" const mp_obj_module_t litert_module = {
     .base = {&mp_type_module},
-    .globals = (mp_obj_dict_t *) &litert_accelerator_globals,
+    .globals = (mp_obj_dict_t *) &litert_module_globals,
 };
+
+MP_REGISTER_MODULE(MP_QSTR_litert, litert_module);
 
 extern "C" void litert_bridge_init(void *jni_env) {
     litert_bridge_init_impl(jni_env);

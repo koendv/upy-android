@@ -1,10 +1,8 @@
-// JNI-facing implementation for android.litert. Both hot-path backends
-// live here: 'kotlin' (one JNI call each, through LiteRtShim) and 'c'
-// (direct libLiteRt.so calls on a raw handle extracted via JNI field
-// access, zero further JNI once the handle is in hand) -- see
-// litert_jni_bridge.h's own header comment for why litert_module.cpp
-// never sees a real jobject/JNIEnv*.
-// see session-state: litert_module.cpp#hot_path_mechanism
+// JNI-facing implementation for litert (litert_module.cpp). One JNI
+// call each, through LiteRtShim.kt -- see litert_jni_bridge.h's own
+// header comment for why litert_module.cpp never sees a real
+// jobject/JNIEnv*.
+// see session-state: litert_jni_bridge.cpp#hot_path_mechanism
 
 #include "litert_jni_bridge.h"
 
@@ -12,10 +10,6 @@
 
 #include <cstdlib>
 #include <cstring>
-
-#include "litert/c/litert_common.h"
-#include "litert/c/litert_compiled_model.h"
-#include "litert/c/litert_tensor_buffer.h"
 
 namespace {
 
@@ -31,17 +25,20 @@ jmethodID g_mid_create_input_buffers = nullptr;
 jmethodID g_mid_create_output_buffers = nullptr;
 jmethodID g_mid_write_int8 = nullptr;
 jmethodID g_mid_read_int8 = nullptr;
+jmethodID g_mid_write_float = nullptr;
+jmethodID g_mid_read_float = nullptr;
+jmethodID g_mid_write_int = nullptr;
+jmethodID g_mid_read_int = nullptr;
+jmethodID g_mid_write_bool = nullptr;
+jmethodID g_mid_read_bool = nullptr;
+jmethodID g_mid_write_long = nullptr;
+jmethodID g_mid_read_long = nullptr;
 jmethodID g_mid_run = nullptr;
 jmethodID g_mid_close_environment = nullptr;
 jmethodID g_mid_close_compiled_model = nullptr;
 jmethodID g_mid_close_tensor_buffer = nullptr;
 
-// Only ever called on the single persistent "mp-engine-worker" thread
-// (see EngineWorker.kt / engine_jni.cpp#threading_contract), which is a
-// real java.lang.Thread from birth and stays JVM-attached for the
-// process's entire lifetime -- so GetEnv() here is a plain lookup, not
-// an attach, and never returns JNI_EDETACHED in practice. No
-// AttachCurrentThread()/DetachCurrentThread() anywhere in this file.
+// see session-state: litert_jni_bridge.cpp#threading
 JNIEnv *current_env() {
     JNIEnv *env = nullptr;
     g_jvm->GetEnv((void **) &env, JNI_VERSION_1_6);
@@ -57,7 +54,7 @@ char *describe_and_clear_exception(JNIEnv *env) {
     jthrowable exc = env->ExceptionOccurred();
     env->ExceptionClear();
     if (!exc) {
-        return strdup("android.litert: unknown error");
+        return strdup("litert: unknown error");
     }
     jclass throwable_cls = env->FindClass("java/lang/Throwable");
     jmethodID to_string_mid = env->GetMethodID(throwable_cls, "toString", "()Ljava/lang/String;");
@@ -115,6 +112,22 @@ extern "C" void litert_bridge_init_impl(void *jni_env) {
         "writeInt8", "(Lcom/google/ai/edge/litert/TensorBuffer;[B)V");
     g_mid_read_int8 = env->GetStaticMethodID(g_shim_class,
         "readInt8", "(Lcom/google/ai/edge/litert/TensorBuffer;)[B");
+    g_mid_write_float = env->GetStaticMethodID(g_shim_class,
+        "writeFloat", "(Lcom/google/ai/edge/litert/TensorBuffer;[F)V");
+    g_mid_read_float = env->GetStaticMethodID(g_shim_class,
+        "readFloat", "(Lcom/google/ai/edge/litert/TensorBuffer;)[F");
+    g_mid_write_int = env->GetStaticMethodID(g_shim_class,
+        "writeInt", "(Lcom/google/ai/edge/litert/TensorBuffer;[I)V");
+    g_mid_read_int = env->GetStaticMethodID(g_shim_class,
+        "readInt", "(Lcom/google/ai/edge/litert/TensorBuffer;)[I");
+    g_mid_write_bool = env->GetStaticMethodID(g_shim_class,
+        "writeBool", "(Lcom/google/ai/edge/litert/TensorBuffer;[Z)V");
+    g_mid_read_bool = env->GetStaticMethodID(g_shim_class,
+        "readBool", "(Lcom/google/ai/edge/litert/TensorBuffer;)[Z");
+    g_mid_write_long = env->GetStaticMethodID(g_shim_class,
+        "writeLong", "(Lcom/google/ai/edge/litert/TensorBuffer;[J)V");
+    g_mid_read_long = env->GetStaticMethodID(g_shim_class,
+        "readLong", "(Lcom/google/ai/edge/litert/TensorBuffer;)[J");
     g_mid_run = env->GetStaticMethodID(g_shim_class,
         "run",
         "(Lcom/google/ai/edge/litert/CompiledModel;"
@@ -211,74 +224,6 @@ extern "C" bool litert_bridge_create_output_buffers(void *model_global_ref, long
                            out_global_refs, out_count, out_err);
 }
 
-// ---- 'c' backend: direct libLiteRt.so calls, zero JNI. NOT YET
-// ENABLED in v0 -- android.litert.set_backend('c') raises clearly
-// rather than reaching this code (see litert_module.cpp). The
-// lock/memcpy/unlock idiom itself mirrors rt_module.cpp's own proven
-// set_input_ndarray()/get_output_ndarray() and should be sound; what's
-// NOT yet resolved is how to learn a Kotlin-created TensorBuffer's real
-// byte size without going through Kotlin -- LiteRtGetTensorBufferPackedSize()
-// on a handle extracted this way returned inconsistent garbage across
-// buffers in the same batch during v0 development (large garbage / 0 /
-// different garbage for buffers created in one call), while the
-// extracted handle itself was confirmed to be a genuine, valid pointer
-// (not corrupted) via a temporary diagnostic. Needs its own focused
-// investigation before enabling -- see session-state. ----
-
-extern "C" bool litert_bridge_c_write_int8(long buf_handle, const int8_t *data, size_t len,
-                                            char **out_err) {
-    auto buf = (LiteRtTensorBuffer) (void *) buf_handle;
-    void *host_ptr = nullptr;
-    if (LiteRtLockTensorBuffer(buf, &host_ptr, kLiteRtTensorBufferLockModeWrite) != kLiteRtStatusOk) {
-        *out_err = strdup("android.litert: failed to lock tensor buffer for write");
-        return false;
-    }
-    memcpy(host_ptr, data, len);
-    LiteRtUnlockTensorBuffer(buf);
-    return true;
-}
-
-extern "C" bool litert_bridge_c_read_int8(long buf_handle, int8_t *out_data, size_t len,
-                                           char **out_err) {
-    auto buf = (LiteRtTensorBuffer) (void *) buf_handle;
-    void *host_ptr = nullptr;
-    if (LiteRtLockTensorBuffer(buf, &host_ptr, kLiteRtTensorBufferLockModeRead) != kLiteRtStatusOk) {
-        *out_err = strdup("android.litert: failed to lock tensor buffer for read");
-        return false;
-    }
-    memcpy(out_data, host_ptr, len);
-    LiteRtUnlockTensorBuffer(buf);
-    return true;
-}
-
-extern "C" bool litert_bridge_c_run(long model_handle, const long *input_handles,
-                                     size_t num_inputs, const long *output_handles,
-                                     size_t num_outputs, char **out_err) {
-    auto *input_bufs = (LiteRtTensorBuffer *) malloc(sizeof(LiteRtTensorBuffer) * num_inputs);
-    auto *output_bufs = (LiteRtTensorBuffer *) malloc(sizeof(LiteRtTensorBuffer) * num_outputs);
-    for (size_t i = 0; i < num_inputs; i++) {
-        input_bufs[i] = (LiteRtTensorBuffer) (void *) input_handles[i];
-    }
-    for (size_t i = 0; i < num_outputs; i++) {
-        output_bufs[i] = (LiteRtTensorBuffer) (void *) output_handles[i];
-    }
-    auto model = (LiteRtCompiledModel) (void *) model_handle;
-    LiteRtStatus status = LiteRtRunCompiledModel(model, /*signature_index=*/0,
-                                                  num_inputs, input_bufs,
-                                                  num_outputs, output_bufs);
-    free(input_bufs);
-    free(output_bufs);
-    if (status != kLiteRtStatusOk) {
-        char buf[96];
-        snprintf(buf, sizeof(buf), "android.litert: run failed (LiteRtStatus=%d)", (int) status);
-        *out_err = strdup(buf);
-        return false;
-    }
-    return true;
-}
-
-// ---- 'kotlin' backend: one JNI call each, through LiteRtShim. ----
-
 extern "C" bool litert_bridge_kotlin_write_int8(void *buf_global_ref, const int8_t *data,
                                                  size_t len, char **out_err) {
     JNIEnv *env = current_env();
@@ -293,11 +238,12 @@ extern "C" bool litert_bridge_kotlin_write_int8(void *buf_global_ref, const int8
     return true;
 }
 
-// v0 reads TensorBuffer.readInt8()'s real length directly from the
+// Reads TensorBuffer.readInt8()'s real length directly from the
 // jbyteArray it returns (GetArrayLength), rather than requiring a
-// pre-known size -- see this file's own note on litert_bridge_c_write_int8
-// for why a C-API size query isn't used for that instead. *out_data is
-// malloc'd here; the caller (litert_module.cpp) frees it.
+// pre-known size -- learning a Kotlin-created buffer's byte size via
+// the C API (LiteRtGetTensorBufferPackedSize) returned inconsistent
+// garbage during v0 development. *out_data is malloc'd here; the
+// caller (litert_module.cpp) frees it.
 extern "C" bool litert_bridge_kotlin_read_int8(void *buf_global_ref, int8_t **out_data,
                                                 size_t *out_len, char **out_err) {
     JNIEnv *env = current_env();
@@ -310,6 +256,155 @@ extern "C" bool litert_bridge_kotlin_read_int8(void *buf_global_ref, int8_t **ou
     jsize len = env->GetArrayLength(jresult);
     auto *data = (int8_t *) malloc((size_t) len);
     env->GetByteArrayRegion(jresult, 0, len, (jbyte *) data);
+    env->DeleteLocalRef(jresult);
+    *out_data = data;
+    *out_len = (size_t) len;
+    return true;
+}
+
+// write_ndarray()'s float32 path -- a real typed TensorBuffer.writeFloat(),
+// not a byte-reinterpret through writeInt8. num_elements is a count of
+// floats, not bytes.
+extern "C" bool litert_bridge_kotlin_write_float(void *buf_global_ref, const float *data,
+                                                  size_t num_elements, char **out_err) {
+    JNIEnv *env = current_env();
+    jfloatArray jdata = env->NewFloatArray((jsize) num_elements);
+    env->SetFloatArrayRegion(jdata, 0, (jsize) num_elements, data);
+    env->CallStaticVoidMethod(g_shim_class, g_mid_write_float, (jobject) buf_global_ref, jdata);
+    env->DeleteLocalRef(jdata);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    return true;
+}
+
+// read_ndarray()'s float32 path, same length-from-real-array reasoning
+// as litert_bridge_kotlin_read_int8 above. *out_data is a malloc'd
+// buffer of *out_len FLOATS (not bytes), owned by the caller.
+extern "C" bool litert_bridge_kotlin_read_float(void *buf_global_ref, float **out_data,
+                                                 size_t *out_len, char **out_err) {
+    JNIEnv *env = current_env();
+    auto jresult = (jfloatArray) env->CallStaticObjectMethod(g_shim_class, g_mid_read_float,
+                                                              (jobject) buf_global_ref);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    jsize len = env->GetArrayLength(jresult);
+    auto *data = (float *) malloc((size_t) len * sizeof(float));
+    env->GetFloatArrayRegion(jresult, 0, len, data);
+    env->DeleteLocalRef(jresult);
+    *out_data = data;
+    *out_len = (size_t) len;
+    return true;
+}
+
+extern "C" bool litert_bridge_kotlin_write_int(void *buf_global_ref, const int32_t *data,
+                                                size_t num_elements, char **out_err) {
+    JNIEnv *env = current_env();
+    jintArray jdata = env->NewIntArray((jsize) num_elements);
+    env->SetIntArrayRegion(jdata, 0, (jsize) num_elements, (const jint *) data);
+    env->CallStaticVoidMethod(g_shim_class, g_mid_write_int, (jobject) buf_global_ref, jdata);
+    env->DeleteLocalRef(jdata);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    return true;
+}
+
+extern "C" bool litert_bridge_kotlin_read_int(void *buf_global_ref, int32_t **out_data,
+                                               size_t *out_len, char **out_err) {
+    JNIEnv *env = current_env();
+    auto jresult = (jintArray) env->CallStaticObjectMethod(g_shim_class, g_mid_read_int,
+                                                            (jobject) buf_global_ref);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    jsize len = env->GetArrayLength(jresult);
+    auto *data = (int32_t *) malloc((size_t) len * sizeof(int32_t));
+    env->GetIntArrayRegion(jresult, 0, len, (jint *) data);
+    env->DeleteLocalRef(jresult);
+    *out_data = data;
+    *out_len = (size_t) len;
+    return true;
+}
+
+// bool <-> jboolean marshaled explicitly (via a temporary jboolean
+// array) rather than reinterpret-casting a bool* directly -- jboolean
+// is an unsigned char with JNI_TRUE/JNI_FALSE values; C++ bool's
+// representation is not guaranteed identical, so this avoids relying
+// on that.
+extern "C" bool litert_bridge_kotlin_write_bool(void *buf_global_ref, const bool *data,
+                                                 size_t num_elements, char **out_err) {
+    JNIEnv *env = current_env();
+    auto *jdata_tmp = (jboolean *) malloc(sizeof(jboolean) * num_elements);
+    for (size_t i = 0; i < num_elements; i++) {
+        jdata_tmp[i] = data[i] ? JNI_TRUE : JNI_FALSE;
+    }
+    jbooleanArray jdata = env->NewBooleanArray((jsize) num_elements);
+    env->SetBooleanArrayRegion(jdata, 0, (jsize) num_elements, jdata_tmp);
+    free(jdata_tmp);
+    env->CallStaticVoidMethod(g_shim_class, g_mid_write_bool, (jobject) buf_global_ref, jdata);
+    env->DeleteLocalRef(jdata);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    return true;
+}
+
+extern "C" bool litert_bridge_kotlin_read_bool(void *buf_global_ref, bool **out_data,
+                                                size_t *out_len, char **out_err) {
+    JNIEnv *env = current_env();
+    auto jresult = (jbooleanArray) env->CallStaticObjectMethod(g_shim_class, g_mid_read_bool,
+                                                                (jobject) buf_global_ref);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    jsize len = env->GetArrayLength(jresult);
+    auto *jdata_tmp = (jboolean *) malloc(sizeof(jboolean) * (size_t) len);
+    env->GetBooleanArrayRegion(jresult, 0, len, jdata_tmp);
+    env->DeleteLocalRef(jresult);
+    auto *data = (bool *) malloc(sizeof(bool) * (size_t) len);
+    for (jsize i = 0; i < len; i++) {
+        data[i] = jdata_tmp[i] != JNI_FALSE;
+    }
+    free(jdata_tmp);
+    *out_data = data;
+    *out_len = (size_t) len;
+    return true;
+}
+
+extern "C" bool litert_bridge_kotlin_write_long(void *buf_global_ref, const int64_t *data,
+                                                 size_t num_elements, char **out_err) {
+    JNIEnv *env = current_env();
+    jlongArray jdata = env->NewLongArray((jsize) num_elements);
+    env->SetLongArrayRegion(jdata, 0, (jsize) num_elements, (const jlong *) data);
+    env->CallStaticVoidMethod(g_shim_class, g_mid_write_long, (jobject) buf_global_ref, jdata);
+    env->DeleteLocalRef(jdata);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    return true;
+}
+
+extern "C" bool litert_bridge_kotlin_read_long(void *buf_global_ref, int64_t **out_data,
+                                                size_t *out_len, char **out_err) {
+    JNIEnv *env = current_env();
+    auto jresult = (jlongArray) env->CallStaticObjectMethod(g_shim_class, g_mid_read_long,
+                                                             (jobject) buf_global_ref);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    jsize len = env->GetArrayLength(jresult);
+    auto *data = (int64_t *) malloc((size_t) len * sizeof(int64_t));
+    env->GetLongArrayRegion(jresult, 0, len, (jlong *) data);
     env->DeleteLocalRef(jresult);
     *out_data = data;
     *out_len = (size_t) len;
