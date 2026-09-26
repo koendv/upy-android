@@ -114,13 +114,17 @@ void raise_os_error_free(int errno_, char *msg) {
 }
 
 // Native-only registry node, deliberately never holds an mp_obj_t
-// pointer, same reasoning as tf_module.cpp#registry_design/
-// rt_module.cpp#registry_design. global_ref is a JNI global reference
-// to the backing Kotlin object (Environment/CompiledModel/TensorBuffer).
-// Three separate lists (not one) so litert_close_all() can order
-// teardown correctly: buffers and models first (independently
-// script-visible, closed in any order), environments last -- mirrors
-// rt_close_all()'s own environment-outlives-everything ordering.
+// pointer -- a raw pointer to a GC-heap object in a plain C global
+// would be invisible to the GC, so a Model/Environment/TensorBuffer
+// with no remaining Python references could be collected while still
+// linked into this registry, leaving litert_close_all() walking a
+// dangling pointer the next time reset() runs. global_ref is a JNI
+// global reference to the backing Kotlin object (Environment/
+// CompiledModel/TensorBuffer) instead. Three separate lists (not one)
+// so litert_close_all() can order teardown correctly: buffers and
+// models first (independently script-visible, closed in any order),
+// environments last (everything else can depend on one outliving it).
+// see session-state: litert_module.cpp#registry_design
 struct LitertHandleNode {
     long raw_handle;
     void *global_ref;
@@ -267,10 +271,11 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
 
     const char *path = mp_obj_str_get_str(parsed[ARG_path].u_obj);
     // CompiledModel.create() -> LiteRtCreateModelFromFile is not
-    // VFS-aware, same fopen()-based trap already fixed in
-    // tf_model_make_new/rt_model_make_new -- strip the leading '/' so a
-    // VFS-absolute path resolves correctly.
-    // see session-state: tf_module.cpp#tf_model_make_new
+    // VFS-aware (it's a real fopen() underneath, on the raw filesystem,
+    // not this port's own VfsPosix-mounted "/") -- strip the leading
+    // '/' so a VFS-absolute path resolves relative to cwd (the app's
+    // own private storage root) instead of the real device filesystem
+    // root.
     if (path[0] == '/') {
         path++;
     }

@@ -33,11 +33,14 @@ def main():
         print("FAIL:", e)
         return
 
+    # Printing the URI itself would make this test's output non-
+    # deterministic (real per-item IDs) -- check it, but print only a
+    # fixed-text confirmation so a plain .exp diff still works.
     if not uri.startswith("content://"):
         print("FAIL: unexpected uri", uri)
         return
 
-    print("uri:", uri)
+    print("uri starts with content://: True")
     print("PASS")
 
 
