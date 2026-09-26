@@ -17,6 +17,7 @@ extern "C" {
 #include "display_module.h"
 #include "imu_module.h"
 #include "litert_module.h"
+#include "mediastore_module.h"
 #include "rt_module.h"
 #include "settings_state.h"
 #include "tf_module.h"
@@ -83,14 +84,22 @@ SettingsSnapshot settings_snapshot_get() {
 // pushed over IEngine.aidl#setSettings. Fixed for this :engine
 // process's entire lifetime; changing it needs a real app restart, not
 // just Reset -- see nativeReset below.
+// applicationContext: a real android.content.Context, needed by
+// mediastore_module.cpp's own MediaStore access (ContentResolver is
+// only reachable through a Context -- unlike litert_bridge_init, which
+// needs nothing beyond a JNIEnv). See EngineWorker.kt#start /
+// EngineService.kt for where this comes from (EngineService's own
+// applicationContext, read once here, at :engine's own init time --
+// same "read once, not pushed live" tier as heapSizeMb/rootPath).
 extern "C" JNIEXPORT jboolean JNICALL
-Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint stackSizeBytes, jint heapSizeMb, jstring rootPath) {
+Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint stackSizeBytes, jint heapSizeMb, jstring rootPath, jobject applicationContext) {
     if (g_initialized) {
         return JNI_TRUE;
     }
     if (!g_jvm) {
         env->GetJavaVM(&g_jvm);
         litert_bridge_init(env);
+        mediastore_bridge_init(env, applicationContext);
     }
     const char *root_path_chars = env->GetStringUTFChars(rootPath, nullptr);
     allocate_heap(static_cast<int>(heapSizeMb));

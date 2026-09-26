@@ -42,6 +42,12 @@ extern const mp_obj_type_t rt_model_type;
 // const module dict couldn't show runtime-pushed values.
 extern const mp_obj_fun_builtin_fixed_t android_settings_obj;
 
+// mediastore_module.cpp. A real nested mp_obj_module_t, same tier as
+// android_tf_module/android_rt_module above -- Part 7, write-only
+// MediaStore access (no upstream OpenMV/MicroPython equivalent, stays
+// under android.* per this project's own naming rule).
+extern "C" const mp_obj_module_t mediastore_module;
+
 namespace {
 
 const mp_rom_map_elem_t android_proximity_globals_table[] = {
@@ -110,6 +116,7 @@ const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_tf), MP_ROM_PTR(&android_tf_module)},
     {MP_ROM_QSTR(MP_QSTR_rt), MP_ROM_PTR(&android_rt_module)},
     {MP_ROM_QSTR(MP_QSTR_settings), MP_ROM_PTR(&android_settings_obj)},
+    {MP_ROM_QSTR(MP_QSTR_mediastore), MP_ROM_PTR(&mediastore_module)},
 };
 MP_DEFINE_CONST_DICT(android_module_globals, android_module_globals_table);
 

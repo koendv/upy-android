@@ -36,7 +36,7 @@ class EngineService : Service() {
         // heap_size_mb is fixed for this process's whole lifetime;
         // see EngineWorker.kt#start.
         val heapSizeMb = SettingsManager(applicationContext).heapSizeMb
-        worker = EngineWorker(filesDir.absolutePath, heapSizeMb)
+        worker = EngineWorker(filesDir.absolutePath, heapSizeMb, applicationContext)
         worker.start()
     }
 

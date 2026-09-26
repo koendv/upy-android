@@ -260,5 +260,15 @@ SRC_QSTR += ../app/src/main/cpp/litert_module.cpp
 # own).
 SRC_QSTR += ../app/src/main/cpp/settings_module.cpp
 
+# mediastore_module.cpp -- OUR OWN native module (android.mediastore,
+# Part 7, see that file's own header comment). Same minimal case as
+# settings_module.cpp above (no new qstr-stub headers, only py/obj.h/
+# py/runtime.h/py/mperrno.h and mediastore_jni_bridge.h, which uses only
+# primitive C types, no system headers of its own). mediastore_jni_
+# bridge.cpp is deliberately NOT listed here -- it #includes <jni.h>,
+# no qstr-stub exists for JNI headers, same reasoning as litert_jni_
+# bridge.cpp/engine_jni.cpp's own exclusion from this list.
+SRC_QSTR += ../app/src/main/cpp/mediastore_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk

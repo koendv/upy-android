@@ -1,5 +1,6 @@
 package eu.kdvelectronics.upyandroid
 
+import android.content.Context
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -16,8 +17,15 @@ import java.util.concurrent.LinkedBlockingQueue
 // SettingsManager read, no AIDL involved) and fixed for this process's
 // entire lifetime -- changing it needs a real app restart. See
 // EngineWorker.kt#start for why this must be read locally like this,
-// not pushed over IEngine.aidl#setSettings.
-class EngineWorker(private val rootPath: String, private val heapSizeMb: Int) {
+// not pushed over IEngine.aidl#setSettings. applicationContext: passed
+// straight through to Engine.nativeInit() for mediastore_module.cpp's
+// own MediaStore access (Part 7) -- EngineService's own Context, not
+// re-read/re-passed on reset().
+class EngineWorker(
+    private val rootPath: String,
+    private val heapSizeMb: Int,
+    private val applicationContext: Context,
+) {
     companion object {
         // Passed into nativeInit/nativeReset so mp_cstack_init_with_top()
         // gets this thread's real stack size. See engine_jni.cpp.
@@ -30,7 +38,7 @@ class EngineWorker(private val rootPath: String, private val heapSizeMb: Int) {
     // see session-state: EngineWorker.kt#start
     fun start() {
         thread = Thread(null, {
-            Engine.nativeInit(STACK_SIZE_BYTES, heapSizeMb, rootPath)
+            Engine.nativeInit(STACK_SIZE_BYTES, heapSizeMb, rootPath, applicationContext)
             while (true) {
                 taskQueue.take().run()
             }

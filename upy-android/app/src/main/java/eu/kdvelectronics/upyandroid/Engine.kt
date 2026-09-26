@@ -1,5 +1,6 @@
 package eu.kdvelectronics.upyandroid
 
+import android.content.Context
 import android.view.Surface
 
 // Raw JNI surface. Must only be called from EngineWorker's single worker
@@ -14,8 +15,11 @@ object Engine {
     // rootPath: app-private storage dir (Context.filesDir.absolutePath),
     // mounted as a jailed VfsPosix at "/". heapSizeMb is fixed for this
     // :engine process's entire lifetime -- changing it needs a real app
-    // restart, not just Reset. See EngineWorker.kt#start.
-    external fun nativeInit(stackSizeBytes: Int, heapSizeMb: Int, rootPath: String): Boolean
+    // restart, not just Reset. See EngineWorker.kt#start. applicationContext:
+    // needed by mediastore_module.cpp's own MediaStore/ContentResolver
+    // access (Part 7) -- read once here, same tier as rootPath/
+    // heapSizeMb, never re-passed on nativeReset().
+    external fun nativeInit(stackSizeBytes: Int, heapSizeMb: Int, rootPath: String, applicationContext: Context): Boolean
 
     // sink: optional, invoked synchronously on this same call/thread once
     // per print()/traceback write during execution. See EngineOutputSink
