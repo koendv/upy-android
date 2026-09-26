@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Variant A: viewfinder corners framing a >>> prompt -->
+  <rect width="512" height="512" rx="96" fill="#101418"/>
+  <g fill="none" stroke="#35D0FF" stroke-linecap="round" stroke-linejoin="round">
+    <!-- viewfinder corners: box 146..366, corner radius 36, legs 70 -->
+    <g stroke-width="22">
+      <path d="M146 216 V182 A36 36 0 0 1 182 146 H216"/>
+      <path d="M296 146 H330 A36 36 0 0 1 366 182 V216"/>
+      <path d="M366 296 V330 A36 36 0 0 1 330 366 H296"/>
+      <path d="M216 366 H182 A36 36 0 0 1 146 330 V296"/>
+    </g>
+    <!-- >>> prompt -->
+    <g stroke-width="21">
+      <path d="M198 220 L228 256 L198 292"/>
+      <path d="M241 220 L271 256 L241 292"/>
+      <path d="M284 220 L314 256 L284 292"/>
+    </g>
+  </g>
+</svg>

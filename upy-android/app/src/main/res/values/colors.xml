@@ -3,4 +3,5 @@
     <!-- Charcoal, matching the new launcher icon's own background.
          See ic_launcher_foreground.xml's own header comment. -->
     <color name="ic_launcher_background">#101418</color>
+    <color name="ic_launcher_foreground">#35D0FF</color>
 </resources>

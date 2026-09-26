@@ -85,12 +85,17 @@ script:
 
 ## App icon
 
-`app/src/main/res/drawable/ic_launcher_foreground.xml` (a cyan ">>>" REPL
-prompt on a charcoal background) is original artwork, not derived from any
-third-party source — replaces an earlier MicroPython-logo-derived icon
-(itself MIT-licensed and properly attributed, but dropped anyway to avoid
-any third-party trademark/copyright association in this app's own assets
-at all, a product decision rather than a licensing necessity).
+`app/src/main/res/drawable/ic_launcher_foreground.xml` is original artwork
+made for this project: viewfinder corners framing a `>>>` REPL prompt. It
+is not derived from the MicroPython logo and is covered by this project's
+license. `doc/icon.svg` is the same design as a standalone SVG. Replaces
+an earlier MicroPython-logo-derived icon (itself MIT-licensed and properly
+attributed, but dropped anyway to avoid any third-party trademark/
+copyright association in this app's own assets at all, a product decision
+rather than a licensing necessity).
+
+This project is an independent, unofficial Android port and is not
+affiliated with or endorsed by the MicroPython project.
 
 ## Icon font
 

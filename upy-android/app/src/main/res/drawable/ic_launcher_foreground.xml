@@ -1,46 +1,39 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Original artwork (~/Downloads/icon.svg, user-provided, no
-     third-party origin): three cyan ">>>" chevron strokes, replacing
-     the earlier MicroPython-logo-derived icon: dropped for the same
-     reason the in-app icon font's logo glyph was dropped (see
-     NOTICE.md and tools/generate-icon-font.sh's own history), avoiding
-     any third-party copyright/trademark association entirely, even
-     though that prior asset's own license (MIT) was not itself in
-     question.
+<!-- App icon: viewfinder corners framing a ">>>" REPL prompt.
+     Original artwork for this project (see NOTICE.md and doc/icon.svg,
+     the same design as a standalone SVG), fitting doubly since this
+     app also has a real camera screen (android.csi).
 
-     Coordinates below are the original artwork's own path points
-     (viewBox 0 0 512 512, stroke-width 42) re-expressed directly in
-     this file's 108-unit canvas: scaled/translated by hand to land
-     in the same real-world-tested ~50dp safe-zone box the previous
-     icon used (see that file's own former comment: OEM launchers, e.g.
-     Xiaomi/MIUI/HyperOS, mask more aggressively than the nominal 66dp
-     spec in practice). Scale factor 50/294 = 0.170068, where 294 is
-     the artwork's own bounding width including its stroke; translate
-     centers the resulting ~50 x 34.7 box in the 108x108 canvas. -->
+     Drawn on a 512x512 viewport mapped to the 108dp adaptive-icon
+     canvas. Content spans 135..377 (including stroke), i.e. ~51dp
+     centered, which keeps it inside the 66dp safe zone and matches the
+     ~50dp content box that survives aggressive OEM masks (Xiaomi/MIUI/
+     HyperOS) in practice, see this file's own prior git history for
+     how that ~50dp figure was originally derived (F-Droid's own
+     shipped icon, extracted via aapt2 dump xmltree).
+
+     Also used as the monochrome layer for Android 13+ themed icons
+     (see ic_launcher.xml/ic_launcher_round.xml), which only use this
+     drawable's alpha channel, not its color. strokeColor is still a
+     real color resource (@color/ic_launcher_foreground), not hardcoded
+     here, so both uses stay in sync from one place. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- viewfinder corners: box 146..366, corner radius 36, legs 70 -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#35D0FF"
-        android:strokeWidth="7.143"
+        android:strokeColor="@color/ic_launcher_foreground"
+        android:strokeWidth="22"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M32.571 40.221 L42.775 53.997 L32.571 67.772" />
+        android:pathData="M146,216 V182 A36,36 0 0,1 182,146 H216 M296,146 H330 A36,36 0 0,1 366,182 V216 M366,296 V330 A36,36 0 0,1 330,366 H296 M216,366 H182 A36,36 0 0,1 146,330 V296" />
+    <!-- >>> prompt -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#35D0FF"
-        android:strokeWidth="7.143"
+        android:strokeColor="@color/ic_launcher_foreground"
+        android:strokeWidth="21"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"
-        android:pathData="M48.898 40.221 L59.102 53.997 L48.898 67.772" />
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#35D0FF"
-        android:strokeWidth="7.143"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M65.224 40.221 L75.429 53.997 L65.224 67.772" />
+        android:pathData="M198,220 L228,256 L198,292 M241,220 L271,256 L241,292 M284,220 L314,256 L284,292" />
 </vector>
