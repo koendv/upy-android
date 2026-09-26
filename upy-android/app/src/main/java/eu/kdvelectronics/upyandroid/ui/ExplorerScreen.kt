@@ -15,11 +15,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -62,7 +59,6 @@ fun ExplorerScreen(
     filesManager: FilesManager,
     onEdit: (MicroFile?, path: String) -> Unit,
     onRun: (content: String) -> Unit,
-    onBack: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
     var path by remember { mutableStateOf("") }
@@ -84,15 +80,19 @@ fun ExplorerScreen(
 
     LaunchedEffect(path) { refresh() }
 
+    // Peer nav-suite tab now (Part 10) -- no onBack to fall through to
+    // at the VFS root any more; up() is a no-op there (tab switching is
+    // the only way to leave this screen). BackHandler is only enabled
+    // below the root, so a system back press at the root falls through
+    // to the platform's own default behavior instead of being swallowed
+    // silently.
     fun up() {
-        if (path.isEmpty()) {
-            onBack()
-        } else {
+        if (path.isNotEmpty()) {
             path = path.substringBeforeLast('/', "")
         }
     }
 
-    BackHandler { up() }
+    BackHandler(enabled = path.isNotEmpty()) { up() }
 
     val importPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
@@ -224,17 +224,20 @@ fun ExplorerScreen(
                 TopAppBar(
                     title = { Text("Files") },
                     actions = {
+                        IconButton(onClick = { up() }, enabled = path.isNotEmpty()) {
+                            Symbol(SymbolIcon.DRIVE_FOLDER_UPLOAD, contentDescription = "Directory up")
+                        }
                         IconButton(onClick = { importPicker.launch("*/*") }) {
                             Icon(Icons.Filled.UploadFile, contentDescription = "Import")
                         }
                         IconButton(onClick = { showNewFile = true }) {
-                            Icon(Icons.Filled.Add, contentDescription = "New file")
+                            Symbol(SymbolIcon.NOTE_ADD, contentDescription = "New file")
                         }
                         IconButton(onClick = { showNewFolder = true }) {
-                            Icon(Icons.Filled.CreateNewFolder, contentDescription = "New folder")
+                            Symbol(SymbolIcon.CREATE_NEW_FOLDER, contentDescription = "New folder")
                         }
                         IconButton(onClick = { refresh() }) {
-                            Icon(Icons.Filled.Refresh, contentDescription = "Refresh")
+                            Symbol(SymbolIcon.REFRESH, contentDescription = "Refresh")
                         }
                     }
                 )

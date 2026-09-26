@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -23,7 +23,8 @@ import eu.kdvelectronics.upyandroid.managers.BoardManager
 // Passive viewport, not a "run" screen. Vision scripts are written and
 // launched through the existing Terminal/Explorer/Editor "Run" flow
 // like any other script; this screen just shows whatever :engine is
-// currently drawing, with no "Run" input of its own.
+// currently drawing, with no "Run" input of its own. Peer nav-suite tab
+// now (Part 10) -- no onBack of its own, tab switching replaces it.
 // see session-state: CameraScreen.kt#CameraScreen
 //
 // The SurfaceView must be a real View-backed Surface (AndroidView, not
@@ -36,7 +37,6 @@ import eu.kdvelectronics.upyandroid.managers.BoardManager
 @Composable
 fun CameraScreen(
     boardManager: BoardManager,
-    onBack: () -> Unit,
 ) {
     val activity = LocalContext.current as Activity
 
@@ -59,8 +59,9 @@ fun CameraScreen(
             TopAppBar(
                 title = { Text("Camera") },
                 actions = {
-                    TextButton(onClick = { boardManager.interrupt() }) { Text("Interrupt") }
-                    TextButton(onClick = onBack) { Text("Back") }
+                    IconButton(onClick = { boardManager.interrupt() }) {
+                        Symbol(SymbolIcon.STOP, contentDescription = "Interrupt")
+                    }
                 }
             )
         }

@@ -14,6 +14,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -38,6 +39,9 @@ import eu.kdvelectronics.upyandroid.model.ConnectionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
+// Files/Camera/Settings navigation moved to the top-level nav suite
+// (MainActivity's own NavigationSuiteScaffold, Part 10) -- this screen
+// only owns its own terminal chrome now.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalScreen(
@@ -45,9 +49,6 @@ fun TerminalScreen(
     terminalManager: TerminalManager,
     status: ConnectionStatus,
     onReconnect: () -> Unit,
-    onOpenFiles: () -> Unit,
-    onOpenCamera: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
     var input by viewModel.terminalInput
@@ -76,19 +77,21 @@ fun TerminalScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("upy-android") },
+                title = { Text("Command") },
                 actions = {
-                    Text(
-                        text = when (status) {
+                    // Connecting reuses link_off (user's own call) --
+                    // the sheet has no dedicated "connecting" glyph, and
+                    // link_off's "not currently connected" read fits a
+                    // transient state well enough.
+                    Symbol(
+                        codepoint = if (status is ConnectionStatus.Connected) SymbolIcon.LINK else SymbolIcon.LINK_OFF,
+                        contentDescription = when (status) {
                             is ConnectionStatus.Connecting -> "connecting..."
                             is ConnectionStatus.Connected -> "connected"
                             is ConnectionStatus.Disconnected -> "disconnected"
                         },
                         modifier = Modifier.padding(end = 16.dp)
                     )
-                    TextButton(onClick = onOpenFiles) { Text("Files") }
-                    TextButton(onClick = onOpenCamera) { Text("Camera") }
-                    TextButton(onClick = onOpenSettings) { Text("Settings") }
                 }
             )
         }
@@ -119,20 +122,22 @@ fun TerminalScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                TextButton(onClick = {
+                IconButton(onClick = {
                     viewModel.history.up()?.let { input = it }
-                }) { Text("↑") }
-                TextButton(onClick = {
+                }) { Symbol(SymbolIcon.KEYBOARD_ARROW_UP, contentDescription = "Previous line") }
+                IconButton(onClick = {
                     viewModel.history.down()?.let { input = it }
-                }) { Text("↓") }
-                TextButton(onClick = { terminalManager.terminateExecution() }) {
-                    Text("Interrupt")
+                }) { Symbol(SymbolIcon.KEYBOARD_ARROW_DOWN, contentDescription = "Next line") }
+                IconButton(onClick = { terminalManager.terminateExecution() }) {
+                    Symbol(SymbolIcon.STOP, contentDescription = "Interrupt")
                 }
-                TextButton(onClick = {
+                IconButton(onClick = {
                     coroutineScope.launch(Dispatchers.IO) { terminalManager.reset() }
                     TerminalLog.clear()
-                }) { Text("Reset") }
-                TextButton(onClick = { TerminalLog.clear() }) { Text("Clear") }
+                }) { Symbol(SymbolIcon.RESTART_ALT, contentDescription = "Reset") }
+                IconButton(onClick = { TerminalLog.clear() }) {
+                    Symbol(SymbolIcon.DELETE_SWEEP, contentDescription = "Clear")
+                }
             }
 
             Row(
@@ -160,7 +165,7 @@ fun TerminalScreen(
                     singleLine = false
                 )
                 Button(onClick = ::run, modifier = Modifier.padding(start = 8.dp)) {
-                    Text("Run")
+                    Symbol(SymbolIcon.PLAY_ARROW, contentDescription = "Run")
                 }
             }
         }

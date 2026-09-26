@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import eu.kdvelectronics.upyandroid.MainActivity
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 
+private val ICON_SIZE = 20.dp
+
 // see session-state: SettingsScreen.kt#restartApp
 private fun restartApp(context: Context) {
     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -60,12 +62,11 @@ private fun restartApp(context: Context) {
 fun SettingsScreen(
     settingsManager: SettingsManager,
     onSettingsChanged: () -> Unit,
-    onBack: () -> Unit,
 ) {
     val context = LocalContext.current
     // Captured once, at screen open -- the heap size the CURRENTLY
     // running :engine process actually started with. Compared against
-    // on Back to decide whether a restart is even relevant.
+    // the live field below to decide whether a restart is relevant.
     val initialHeapSizeMb = remember { settingsManager.heapSizeMb }
     var heapSizeMb by remember { mutableStateOf(settingsManager.heapSizeMb.toString()) }
     var showRestartDialog by remember { mutableStateOf(false) }
@@ -76,21 +77,19 @@ fun SettingsScreen(
     var httpPrivateFilesEnabled by remember { mutableStateOf(settingsManager.httpPrivateFilesEnabled) }
     var litertPlaystoreEnabled by remember { mutableStateOf(settingsManager.litertPlaystoreEnabled) }
     var adbExecEnabled by remember { mutableStateOf(settingsManager.adbExecEnabled) }
+    // Settings is a peer nav-suite tab now (Part 10), not a screen with
+    // its own Back button -- the old "only prompt on Back" trigger is
+    // gone, since a tab switch/system-back gesture no longer routes
+    // through any handler this screen owns. Re-homed as an inline row,
+    // always visible whenever the field differs from the running
+    // process's own heap size, regardless of how (or whether) the user
+    // then leaves this screen -- can't be silently skipped by any
+    // particular exit path, since it isn't tied to one.
+    val heapSizeChanged = heapSizeMb.toIntOrNull() != initialHeapSizeMb
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Settings") },
-                navigationIcon = {
-                    TextButton(onClick = {
-                        if (heapSizeMb.toIntOrNull() != initialHeapSizeMb) {
-                            showRestartDialog = true
-                        } else {
-                            onBack()
-                        }
-                    }) { Text("Back") }
-                }
-            )
+            TopAppBar(title = { Text("Settings") })
         }
     ) { padding: PaddingValues ->
         Column(
@@ -110,11 +109,21 @@ fun SettingsScreen(
                     text.toIntOrNull()?.let { settingsManager.heapSizeMb = it }
                 },
                 label = { Text("Heap size (MB) -- takes effect after the app is restarted") },
+                leadingIcon = { Symbol(SymbolIcon.MEMORY, contentDescription = null, size = ICON_SIZE) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 modifier = Modifier.fillMaxWidth()
             )
+            if (heapSizeChanged) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Restart to apply the new heap size", modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showRestartDialog = true }) { Text("Restart") }
+                }
+            }
 
-            SettingsRow("Enable SSH", sshEnabled) {
+            SettingsRow("Enable SSH", sshEnabled, icon = SymbolIcon.TERMINAL_2) {
                 sshEnabled = it
                 settingsManager.sshEnabled = it
                 onSettingsChanged()
@@ -128,11 +137,12 @@ fun SettingsScreen(
                     // never cross into :engine. See SettingsManager.kt.
                 },
                 label = { Text("SSH password") },
+                leadingIcon = { Symbol(SymbolIcon.PASSWORD_2, contentDescription = null, size = ICON_SIZE) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            SettingsRow("Enable HTTP server", httpServerEnabled) {
+            SettingsRow("Enable HTTP server", httpServerEnabled, icon = SymbolIcon.PUBLIC) {
                 httpServerEnabled = it
                 settingsManager.httpServerEnabled = it
                 if (!it) {
@@ -148,12 +158,14 @@ fun SettingsScreen(
                     settingsManager.httpPassword = it
                 },
                 label = { Text("HTTP password") },
+                leadingIcon = { Symbol(SymbolIcon.PASSWORD_2, contentDescription = null, size = ICON_SIZE) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
             SettingsRow(
                 "Serve private files over HTTP",
                 httpPrivateFilesEnabled,
+                icon = SymbolIcon.LOCK,
                 enabled = httpServerEnabled
             ) {
                 httpPrivateFilesEnabled = it
@@ -161,13 +173,13 @@ fun SettingsScreen(
                 onSettingsChanged()
             }
 
-            SettingsRow("Enable LiteRT Play Store access", litertPlaystoreEnabled) {
+            SettingsRow("Enable LiteRT Play Store access", litertPlaystoreEnabled, icon = SymbolIcon.SHOP) {
                 litertPlaystoreEnabled = it
                 settingsManager.litertPlaystoreEnabled = it
                 onSettingsChanged()
             }
 
-            SettingsRow("Enable adb exec", adbExecEnabled) {
+            SettingsRow("Enable adb exec", adbExecEnabled, icon = SymbolIcon.ADB) {
                 adbExecEnabled = it
                 settingsManager.adbExecEnabled = it
                 onSettingsChanged()
@@ -183,10 +195,7 @@ fun SettingsScreen(
                 TextButton(onClick = { restartApp(context) }) { Text("OK") }
             },
             dismissButton = {
-                TextButton(onClick = {
-                    showRestartDialog = false
-                    onBack()
-                }) { Text("Cancel") }
+                TextButton(onClick = { showRestartDialog = false }) { Text("Cancel") }
             }
         )
     }
@@ -196,6 +205,7 @@ fun SettingsScreen(
 private fun SettingsRow(
     label: String,
     checked: Boolean,
+    icon: Int,
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
 ) {
@@ -203,6 +213,7 @@ private fun SettingsRow(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        Symbol(icon, contentDescription = null, modifier = Modifier.padding(end = 12.dp), size = ICON_SIZE)
         Text(label, modifier = Modifier.weight(1f))
         Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }

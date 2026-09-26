@@ -111,6 +111,11 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
+    // Part 10 -- four peer nav destinations (Command/Files/Camera/
+    // Settings), NavigationBar/NavigationRail auto-selected by
+    // WindowSizeClass (the Tab A7 hits "expanded" width in landscape,
+    // where Material's own guidance prefers a rail over a bottom bar).
+    implementation("androidx.compose.material3:material3-adaptive-navigation-suite:1.4.0")
     implementation("androidx.activity:activity-compose:1.13.0")
     // File explorer + editor screens (2026-09-16), see SESSION_STATE.yaml.
     // material-icons-core (bundled with material3) only has a small
