@@ -10,11 +10,17 @@ package eu.kdvelectronics.upyandroid.mediastore
 import android.content.ContentValues
 import android.content.Context
 import android.provider.MediaStore
+import eu.kdvelectronics.upyandroid.http.MediaStoreTokenRegistry
 import java.io.IOException
 
 // Returns the new item's real content:// URI as a string -- the
 // caller (mediastore_module.cpp) hands this back to the script
 // verbatim, it's the only handle a script has on what it just saved.
+// Also registers a random HTTP-serving token (MediaStoreTokenRegistry)
+// for the HTTP server's own GET /media route (Part 7) -- every image a
+// script saves this way becomes fetchable over HTTP without any extra
+// script-side call, matching the plan's own "MQTT carries a reference,
+// HTTP GET pulls the bytes" pattern.
 fun saveImage(context: Context, data: ByteArray, displayName: String, mimeType: String): String {
     val values = ContentValues().apply {
         put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
@@ -25,5 +31,6 @@ fun saveImage(context: Context, data: ByteArray, displayName: String, mimeType: 
         ?: throw IOException("MediaStore insert() returned null")
     resolver.openOutputStream(uri)?.use { it.write(data) }
         ?: throw IOException("MediaStore openOutputStream() returned null")
+    MediaStoreTokenRegistry.register(context, uri.toString(), displayName, mimeType)
     return uri.toString()
 }

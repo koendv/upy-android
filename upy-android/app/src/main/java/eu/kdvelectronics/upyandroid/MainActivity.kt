@@ -18,6 +18,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import eu.kdvelectronics.upyandroid.fileprovider.shareFile
+import eu.kdvelectronics.upyandroid.http.HttpServerManager
 import eu.kdvelectronics.upyandroid.managers.BoardManager
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
@@ -43,6 +44,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var terminalManager: TerminalManager
     private lateinit var filesManager: FilesManager
     private lateinit var settingsManager: SettingsManager
+    private lateinit var httpServerManager: HttpServerManager
     private lateinit var viewModel: MainViewModel
 
     // Must be registered unconditionally before STARTED (Android's own
@@ -76,6 +78,13 @@ class MainActivity : ComponentActivity() {
         terminalManager = TerminalManager(boardManager)
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)
+        // Lives in this (default/UI) process, not :engine -- see
+        // HttpServerManager.kt's own header comment. Deliberately never
+        // stopped in onDestroy(): like AdbExecProvider's own BoardManager,
+        // it should keep serving for as long as this process is alive,
+        // not just while MainActivity itself is on screen.
+        httpServerManager = HttpServerManager(applicationContext, settingsManager)
+        httpServerManager.applySettings()
         boardManager.connect()
         maybeRequestCameraPermission()
 
@@ -118,7 +127,10 @@ class MainActivity : ComponentActivity() {
                     composable("settings") {
                         SettingsScreen(
                             settingsManager = settingsManager,
-                            onSettingsChanged = { boardManager.pushSettings() },
+                            onSettingsChanged = {
+                                boardManager.pushSettings()
+                                httpServerManager.applySettings()
+                            },
                             onBack = { navController.popBackStack() }
                         )
                     }
