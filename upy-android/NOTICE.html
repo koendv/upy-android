@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>Third-party notices</title></head>
+<body>
+
+<h1>Third-party notices</h1>
+
+<p>upy-android is an independent, unofficial Android port of MicroPython
+and is not affiliated with or endorsed by the MicroPython project.</p>
+
+<p>This file lists every third-party component this app includes,
+vendors, or links against. Plain HTML on purpose: it is bundled into
+the app itself and shown from Settings &gt; About via
+<code>android.text.Html.fromHtml()</code> -- no rendering library
+needed, and real headers/links display properly there.</p>
+
+<h2>Vendored native code (compiled into libupy_engine.so)</h2>
+
+<h3>MicroPython</h3>
+<ul>
+<li>Source: <a href="https://github.com/micropython/micropython">https://github.com/micropython/micropython</a></li>
+<li>Copyright: 2013-2026 Damien P. George and contributors</li>
+<li>License: MIT</li>
+</ul>
+
+<h3>OpenMV imlib / py_image</h3>
+<p>License: MIT, except zbar.c below (LGPL) and the ml/tf module further
+down (a different, non-commercial-use OpenMV license). OpenMV's own
+GPL-licensed files (AGAST, LSD) are not included in this build.</p>
+<ul>
+<li>Source: <a href="https://github.com/openmv/openmv">https://github.com/openmv/openmv</a></li>
+</ul>
+
+<h3>zbar (barcode/QR decoding)</h3>
+<ul>
+<li>Source: <a href="http://sourceforge.net/projects/zbar">http://sourceforge.net/projects/zbar</a></li>
+<li>Copyright: 2008-2010 Jeff Brown &lt;spadix@users.sourceforge.net&gt;</li>
+<li>License: GNU Lesser General Public License, version 2.1 or later</li>
+</ul>
+<p>Statically linked into libupy_engine.so. Since this is a static link,
+this project's complete source (including this file, unmodified) is
+made available alongside this notice, satisfying LGPL's rebuild/relink
+provisions.</p>
+
+<h3>ulab (numpy/scipy-like numerical computing)</h3>
+<ul>
+<li>Source: <a href="https://github.com/v923z/micropython-ulab">https://github.com/v923z/micropython-ulab</a></li>
+<li>Copyright: 2019-2021 Zoltan Voros and contributors</li>
+<li>License: MIT</li>
+<li>Vendored at commit 01ad8a5, code/ subdirectory only.</li>
+</ul>
+
+<h3>ml / tf module (OpenMV script-compatible on-device inference)</h3>
+<ul>
+<li>Source: <a href="https://github.com/openmv/openmv">https://github.com/openmv/openmv</a> (py_ml.c, tflm_backend.cc)</li>
+<li>Copyright: 2024 OpenMV, LLC.</li>
+<li>License: A custom OpenMV redistribution license (BSD-style), NOT MIT
+like the rest of imlib above -- redistribution and use are permitted,
+but only for personal, non-commercial purposes. Free/open-source
+distribution of this app is not a commercial use of these two files.</li>
+</ul>
+<p>TensorFlow Lite Micro backend (vendored, compiled from source):</p>
+<ul>
+<li>Source: <a href="https://github.com/tensorflow/tflite-micro">https://github.com/tensorflow/tflite-micro</a></li>
+<li>License: Apache License 2.0</li>
+</ul>
+
+<h3>LiteRT</h3>
+<ul>
+<li>Source: <a href="https://github.com/google-ai-edge/LiteRT">https://github.com/google-ai-edge/LiteRT</a></li>
+<li>License: Apache License 2.0</li>
+</ul>
+<p>libLiteRt.so is a prebuilt binary dependency (resolved via Gradle from
+Google's own Maven repository), not compiled from source by this
+project. C headers are fetched separately from a pinned LiteRT source
+tag, since the published binary ships none.</p>
+
+<h2>Example / test data</h2>
+<p>add_simple.tflite, single_add_default_a8w8_recipe_quantized.tflite</p>
+<ul>
+<li>Source: <a href="https://github.com/google-ai-edge/LiteRT">https://github.com/google-ai-edge/LiteRT</a> (test fixtures under litert/test/testdata/)</li>
+<li>License: Apache License 2.0</li>
+</ul>
+
+<h2>App icon</h2>
+<p>The app icon (viewfinder corners framing a "&gt;&gt;&gt;" REPL prompt)
+is original artwork made for this project, not derived from the
+MicroPython logo, and is covered by this project's own license.</p>
+
+<h2>Icon font</h2>
+<p>The icon font is a subsetted, static-instance build of Google's
+Material Symbols Rounded (24 glyphs, no ligature tables).</p>
+<ul>
+<li>Source: <a href="https://github.com/google/material-design-icons">https://github.com/google/material-design-icons</a></li>
+<li>License: Apache License 2.0</li>
+</ul>
+
+<h2>Terminal command history</h2>
+<p>Adapted, unchanged apart from the package name, from micro-repl.</p>
+<ul>
+<li>Source: <a href="https://github.com/Ma7moud3ly/micro-repl">https://github.com/Ma7moud3ly/micro-repl</a></li>
+<li>Author: Ma7moud3ly</li>
+<li>License: MIT</li>
+</ul>
+<p>Everything else in this app (the AIDL-based transport, the
+separate-process engine, the UI, the VFS) was written independently --
+micro-repl's raw-REPL/USB-serial design was not reused.</p>
+
+<h2>File explorer and code editor</h2>
+<p>The file explorer and code editor screens follow the same
+functionality as micro-repl's own explorer/editor screens, rewritten
+against local sandboxed storage instead of micro-repl's remote-board
+REPL round-trip -- no source code copied.</p>
+<p>The code editor itself uses a separate library, not micro-repl's own
+code: Nemo Code Editor.</p>
+<ul>
+<li>Source: <a href="https://github.com/Ma7moud3ly/nemo-editor">https://github.com/Ma7moud3ly/nemo-editor</a></li>
+<li>Author: Ma7moud3ly</li>
+<li>License: MIT</li>
+<li>Used via its published Maven artifact (io.github.ma7moud3ly:nemo-editor).</li>
+</ul>
+
+</body>
+</html>

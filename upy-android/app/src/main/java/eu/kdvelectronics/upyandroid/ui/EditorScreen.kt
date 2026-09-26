@@ -35,7 +35,7 @@ import kotlinx.coroutines.withContext
 /**
  * Code editor -- same functionality as micro-repl's own editor (run /
  * save / new / undo / redo, syntax highlighting via the same nemo-editor
- * library micro-repl itself depends on -- MIT, see NOTICE.md) minus its
+ * library micro-repl itself depends on -- MIT, see NOTICE.html) minus its
  * theme picker (dropped, out of scope for now -- see SESSION_STATE.yaml).
  * Saves locally via [FilesManager], not to a remote board.
  *

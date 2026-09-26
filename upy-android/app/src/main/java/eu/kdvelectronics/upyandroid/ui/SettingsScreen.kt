@@ -4,6 +4,7 @@ import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.os.Process
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -62,6 +64,7 @@ private fun restartApp(context: Context) {
 fun SettingsScreen(
     settingsManager: SettingsManager,
     onSettingsChanged: () -> Unit,
+    onOpenAbout: () -> Unit,
 ) {
     val context = LocalContext.current
     // Captured once, at screen open -- the heap size the CURRENTLY
@@ -111,7 +114,18 @@ fun SettingsScreen(
                 label = { Text("Heap size (MB) -- takes effect after the app is restarted") },
                 leadingIcon = { Symbol(SymbolIcon.MEMORY, contentDescription = null, size = ICON_SIZE) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    // Restores the old Back-button trigger's actual effect
+                    // (an automatic confirm prompt), not just the always-
+                    // visible reminder row below -- losing focus is this
+                    // screen's own equivalent of "the user is done editing
+                    // this field", now that there's no Back button to hook.
+                    .onFocusChanged { focusState ->
+                        if (!focusState.isFocused && heapSizeChanged) {
+                            showRestartDialog = true
+                        }
+                    }
             )
             if (heapSizeChanged) {
                 Row(
@@ -183,6 +197,20 @@ fun SettingsScreen(
                 adbExecEnabled = it
                 settingsManager.adbExecEnabled = it
                 onSettingsChanged()
+            }
+
+            // Same "About phone"-style row real Android Settings puts at
+            // the bottom of its own list -- navigates to a non-peer
+            // detail screen (AboutScreen), same tier as EditorScreen.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenAbout)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("About", modifier = Modifier.weight(1f))
+                Text(">")
             }
         }
     }

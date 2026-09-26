@@ -97,6 +97,6 @@ Working prototype. Largely generated with AI assistance, not fully audited. Use 
 
 ### License
 
-[MIT](LICENSE.md). Third-party attribution in [NOTICE](upy-android/NOTICE.md).
+[MIT](LICENSE.md). Third-party attribution in [NOTICE](upy-android/NOTICE.html).
 
 MicroPython, ulab, and OpenMV-derived files retain their upstream licenses.

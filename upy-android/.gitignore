@@ -53,6 +53,11 @@ app/src/main/cpp/tflm/
 # treatment as app/src/main/cpp/litert/ above.
 app/src/main/jniLibs/
 
+# NOTICE.md copied here by build.gradle.kts's own copyNotice task (shown
+# in-app via AboutScreen.kt) -- the repo-root NOTICE.md is the one
+# tracked copy, this is regenerated on every build.
+app/src/main/assets/
+
 # Machine-specific (contains a local absolute SDK path)
 local.properties
 

@@ -47,7 +47,7 @@ android {
             // this project has no dedicated release key. Simple choice:
             // makes assembleRelease's output genuinely installable
             // (Android refuses to install an unsigned APK) without
-            // introducing keystore/secret management. See NOTICE.md/
+            // introducing keystore/secret management. See NOTICE.html/
             // README for the "prototype/datapoint" framing this matches.
             //
             // If this is ever turned on: litert-api's own proguard.txt
@@ -96,8 +96,21 @@ android {
     // -- android.rt's/android.litert's LiteRtEnvironment auto-discovers
     // and dlopen()s it by name at runtime, see rt_module.cpp, so it
     // must actually ship in the APK. AGP scans jniLibs/<abi>/ by
-    // convention, no extra packaging config needed. See NOTICE.md for
+    // convention, no extra packaging config needed. See NOTICE.html for
     // licensing.
+}
+
+// NOTICE.html is shown in-app (Settings > About) via AboutScreen.kt,
+// which reads it as a plain asset -- copied here rather than hand-
+// duplicated into src/main/assets/, so there's exactly one copy to keep
+// accurate and it can't silently drift out of sync with what actually
+// ships.
+val copyNotice = tasks.register<Copy>("copyNotice") {
+    from(rootProject.file("NOTICE.html"))
+    into(layout.projectDirectory.dir("src/main/assets"))
+}
+tasks.named("preBuild") {
+    dependsOn(copyNotice)
 }
 
 dependencyLocking {
@@ -123,7 +136,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.8")
     // Nemo Code Editor (MIT, https://github.com/Ma7moud3ly/nemo-editor) --
     // same author as micro-repl, same version they depend on. Verified
-    // MIT-licensed before adding (see NOTICE.md).
+    // MIT-licensed before adding (see NOTICE.html).
     implementation("io.github.ma7moud3ly:nemo-editor:1.0.4")
     // LiteRT's Kotlin/Java API (android.litert module, see
     // litert_module.cpp/LiteRtShim.kt) -- reuses Google's own tested
@@ -154,7 +167,7 @@ dependencies {
     // by AGP, confirmed present in the built APK) and by
     // fetch-litert.sh's jniLibs staging step, respectively -- neither
     // needs a Gradle dependency to ship. This is still the project's
-    // first prebuilt-binary native dependency (see NOTICE.md) --
+    // first prebuilt-binary native dependency (see NOTICE.html) --
     // everything else vendored is compiled from source.
     implementation("com.google.ai.edge.litert:litert-api:2.2.0")
     // umqtt module (umqtt_module.cpp/MqttShim.kt) -- Part 7. Chosen over

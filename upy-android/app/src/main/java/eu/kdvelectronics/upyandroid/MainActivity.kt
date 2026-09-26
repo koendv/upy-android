@@ -36,6 +36,7 @@ import eu.kdvelectronics.upyandroid.managers.SettingsManager
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
 import eu.kdvelectronics.upyandroid.model.MicroFile
 import eu.kdvelectronics.upyandroid.ssh.SshServerManager
+import eu.kdvelectronics.upyandroid.ui.AboutScreen
 import eu.kdvelectronics.upyandroid.ui.CameraScreen
 import eu.kdvelectronics.upyandroid.ui.EditorScreen
 import eu.kdvelectronics.upyandroid.ui.ExplorerScreen
@@ -203,6 +204,7 @@ class MainActivity : ComponentActivity() {
                                     httpServerManager.applySettings()
                                     sshServerManager.applySettings()
                                 },
+                                onOpenAbout = { navController.navigate("about") },
                             )
                         }
                         composable(TopLevelDestination.CAMERA.route) {
@@ -227,6 +229,9 @@ class MainActivity : ComponentActivity() {
                                 onRun = { content -> runAndShowTerminal(content) },
                                 onBack = { navController.popBackStack() }
                             )
+                        }
+                        composable("about") {
+                            AboutScreen(onBack = { navController.popBackStack() })
                         }
                     }
                 }
