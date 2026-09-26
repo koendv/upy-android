@@ -23,6 +23,7 @@ import eu.kdvelectronics.upyandroid.managers.BoardManager
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
 import eu.kdvelectronics.upyandroid.model.MicroFile
+import eu.kdvelectronics.upyandroid.ssh.SshServerManager
 import eu.kdvelectronics.upyandroid.ui.CameraScreen
 import eu.kdvelectronics.upyandroid.ui.EditorScreen
 import eu.kdvelectronics.upyandroid.ui.ExplorerScreen
@@ -45,6 +46,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var filesManager: FilesManager
     private lateinit var settingsManager: SettingsManager
     private lateinit var httpServerManager: HttpServerManager
+    private lateinit var sshServerManager: SshServerManager
     private lateinit var viewModel: MainViewModel
 
     // Must be registered unconditionally before STARTED (Android's own
@@ -67,9 +69,9 @@ class MainActivity : ComponentActivity() {
         // Registered once, globally, rather than per-screen: every
         // exec() (terminal input, or explorer/editor "Run") shows up in
         // the terminal's own output, so a single listener forwarding
-        // straight to terminalOutput covers every caller. Re-applied to
+        // straight to TerminalLog covers every caller. Re-applied to
         // the engine automatically on every BoardManager (re)connect.
-        boardManager.setOutputListener { chunk -> viewModel.terminalOutput.value += chunk }
+        boardManager.setOutputListener { chunk -> TerminalLog.append(chunk) }
         // android.fileprovider.share() requests, routed here (the
         // main/UI process) from :engine -- see the plan's own Part 7
         // cross-process constraint. this is a real Activity Context,
@@ -85,6 +87,10 @@ class MainActivity : ComponentActivity() {
         // not just while MainActivity itself is on screen.
         httpServerManager = HttpServerManager(applicationContext, settingsManager)
         httpServerManager.applySettings()
+        // Same lifecycle reasoning as httpServerManager above -- also
+        // never stopped in onDestroy().
+        sshServerManager = SshServerManager(applicationContext, settingsManager)
+        sshServerManager.applySettings()
         boardManager.connect()
         maybeRequestCameraPermission()
 
@@ -101,7 +107,7 @@ class MainActivity : ComponentActivity() {
                 var pendingPath = remember { mutableStateOf("") }
 
                 fun runAndShowTerminal(content: String) {
-                    vm.terminalOutput.value += "\n>>> (running script)\n"
+                    TerminalLog.append("\n>>> (running script)\n")
                     // Output arrives live via the output listener
                     // registered above, not from eval()'s return value.
                     coroutineScope.launch(Dispatchers.IO) {
@@ -130,6 +136,7 @@ class MainActivity : ComponentActivity() {
                             onSettingsChanged = {
                                 boardManager.pushSettings()
                                 httpServerManager.applySettings()
+                                sshServerManager.applySettings()
                             },
                             onBack = { navController.popBackStack() }
                         )

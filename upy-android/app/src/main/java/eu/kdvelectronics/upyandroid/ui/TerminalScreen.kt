@@ -22,6 +22,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -31,6 +32,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.unit.dp
 import eu.kdvelectronics.upyandroid.MainViewModel
+import eu.kdvelectronics.upyandroid.TerminalLog
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
 import kotlinx.coroutines.Dispatchers
@@ -49,14 +51,16 @@ fun TerminalScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     var input by viewModel.terminalInput
-    var output by viewModel.terminalOutput
+    // Process-wide, not per-ViewModel -- see TerminalLog.kt's own
+    // header comment (adb-exec/SSH both write into this same log).
+    val output by TerminalLog.text.collectAsState()
     val scrollState = rememberScrollState()
 
     fun run() {
         val code = input
         if (code.isBlank()) return
         viewModel.history.push(code)
-        output += "\n>>> $code\n"
+        TerminalLog.append("\n>>> $code\n")
         input = ""
         // Output arrives live via the output listener registered once in
         // MainActivity, not from eval()'s return value. See BoardManager.kt.
@@ -126,9 +130,9 @@ fun TerminalScreen(
                 }
                 TextButton(onClick = {
                     coroutineScope.launch(Dispatchers.IO) { terminalManager.reset() }
-                    output = ""
+                    TerminalLog.clear()
                 }) { Text("Reset") }
-                TextButton(onClick = { output = "" }) { Text("Clear") }
+                TextButton(onClick = { TerminalLog.clear() }) { Text("Clear") }
             }
 
             Row(

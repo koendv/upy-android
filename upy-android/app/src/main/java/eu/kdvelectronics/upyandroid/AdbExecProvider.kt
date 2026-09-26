@@ -9,26 +9,15 @@ import android.os.Binder
 import android.os.Bundle
 import android.os.Process
 import android.util.Base64
-import eu.kdvelectronics.upyandroid.managers.BoardManager
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
-import eu.kdvelectronics.upyandroid.model.ConnectionStatus
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
 
-// adb-driven one-shot MicroPython exec. Never unbinds its BoardManager
-// once connected -- intentional, not a leak.
+// adb-driven one-shot MicroPython exec. Delegates the actual
+// connect/run/reset/interrupt work to ScriptExecCore, shared with the
+// SSH shell (Part 8) -- this class is now only the UID-gated,
+// base64-decoding front door.
 // see session-state: AdbExecProvider.kt#AdbExecProvider
 class AdbExecProvider : ContentProvider() {
     private lateinit var appContext: Context
-    private val connectLock = Any()
-
-    @Volatile private var boardManager: BoardManager? = null
-    @Volatile private var connected = false
-    @Volatile private var latch: CountDownLatch? = null
-
-    // Only "run" is gated -- "reset"/"interrupt" are not.
-    private val busy = AtomicBoolean(false)
 
     override fun onCreate(): Boolean {
         appContext = context!!.applicationContext
@@ -48,64 +37,35 @@ class AdbExecProvider : ContentProvider() {
         return when (method) {
             "run" -> handleRun(arg)
             "reset" -> {
-                ensureConnected()
-                boardManager?.reset()
+                ScriptExecCore.reset(appContext)
                 Bundle()
             }
             "interrupt" -> {
-                // Bypasses the busy gate below (run() only).
-                ensureConnected()
-                boardManager?.interrupt()
+                ScriptExecCore.interrupt(appContext)
                 Bundle()
             }
             else -> Bundle().apply { putString("error", "unknown_method") }
         }
     }
 
+    // see session-state: AdbExecProvider.kt#handleRun
     private fun handleRun(arg: String?): Bundle {
-        if (!busy.compareAndSet(false, true)) {
-            return Bundle().apply { putString("error", "busy") }
+        val decoded = try {
+            String(Base64.decode(arg, Base64.DEFAULT), Charsets.UTF_8)
+        } catch (e: IllegalArgumentException) {
+            return Bundle().apply { putString("error", "bad_base64") }
         }
-        try {
-            val decoded = try {
-                String(Base64.decode(arg, Base64.DEFAULT), Charsets.UTF_8)
-            } catch (e: IllegalArgumentException) {
-                return Bundle().apply { putString("error", "bad_base64") }
+        return when (val result = ScriptExecCore.run(appContext, decoded)) {
+            is ScriptExecCore.RunResult.Busy -> Bundle().apply { putString("error", "busy") }
+            is ScriptExecCore.RunResult.Disconnected -> Bundle().apply { putString("error", "disconnected") }
+            is ScriptExecCore.RunResult.Ok -> {
+                // Retroactive requirement (Part 8): adb-exec's commands
+                // and output must show up in the on-screen terminal too,
+                // not just be returned to the caller -- see
+                // TerminalLog.kt's own header comment.
+                TerminalLog.append("\n>>> (adb-exec)\n$decoded\n${result.output}\n")
+                Bundle().apply { putString("output", result.output) }
             }
-            ensureConnected()
-            val output = boardManager?.exec(decoded) ?: ""
-            // "" is ambiguous (no output vs. engine died); check connected.
-            return if (!connected) {
-                Bundle().apply { putString("error", "disconnected") }
-            } else {
-                Bundle().apply { putString("output", output) }
-            }
-        } finally {
-            busy.set(false)
-        }
-    }
-
-    // see session-state: AdbExecProvider.kt#ensureConnected
-    private fun ensureConnected() {
-        synchronized(connectLock) {
-            if (connected) return
-
-            val bm = boardManager ?: BoardManager(
-                context = appContext,
-                registerOutputListener = false,
-            ) { status ->
-                connected = status is ConnectionStatus.Connected
-                // Connecting is transient/synchronous; only a terminal
-                // status may release the latch.
-                if (status !is ConnectionStatus.Connecting) {
-                    latch?.countDown()
-                }
-            }.also { boardManager = it }
-
-            val freshLatch = CountDownLatch(1)
-            latch = freshLatch
-            bm.connect()
-            freshLatch.await(10, TimeUnit.SECONDS)
         }
     }
 

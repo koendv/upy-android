@@ -80,10 +80,14 @@ android {
     // functional at runtime (INDEX.LIST is a JAR-indexing optimization
     // for applet-style classpath scanning; io.netty.versions.properties
     // is a diagnostic version-reporting file) -- safe to drop entirely.
+    // META-INF/DEPENDENCIES is the same story again for Apache MINA
+    // SSHD (Part 8) -- both sshd-core and sshd-common ship their own
+    // copy of this plain, non-functional license-attribution text file.
     packaging {
         resources {
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/io.netty.versions.properties"
+            excludes += "META-INF/DEPENDENCIES"
         }
     }
 
@@ -171,4 +175,10 @@ dependencies {
     implementation("io.ktor:ktor-server-cio:3.6.0")
     implementation("io.ktor:ktor-server-auth:3.6.0")
     implementation("io.ktor:ktor-server-status-pages:3.6.0")
+    // SSH server (Part 8) -- Apache MINA SSHD, the standard actively-
+    // maintained JVM SSH server library with real shell-channel support
+    // (confirmed choice, see the plan's own Part 8 design). Latest
+    // stable GA per Maven Central metadata (3.0.0 is still milestone-
+    // only, per this project's own preference for stable releases).
+    implementation("org.apache.sshd:sshd-core:2.19.0")
 }
