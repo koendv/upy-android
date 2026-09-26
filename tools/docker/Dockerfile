@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1
+
 # Build upy-android's upy-debug.apk (or a simple debug-key-signed
 # upy-release.apk) inside Docker. MicroPython running as an Android app.
 #
@@ -19,7 +21,18 @@
 # - github workflows
 # - local builds
 #
+# Two-phase locally: build "tools" once (rebuild only when a pinned SDK/
+# NDK/cmake version above changes), then "build" every time after --
+# BuildKit's own layer cache already makes an unchanged "tools" stage a
+# no-op, this split just documents/names that so it's not accidental.
+# The "build" stage's own compile step is BuildKit-cache-mounted
+# (Gradle's cache dir + app/.cxx + app/build), so a rebuild after a small
+# source change only recompiles/relinks what actually changed instead of
+# a full cold build -- requires a BuildKit-enabled `docker build` (the
+# default on any reasonably recent Docker).
+#
 # Local debug build:
+#   docker build --target tools -t upy-android-tools .
 #   docker build --target build -t upy-android .
 #   id=$(docker create upy-android)
 #   docker cp "$id":/output ./upy-android_apk
@@ -180,15 +193,22 @@ RUN chmod +x ./gradlew
 #    find . -name 'gradle.lockfile' -o -name '*gradle.lockfile*' && \
 #    cp app/gradle.lockfile /output/gradle.lockfile
 
-RUN if [ "$BUILD_TYPE" = "release" ]; then \
-        ./gradlew :app:assembleRelease; \
-    else \
-        ./gradlew :app:assembleDebug; \
-    fi
-
-RUN if [ "$BUILD_TYPE" = "release" ]; then \
+# Cache-mounted: Gradle's dependency/build cache plus CMake/Ninja's own
+# incremental object-file state (app/.cxx) and Gradle's task-output
+# state (app/build) all survive across separate `docker build`
+# invocations, so an unchanged source tree recompiles nothing and a
+# small change only rebuilds what depends on it. A cache mount's
+# contents are NOT part of the image filesystem once this RUN ends --
+# the APK copy below must happen in this same RUN, not a later one, or
+# it would see an empty app/build.
+RUN --mount=type=cache,target=/home/devuser/.gradle,uid=1000,gid=1000 \
+    --mount=type=cache,target=/home/devuser/upy-android/app/.cxx,uid=1000,gid=1000 \
+    --mount=type=cache,target=/home/devuser/upy-android/app/build,uid=1000,gid=1000 \
+    if [ "$BUILD_TYPE" = "release" ]; then \
+        ./gradlew :app:assembleRelease && \
         cp app/build/outputs/apk/release/app-release.apk /output/upy-release.apk; \
     else \
+        ./gradlew :app:assembleDebug && \
         cp app/build/outputs/apk/debug/app-debug.apk /output/upy-debug.apk; \
     fi
 

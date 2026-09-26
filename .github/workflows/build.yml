@@ -38,6 +38,12 @@ jobs:
       - name: checkout upy-android-docker sources
         uses: actions/checkout@v7
 
+      - name: docker build tools
+        run: |
+          docker build --target tools \
+            -t upy-android-tools \
+            -f tools/docker/Dockerfile .
+
       - name: docker build
         run: |
           docker build --target build \

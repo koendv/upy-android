@@ -4,6 +4,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.os.Bundle
 import android.os.IBinder
 import android.os.RemoteException
 import android.util.Log
@@ -25,6 +26,8 @@ import eu.kdvelectronics.upyandroid.model.ConnectionStatus
  */
 class BoardManager(
     private val context: Context,
+    // see session-state: BoardManager.kt#registerOutputListener
+    private val registerOutputListener: Boolean = true,
     private val onStatusChanges: ((status: ConnectionStatus) -> Unit)? = null,
 ) {
     companion object {
@@ -50,7 +53,13 @@ class BoardManager(
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             engine = IEngine.Stub.asInterface(binder)
-            engine?.setOutputListener(outputListenerStub)
+            // Before Connected, unconditionally (regardless of
+            // registerOutputListener) -- see IEngine.aidl#setSettings
+            // for why this ordering matters.
+            pushSettings()
+            if (registerOutputListener) {
+                engine?.setOutputListener(outputListenerStub)
+            }
             onStatusChanges?.invoke(ConnectionStatus.Connected)
         }
 
@@ -83,6 +92,33 @@ class BoardManager(
     fun disconnect() {
         engine = null
         context.unbindService(connection)
+    }
+
+    /**
+     * Pushes the current, non-secret settings snapshot into :engine.
+     * Called on every successful connect (before onStatusChanges sees
+     * Connected -- see [onServiceConnected]) and again from the
+     * Settings screen whenever the user changes a setting while
+     * connected. sshPassword/httpPassword are deliberately never put
+     * into this Bundle -- see IEngine.aidl#setSettings. heap_size_mb is
+     * deliberately not here either -- that is read once, locally, by
+     * EngineService.onCreate() only; see Engine.kt#nativeSetSettings.
+     */
+    fun pushSettings() {
+        val s = SettingsManager(context)
+        val bundle = Bundle().apply {
+            putBoolean("ssh_enabled", s.sshEnabled)
+            putBoolean("http_server_enabled", s.httpServerEnabled)
+            putBoolean("http_private_files_enabled", s.httpPrivateFilesEnabled)
+            putBoolean("litert_playstore_enabled", s.litertPlaystoreEnabled)
+            putBoolean("adb_exec_enabled", s.adbExecEnabled)
+        }
+        try {
+            engine?.setSettings(bundle)
+        } catch (re: RemoteException) {
+            // Engine is gone; the next connect() will push a fresh
+            // snapshot into whatever process replaces it.
+        }
     }
 
     /**

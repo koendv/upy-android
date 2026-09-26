@@ -34,6 +34,12 @@
             android:process=":engine"
             android:exported="false" />
 
+        <!-- adb-driven one-shot MicroPython exec. See AdbExecProvider.kt. -->
+        <provider
+            android:name=".AdbExecProvider"
+            android:authorities="${applicationId}.exec"
+            android:exported="true" />
+
         <!-- litert-api (android.litert module) pulls in WorkManager
              transitively; its own androidx.startup auto-init is purely
              local (SQLite job-scheduling), never contacts a server, but

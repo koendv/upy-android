@@ -1,0 +1,7 @@
+.git
+upy-android/app/build
+upy-android/app/.cxx
+upy-android/.gradle
+upy-android/.kotlin
+upy-android/local.properties
+*.apk
