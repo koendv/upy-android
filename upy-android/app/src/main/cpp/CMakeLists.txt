@@ -52,8 +52,6 @@ add_library(upy_engine SHARED
     imu_module.cpp
     android_module.cpp
     settings_module.cpp
-    tf_module.cpp
-    rt_module.cpp
     litert_module.cpp
     litert_jni_bridge.cpp
     mediastore_module.cpp
@@ -98,20 +96,6 @@ target_include_directories(upy_engine PRIVATE
 target_compile_definitions(upy_engine PRIVATE
     CMSIS_MCU_H="cmsis_mcu_stub.h"
     ULAB_CONFIG_FILE="ulab_config.h"
-    # tf_module.cpp's hw_nnapi check (android.tf.info()) calls NNAPI
-    # device-enumeration functions that need API 29, guarded by
-    # __builtin_available -- but without this define, Bionic's headers
-    # use "strict" availability mode (android/versioning.h, confirmed
-    # by reading it directly, not guessed) where calling any above-
-    # minSdk API is a hard BUILD ERROR regardless of any runtime guard.
-    # This is the NDK's own documented mechanism for exactly this case
-    # (https://developer.android.com/ndk/guides/using-newer-apis) --
-    # switches to weak-linked symbols + __builtin_available-checked
-    # calls actually compiling. Project-wide, not scoped to tf_module.cpp
-    # specifically, matching this file's existing CMSIS_MCU_H/
-    # ULAB_CONFIG_FILE pattern -- harmless for every other file, none of
-    # which reference any API-level-gated symbol.
-    __ANDROID_UNAVAILABLE_SYMBOLS_ARE_WEAK__
 )
 
 target_compile_options(upy_engine PRIVATE
@@ -129,10 +113,9 @@ target_compile_options(upy_engine PRIVATE
 # pattern as ulab/imlib.
 #
 # Built as its OWN isolated static library, NOT folded into upy_engine's
-# main source list: android.tf/android.rt/litert (all still alive per
-# this project's established sequencing policy, see SESSION_STATE.yaml)
-# already link a real TfLite*/tflite:: symbol surface from the prebuilt
-# libLiteRt.so, and TFLM's own reference-kernel tree defines the SAME
+# main source list: litert_module.cpp already links a real TfLite*/
+# tflite:: symbol surface from the prebuilt libLiteRt.so, and TFLM's own
+# reference-kernel tree defines the SAME
 # C++ namespace (tflite::) and C API names (TfLiteIntArrayCreate,
 # TfLiteTypeGetName, etc.) under different (TF_LITE_STATIC_MEMORY)
 # semantics -- a real collision risk, not hypothetical, since both end
@@ -167,10 +150,10 @@ target_compile_features(tflm PRIVATE cxx_std_17)
 # guessed) -- TfLiteIntArray and other core structs have a genuinely
 # different (fixed-size, no heap) layout under this macro. Must apply
 # identically here AND on tflm_backend.cc below (both touch these
-# structs), and must NOT apply to anything else in upy_engine, whose
-# other files (tf_module.cpp/rt_module.cpp/litert_module.cpp) link
-# against the prebuilt libLiteRt.so's own regular (non-static-memory)
-# struct layout. -DNDEBUG/-DTF_LITE_STRIP_ERROR_STRINGS deliberately
+# structs), and must NOT apply to anything else in upy_engine -- in
+# particular litert_module.cpp, which links against the prebuilt
+# libLiteRt.so's own regular (non-static-memory) struct layout.
+# -DNDEBUG/-DTF_LITE_STRIP_ERROR_STRINGS deliberately
 # NOT added -- those are the Makefile's "release" BUILD_TYPE only; the
 # default keeps real error strings, which is what makes tflm_backend.cc's
 # RegisterDebugLogCallback(ml_backend_log_handler) routing actually
@@ -183,9 +166,13 @@ target_compile_definitions(tflm PRIVATE
 # tflm_backend.cc's own #include "tensorflow/lite/micro/..." lines need
 # the tflm/ root -- scoped to just this one file, not added to
 # upy_engine's own target_include_directories below, so the rest of
-# upy_engine's sources (tf_module.cpp/rt_module.cpp/litert_module.cpp,
-# which resolve their own tflite/c/*.h and litert/c/*.h via litert/include
-# instead) never see TFLM's header tree at all. Same TF_LITE_STATIC_MEMORY
+# upy_engine's sources never see TFLM's header tree at all (litert_
+# module.cpp doesn't include LiteRT's own C API headers either -- it
+# talks to litert-api's Kotlin surface via JNI only, see litert_
+# jni_bridge.h's own header comment; litert/include stays in target_
+# include_directories below purely so libLiteRt.so itself still gets
+# linked and packaged into the APK, not because any source here
+# includes its headers). Same TF_LITE_STATIC_MEMORY
 # define as the tflm target above -- see that target's own comment.
 #
 # MICROPY_PY_ML_TFLM must ALSO be a command-line define here, not just
@@ -230,7 +217,7 @@ set_source_files_properties(micropython_embed/openmv/tflm_backend.cc
     COMPILE_OPTIONS "-fvisibility=hidden;-fvisibility-inlines-hidden"
 )
 
-# LiteRT (android.tf module, see SESSION_STATE.yaml's design discussion)
+# LiteRT (litert_module.cpp, see SESSION_STATE.yaml's design discussion)
 # -- this project's first PREBUILT BINARY dependency (see NOTICE.md),
 # fetched by native-bringup/fetch-litert.sh (run it before building if
 # app/src/main/cpp/litert/ doesn't exist -- same "populate before build"
@@ -249,15 +236,13 @@ set_target_properties(litert PROPERTIES
 # ANativeWindow_* API (display_module.cpp), and ASensorManager_*/
 # ASensorEventQueue_*/ALooper_* (imu_module.cpp) -- all exported from
 # libandroid.so, no separate library needed for the sensor API.
-# neuralnetworks: android.tf.info()'s hw_nnapi field (tf_module.cpp) --
-# libneuralnetworks.so needs API 27 (confirmed by reading
-# NeuralNetworks.h directly, not assumed), which is why minSdk was
-# bumped 26->27 (see build.gradle.kts's own comment) specifically to
-# make this a safe, eager, direct link -- the library is guaranteed
-# present on every device this app can install on. The specific
-# device-enumeration functions used are still API 29-only regardless,
-# guarded by a runtime check in tf_module.cpp, not a build-time one.
-target_link_libraries(upy_engine log m camera2ndk mediandk android litert neuralnetworks tflm)
+# litert: no upy_engine source calls a LiteRT C-API symbol directly any
+# more (litert_module.cpp talks to litert-api's Kotlin surface via JNI
+# only) -- this link line's real purpose now is just getting AGP to
+# package libLiteRt.so into the APK's jniLibs, which LiteRtShim.kt still
+# needs present at runtime (see this file's own `litert` target comment
+# above and build.gradle.kts's litert-api dependency comment).
+target_link_libraries(upy_engine log m camera2ndk mediandk android litert tflm)
 
 # Linker map for libupy_engine.so -- static-link internals only (which
 # MicroPython/ulab/openmv/our own object files pulled in, section sizes,

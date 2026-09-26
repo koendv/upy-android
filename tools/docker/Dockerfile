@@ -169,13 +169,10 @@ RUN mkdir -p vendor/openmv \
         cp "/home/devuser/openmv/$src" "vendor/openmv/$dest"; \
     done < /home/devuser/openmv-manifest.tsv
 
-# LiteRT (android.tf module): this project's first PREBUILT BINARY
-# dependency, fetched fresh the same way the real dev workflow does (see
-# fetch-litert.sh's own header comment): the AAR's .so from
-# dl.google.com plus a sparse-cloned header set from the matching
-# upstream tag. Must run before the qstr-scan step below.
-# tf_module.cpp's #include "tflite/c/c_api.h" needs
-# app/src/main/cpp/litert/include to already exist.
+# LiteRT (litert module, see fetch-litert.sh's own header comment):
+# this project's first PREBUILT BINARY dependency, fetched fresh the
+# same way the real dev workflow does: the AAR's .so from dl.google.com
+# plus a sparse-cloned header set from the matching upstream tag.
 RUN ./fetch-litert.sh
 
 # Populate vendor/ulab/ wholesale. Confirmed byte-identical to the

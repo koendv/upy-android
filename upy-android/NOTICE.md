@@ -44,7 +44,7 @@ The LGPL-2.1 license text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.ht
 - License: MIT
 - Vendored at commit 01ad8a5, `code/` subdirectory only.
 
-### LiteRT (android.tf module) — PREBUILT BINARY, not compiled from source
+### LiteRT (litert module) — PREBUILT BINARY, not compiled from source
 
 Unlike everything else in this section, `libLiteRt.so` is a prebuilt
 binary dependency (`com.google.ai.edge.litert:litert:2.2.0`, resolved via
@@ -62,23 +62,20 @@ published AAR ships none.
 
 ## Example / test data
 
-`examples/tf_selftest/add_simple.tflite` is LiteRT's own test fixture
-(not a real model — one op, doubles a 4-element float32 input), used by
-`examples/tf_selftest/tf_selftest.py` as a confidence test for the
-android.tf module:
+`examples/add_simple/add_simple.tflite` is LiteRT's own test fixture
+(not a real model — one op, doubles a 4-element float32 input), used as
+a confidence test by `examples/litert_selftest/litert_selftest.py` and
+`examples/ml_selftest/ml_selftest.py`. Not filed under either module's
+own directory since it's shared between them:
 
 - Source: https://github.com/google-ai-edge/LiteRT, `litert/test/testdata/add_simple.tflite`
 - License: Apache License 2.0
 
 `examples/quant/single_add_default_a8w8_recipe_quantized.tflite` is also
 LiteRT's own test fixture (a single int8-quantized add op, real
-per-tensor scale/zero_point). Deliberately not filed under a
-module-specific directory: the .tflite format works with either
-module's API, and it was actually first used through android.tf.Model
-to verify the round/clamp quantization fix in tf_module.cpp's
-set_input_ndarray(). Meant to also cover a future android.rt module
-selftest against the same fixture; not yet used by any committed
-script:
+per-tensor scale/zero_point), used by
+`examples/litert_selftest/litert_selftest.py` as a confidence test for
+the `litert` module's quantization handling:
 
 - Source: https://github.com/google-ai-edge/LiteRT, `litert/test/testdata/single_add_default_a8w8_recipe_quantized.tflite`
 - License: Apache License 2.0

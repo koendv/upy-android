@@ -18,8 +18,7 @@ extern "C" const mp_obj_module_t imu_module;
 // enough: a plain function object referenced from one other .cpp file
 // in the same build, not a moduledefs.h-registered top-level module.
 // Same reasoning applies to android_light_*/android_zoom_* below
-// (camera_module.cpp) and android_tf_info_obj/tf_model_type further
-// down (tf_module.cpp).
+// (camera_module.cpp).
 extern const mp_obj_fun_builtin_fixed_t android_proximity_distance_cm_obj;
 
 extern const mp_obj_fun_builtin_fixed_t android_light_on_obj;
@@ -27,25 +26,15 @@ extern const mp_obj_fun_builtin_fixed_t android_light_off_obj;
 extern const mp_obj_fun_builtin_fixed_t android_zoom_set_obj;
 extern const mp_obj_fun_builtin_fixed_t android_zoom_range_obj;
 
-// tf_model_type is a real mp_obj_type_t (like csi_type in
-// camera_module.cpp), not a plain function object. android.tf.Model()
-// constructs real instances of it.
-extern const mp_obj_fun_builtin_fixed_t android_tf_info_obj;
-extern const mp_obj_type_t tf_model_type;
-
-// android.rt.Model, same reasoning as tf_model_type above.
-extern const mp_obj_fun_builtin_fixed_t android_rt_info_obj;
-extern const mp_obj_type_t rt_model_type;
-
 // settings_module.cpp. A plain function (android.settings()), not a
 // nested module -- it returns a fresh dict snapshot each call, since a
 // const module dict couldn't show runtime-pushed values.
 extern const mp_obj_fun_builtin_fixed_t android_settings_obj;
 
 // mediastore_module.cpp. A real nested mp_obj_module_t, same tier as
-// android_tf_module/android_rt_module above -- Part 7, write-only
-// MediaStore access (no upstream OpenMV/MicroPython equivalent, stays
-// under android.* per this project's own naming rule).
+// android_proximity_module/android_light_module above -- Part 7,
+// write-only MediaStore access (no upstream OpenMV/MicroPython
+// equivalent, stays under android.* per this project's own naming rule).
 extern "C" const mp_obj_module_t mediastore_module;
 
 // fileprovider_module.cpp. Complements mediastore's "save for later
@@ -75,20 +64,6 @@ const mp_rom_map_elem_t android_zoom_globals_table[] = {
 };
 MP_DEFINE_CONST_DICT(android_zoom_globals, android_zoom_globals_table);
 
-const mp_rom_map_elem_t android_tf_globals_table[] = {
-    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_tf)},
-    {MP_ROM_QSTR(MP_QSTR_info), MP_ROM_PTR(&android_tf_info_obj)},
-    {MP_ROM_QSTR(MP_QSTR_Model), MP_ROM_PTR(&tf_model_type)},
-};
-MP_DEFINE_CONST_DICT(android_tf_globals, android_tf_globals_table);
-
-const mp_rom_map_elem_t android_rt_globals_table[] = {
-    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_rt)},
-    {MP_ROM_QSTR(MP_QSTR_info), MP_ROM_PTR(&android_rt_info_obj)},
-    {MP_ROM_QSTR(MP_QSTR_Model), MP_ROM_PTR(&rt_model_type)},
-};
-MP_DEFINE_CONST_DICT(android_rt_globals, android_rt_globals_table);
-
 // Plain mp_obj_module_t, same as imu_module.
 // see session-state: android_module.cpp#module_design
 const mp_obj_module_t android_proximity_module = {
@@ -103,14 +78,6 @@ const mp_obj_module_t android_zoom_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &android_zoom_globals,
 };
-const mp_obj_module_t android_tf_module = {
-    .base = {&mp_type_module},
-    .globals = (mp_obj_dict_t *) &android_tf_globals,
-};
-const mp_obj_module_t android_rt_module = {
-    .base = {&mp_type_module},
-    .globals = (mp_obj_dict_t *) &android_rt_globals,
-};
 
 const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_android)},
@@ -118,8 +85,6 @@ const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_proximity), MP_ROM_PTR(&android_proximity_module)},
     {MP_ROM_QSTR(MP_QSTR_light), MP_ROM_PTR(&android_light_module)},
     {MP_ROM_QSTR(MP_QSTR_zoom), MP_ROM_PTR(&android_zoom_module)},
-    {MP_ROM_QSTR(MP_QSTR_tf), MP_ROM_PTR(&android_tf_module)},
-    {MP_ROM_QSTR(MP_QSTR_rt), MP_ROM_PTR(&android_rt_module)},
     {MP_ROM_QSTR(MP_QSTR_settings), MP_ROM_PTR(&android_settings_obj)},
     {MP_ROM_QSTR(MP_QSTR_mediastore), MP_ROM_PTR(&mediastore_module)},
     {MP_ROM_QSTR(MP_QSTR_fileprovider), MP_ROM_PTR(&fileprovider_module)},

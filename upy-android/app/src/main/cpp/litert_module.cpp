@@ -7,13 +7,17 @@
 // see this file's own header comment on why an ndarray convenience
 // layer was tried and dropped) -- Environment, CompiledModel,
 // TensorBuffer, Options, Accelerator, each exposed separately, not
-// folded into one Model god-object the way android.tf/android.rt are.
-// Deliberately additive: android.tf and android.rt stay exactly as
-// they are, untouched. Eventually litert replaces both, but not
-// atomically -- android.tf is the only path to NNAPI hardware (the
-// newer C API has zero NNAPI code anywhere, confirmed against LiteRT's
-// own source), so android.tf stays alive until litert is proven on
-// real hardware, deleted only afterward as its own separate step.
+// folded into one Model god-object the way android.tf/android.rt were.
+// android.tf/android.rt (this project's original, NNAPI/LiteRt-C-API-
+// based modules) have since been deleted -- Part 5's ml/tf module
+// (py_ml.c + a vendored TFLM backend, real unmodified-OpenMV-script
+// compatibility) is their actual replacement, both-devices-verified,
+// not this module. litert stays as its own separate, lower-level path
+// against litert-api's own Kotlin surface -- it never grew the ndarray
+// convenience layer android.rt had (see below), and the newer C API
+// this module wraps has zero NNAPI code anywhere (confirmed against
+// LiteRT's own source), so it was never a hardware-acceleration
+// replacement for android.tf either.
 //
 // TensorBuffer exposes all five of the real litert-api's own typed
 // read/write pairs (int8, float, int, bool, long -- matching
@@ -47,10 +51,11 @@
 // purely for introspection -- real complexity and real risk for a
 // convenience layer this module's own design philosophy ("literal
 // method-name parity... not a redesign") argues against anyway.
-// android.rt already has a proven, working ndarray convenience layer
-// for exactly this numeric-workload use case and stays alive in this
-// codebase for that reason -- scripts wanting it should use that
-// module instead of expecting litert to grow one.
+// android.rt had a proven, working ndarray convenience layer for
+// exactly this numeric-workload use case, but has since been deleted
+// (see this file's own top comment) -- scripts wanting one should use
+// `ml`/`tf` (Part 5's OpenMV-compatible module) instead of expecting
+// litert to grow one.
 // see session-state: litert_module.cpp#module_design
 //
 // This file is qstr-scanned (SRC_QSTR in micropython_embed.mk).

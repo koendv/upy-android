@@ -43,7 +43,7 @@
 // byte-identical to LiteRT/TFLite's float32 tensors (google-ai-edge/
 // LiteRT, a third separate upstream repo).
 // Change this flag without knowing that,
-// and android.tf's set_input_ndarray()/get_output_ndarray()
+// and litert_module.cpp's TensorBuffer read/write helpers
 // silently corrupt data instead of failing loudly.
 // see session-state: mpconfigport.h#MICROPY_FLOAT_IMPL
 #define MICROPY_FLOAT_IMPL                      (MICROPY_FLOAT_IMPL_FLOAT)

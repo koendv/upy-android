@@ -1,13 +1,12 @@
 # ml/tf (TFLM backend) confidence test -- confirms the real interpreter +
 # MicroMutableOpResolver<113> vendored in Part 5 actually runs inference
 # on THIS device and THIS build, not just that the code compiles. Runs
-# the SAME known-good fixture android.tf/android.rt's own selftests use
-# (see examples/tf_selftest/tf_selftest.py), through the new top-level
-# `ml`/`tf` module instead.
+# the SAME known-good fixture android.tf/android.rt's own selftests used
+# to (both since deleted -- ml/tf is their replacement), through the new
+# top-level `ml`/`tf` module instead.
 #
-# Setup: same as tf_selftest.py -- copy add_simple.tflite onto the
-# device's VFS root first, e.g.
-#   adb push examples/tf_selftest/add_simple.tflite /data/local/tmp/add_simple.tflite
+# Setup: copy add_simple.tflite onto the device's VFS root first, e.g.
+#   adb push examples/add_simple/add_simple.tflite /data/local/tmp/add_simple.tflite
 #   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
 #       'cat /data/local/tmp/add_simple.tflite > files/add_simple.tflite'
 

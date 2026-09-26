@@ -1,7 +1,16 @@
 #!/bin/sh
 # Fetches this project's first PREBUILT BINARY native dependency: LiteRT
-# (TensorFlow Lite's successor, Apache 2.0), for the android.tf module (see
-# SESSION_STATE.yaml's "android.tf" design discussion).
+# (TensorFlow Lite's successor, Apache 2.0). Originally added for
+# android.tf/android.rt (both since deleted, see git history/
+# SESSION_STATE.yaml); libLiteRt.so/libLiteRtClGlAccelerator.so are still
+# needed by the current top-level `litert` module (litert_module.cpp/
+# LiteRtShim.kt), which talks to litert-api's own Kotlin surface rather
+# than these C headers directly -- see build.gradle.kts's litert-api
+# dependency comment for why the .so's still need fetching/staging this
+# way. The C headers this script also fetches (tflite/c/*, litert/c/*)
+# are no longer directly #included by any project source now that
+# tf_module.cpp/rt_module.cpp are gone -- left in place rather than
+# trimmed, since nothing depends on them being absent either.
 #
 # Unlike everything else in native-bringup/ (micropython/openmv/ulab, all
 # compiled from vendored SOURCE), there is no "build from source" step here
@@ -16,9 +25,11 @@
 #    downloaded yet at CMake-configure time; only :app:assembleDebug
 #    actually pulls the binary in, :app:dependencies only resolves POM
 #    metadata -- confirmed directly, not assumed). Two .so's ship here:
-#    libLiteRt.so (the classic TfLiteInterpreter C API, used by
-#    android.tf, linked by CMakeLists.txt) and libLiteRtClGlAccelerator.so
-#    (a GPU/OpenCL-GL delegate, used by android.rt's LiteRtEnvironment).
+#    libLiteRt.so (the classic TfLiteInterpreter C API, linked by
+#    CMakeLists.txt -- see that file's own comment for why, even though
+#    no source calls into it directly any more) and
+#    libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate, used by
+#    litert-api's own LiteRtEnvironment at runtime).
 #    The GPU delegate is never linked directly -- libLiteRt.so's own
 #    runtime dlopen()s it by name at LiteRtCreateEnvironment() time --
 #    it only needs to be present in the app's own native library dir,
@@ -28,11 +39,12 @@
 #    clone of the upstream LiteRT source at the matching v2.2.0 tag
 #    instead. Confirmed zero diff between v2.2.0 and a later HEAD for
 #    these exact files before relying on this, so no version-skew risk.
-#    Two API surfaces are fetched: tflite/c/* (the classic API,
-#    android.tf) and litert/c/* (the newer LiteRtEnvironment/
-#    LiteRtCompiledModel API, android.rt) -- see SESSION_STATE.yaml for
-#    how each header set's own transitive closure was walked and
-#    verified against the real .so's exported symbols.
+#    Two API surfaces are fetched: tflite/c/* (the classic API) and
+#    litert/c/* (the newer LiteRtEnvironment/LiteRtCompiledModel API) --
+#    both originally consumed directly by tf_module.cpp/rt_module.cpp
+#    (since deleted); see SESSION_STATE.yaml for how each header set's
+#    own transitive closure was walked and verified against the real
+#    .so's exported symbols.
 #
 # Output: app/src/main/cpp/litert/{lib/libLiteRt.so,include/tflite/...} --
 # gitignored, same ephemeral treatment as micropython_embed/ (regenerate
@@ -55,7 +67,8 @@ curl -sL -o "$WORK_DIR/litert.aar" "$AAR_URL"
 echo "fetch-litert: extracting arm64-v8a .so files (this project is arm64-v8a only, see build.gradle.kts abiFilters)..."
 unzip -oq "$WORK_DIR/litert.aar" "jni/arm64-v8a/libLiteRt.so" "jni/arm64-v8a/libLiteRtClGlAccelerator.so" -d "$WORK_DIR/aar"
 cp "$WORK_DIR/aar/jni/arm64-v8a/libLiteRt.so" "$OUT_DIR/lib/libLiteRt.so"
-# GPU/OpenCL-GL delegate for android.rt. Never linked by CMakeLists.txt --
+# GPU/OpenCL-GL delegate for litert-api's LiteRtEnvironment. Never linked
+# by CMakeLists.txt --
 # libLiteRt.so's own runtime dlopen()s it by name, see this file's own
 # header comment.
 cp "$WORK_DIR/aar/jni/arm64-v8a/libLiteRtClGlAccelerator.so" "$OUT_DIR/lib/libLiteRtClGlAccelerator.so"
@@ -92,10 +105,12 @@ cp -r "$WORK_DIR/LiteRT/tflite/core/async" "$OUT_DIR/include/tflite/core/async"
 mkdir -p "$OUT_DIR/include/tflite/converter"
 cp -r "$WORK_DIR/LiteRT/tflite/converter/core" "$OUT_DIR/include/tflite/converter/core"
 
-# For android.rt (LiteRtEnvironment/LiteRtCompiledModel, the newer API --
-# see SESSION_STATE.yaml). internal/ is fetched as part of the same tree,
-# same "whole directory, not hand-picked" style as tflite/c/ above -- the
-# handful of internal/ headers android.rt doesn't use just sit unreferenced.
+# LiteRtEnvironment/LiteRtCompiledModel, the newer API -- originally used
+# directly by rt_module.cpp (since deleted), see SESSION_STATE.yaml.
+# internal/ is fetched as part of the same tree, same "whole directory,
+# not hand-picked" style as tflite/c/ above -- most of internal/'s own
+# headers were never used even when rt_module.cpp existed, and just sit
+# unreferenced.
 mkdir -p "$OUT_DIR/include/litert"
 cp -r "$WORK_DIR/LiteRT/litert/c" "$OUT_DIR/include/litert/c"
 

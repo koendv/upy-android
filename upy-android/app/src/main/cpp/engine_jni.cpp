@@ -20,9 +20,7 @@ extern "C" {
 #include "litert_module.h"
 #include "mediastore_module.h"
 #include "mqtt_module.h"
-#include "rt_module.h"
 #include "settings_state.h"
-#include "tf_module.h"
 
 namespace {
 constexpr int kDefaultHeapSizeMb = 32;
@@ -162,8 +160,6 @@ extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint stackSizeBytes, jstring rootPath) {
     camera_close_all();
     imu_close_all();
-    tf_close_all();
-    rt_close_all();
     litert_close_all();
     mqtt_close_all();
 
@@ -185,8 +181,6 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
     // that assumption rather than leaving it unverified.
     camera_close_all();
     imu_close_all();
-    tf_close_all();
-    rt_close_all();
     litert_close_all();
     mqtt_close_all();
     if (g_initialized) {

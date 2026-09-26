@@ -26,8 +26,9 @@ void litert_bridge_init_impl(void *jni_env);
 // false and sets *out_err to a malloc'd (strdup'd) error string the
 // caller (litert_module.cpp) must free() after using it to
 // raise_os_error -- matches this project's own raise_os_error_status
-// pattern (rt_module.cpp), just plumbed through a malloc'd string
-// instead of a LiteRtStatus int, since JNI exceptions don't have one.
+// pattern (a status-int variant used elsewhere in this codebase), just
+// plumbed through a malloc'd string instead of a LiteRtStatus int,
+// since JNI exceptions don't have one.
 // On success, *out_err is left untouched (caller must init it to
 // nullptr and only read a real message on failure).
 

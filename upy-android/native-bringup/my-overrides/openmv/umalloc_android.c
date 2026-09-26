@@ -39,8 +39,9 @@ void uma_free(void *ptr) {
 // only when the primary GC-heap allocation fails, then uma_free() on
 // the same pointer later) -- not part of the original Android
 // replacement set above, which predates py_ml.c's own addition to this
-// port. Same posix_memalign-based pattern rt_module.cpp's
-// rt_create_host_buffer() already uses for aligned host tensor buffers.
+// port. Same posix_memalign-based aligned-allocation pattern this
+// project's own (since-deleted) rt_module.cpp used for its host tensor
+// buffers.
 void *uma_malign(size_t size, size_t align, uint32_t flags) {
     (void) flags;
     void *ptr = NULL;

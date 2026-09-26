@@ -210,47 +210,30 @@ SRC_QSTR += ../app/src/main/cpp/imu_module.cpp
 # py/obj.h, both already resolved by every other module's scan).
 SRC_QSTR += ../app/src/main/cpp/android_module.cpp
 
-# tf_module.cpp -- OUR OWN native module (android.tf, see that file's
-# own header comment), first file to #include LiteRT's C API
-# (app/src/main/cpp/litert/include/, populated by fetch-litert.sh --
-# run it first if that directory doesn't exist yet). Unlike camera_
-# module.cpp's NDK headers (<camera/...>, needed a qstr-stub -- see this
-# file's own comment above), LiteRT's C API headers only reach plain
-# portable standard-library headers (<stdint.h>, <vector>, <memory>,
-# etc, confirmed by grep before relying on this) -- the same tier
-# camera_module.cpp's own <vector>/<algorithm> already prove this exact
-# scan handles, so a real -I is enough, no stub needed for LiteRT itself.
-# <android/NeuralNetworks.h> (added later, for android.tf.info()'s
-# hw_nnapi field) is a genuine NDK sysroot header though, same tier as
-# camera_module.cpp's <camera/...> ones -- DOES need a qstr-stub, and
-# its own transitive #include chain (walked by hand from the real
-# header, not guessed) needed three more:
-# qstr-stub/android/{NeuralNetworks,NeuralNetworksTypes,hardware_buffer,
-# rect,data_space}.h. android/api-level.h is NOT needed -- the actual
-# API-29 guard ended up needing __builtin_available (a compiler
-# intrinsic, see tf_module.cpp's own comment for why a plain
-# android_get_device_api_level() runtime check wasn't enough), not that
-# header at all.
-SRC_QSTR += ../app/src/main/cpp/tf_module.cpp
-CFLAGS += -I../app/src/main/cpp/litert/include
-
-# rt_module.cpp -- OUR OWN native module (android.rt, see that file's own
-# header comment). Same litert/include -I as tf_module.cpp above (both
-# link the same libLiteRt.so; rt_module.cpp just #includes litert/c/*
-# instead of tflite/c/*), so no new CFLAGS needed here, only the SRC_QSTR
-# entry itself -- same minimal case as android_module.cpp above (no new
-# qstr-stub headers, only py/runtime.h/py/obj.h/py/mperrno.h and portable
-# standard-library headers already proven fine by tf_module.cpp's own
-# <cmath>/<limits> usage).
-SRC_QSTR += ../app/src/main/cpp/rt_module.cpp
-
 # litert_module.cpp -- OUR OWN native module (android.litert, see that
-# file's own header comment). Same litert/include -I as tf_module.cpp/
-# rt_module.cpp above (already global from tf_module.cpp's own CFLAGS
-# line), no new CFLAGS needed. litert_jni_bridge.cpp deliberately NOT
-# listed here -- it #includes <jni.h>, no qstr-stub exists for JNI
-# headers, same reasoning as engine_jni.cpp's own exclusion from this
-# list (and this file has no MP_QSTR_* usage of its own to scan for).
+# file's own header comment). Does NOT itself #include LiteRT's C API
+# (app/src/main/cpp/litert/include/) -- it talks to litert-api's Kotlin
+# surface entirely through litert_jni_bridge.h (stddef.h/stdint.h only),
+# never the native C headers directly (that direct-C-API approach was
+# tf_module.cpp's/rt_module.cpp's, both since deleted -- see git history/
+# SESSION_STATE.yaml). No new qstr-stub headers needed here either, only
+# py/runtime.h/py/obj.h/py/mperrno.h and its own litert_jni_bridge.h/
+# litert_module.h, both plain portable headers. litert_jni_bridge.cpp
+# deliberately NOT listed here -- it #includes <jni.h>, no qstr-stub
+# exists for JNI headers, same reasoning as engine_jni.cpp's own
+# exclusion from this list (and this file has no MP_QSTR_* usage of its
+# own to scan for).
+#
+# The CMake build's own target_include_directories still adds
+# litert/include (app/src/main/cpp/CMakeLists.txt) and still links
+# libLiteRt.so -- NOT dead despite no .cpp including its C headers
+# anymore: it's how libLiteRt.so itself gets packaged into the APK's
+# jniLibs at all, which litert-api's own Kotlin/JNI implementation
+# (LiteRtShim.kt) needs present at runtime even though this project's
+# own C++ never calls into it directly (see build.gradle.kts's own
+# litert-api dependency comment for the full packaging story). This
+# qstr-scan Makefile has no such runtime-packaging concern, so it has no
+# equivalent -I of its own.
 SRC_QSTR += ../app/src/main/cpp/litert_module.cpp
 
 # settings_module.cpp -- OUR OWN native module (android.settings, see
