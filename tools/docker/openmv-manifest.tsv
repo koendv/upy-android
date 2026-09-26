@@ -51,6 +51,8 @@ modules/py_image_descriptor.c	py_image_descriptor.c
 modules/py_image_descriptor.h	py_image_descriptor.h
 modules/py_image.h	py_image.h
 modules/py_imageio.c	py_imageio.c
+modules/py_ml.c	py_ml.c
+modules/py_ml.h	py_ml.h
 modules/py_imageio.h	py_imageio.h
 modules/py_image_stats.c	py_image_stats.c
 modules/py_image_stats.h	py_image_stats.h

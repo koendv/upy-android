@@ -224,3 +224,22 @@ unsigned long mp_android_random_seed_init(void);
 // automatically -- no separate list to maintain.
 #define MICROPY_PY_BUILTINS_HELP                 (1)
 #define MICROPY_PY_BUILTINS_HELP_MODULES         (1)
+
+// OpenMV's own py_ml.c (vendor/openmv/py_ml.c) -- NOT a core MicroPython
+// flag, no fallback exists in py/mpconfig.h; OpenMV's own board configs
+// define it directly, same as this project's own IMLIB_ENABLE_* flags
+// (imlib_config.h) do for imlib. Registers as `import tf` (legacy
+// alias) and `import ml` (current name), both top-level, matching real
+// unmodified OpenMV scripts -- see SESSION_STATE.yaml's Part 5 entry
+// for the full research (including why OpenMV's own scripts/libraries/
+// ml/ml-core Python wrapper package is deliberately NOT vendored:
+// stale/pre-consolidation at this pin, `ml` is already the complete,
+// current design in C).
+#define MICROPY_PY_ML                            (1)
+// MICROPY_PY_ML_TFLM is deliberately NOT defined here -- tflm_backend.cc
+// has no SRC_QSTR entry (no qstr usage of its own), so it's never
+// reached by this file's own qstr-scan at all; the real app build
+// passes it as a command-line -D scoped to just that one file (see
+// CMakeLists.txt's own comment for why: its #if check is the file's
+// very first line, before py/runtime.h -- and thus before this file --
+// is ever included).

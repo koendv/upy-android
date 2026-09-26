@@ -13,3 +13,4 @@ upy-android/native-bringup/vendor
 upy-android/native-bringup/micropython_embed
 upy-android/app/src/main/cpp/micropython_embed
 upy-android/app/src/main/cpp/litert
+upy-android/app/src/main/cpp/tflm

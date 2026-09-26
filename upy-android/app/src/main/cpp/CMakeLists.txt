@@ -62,6 +62,13 @@ add_library(upy_engine SHARED
     ${MPY_EXTMOD_SOURCES}
     ${MPY_ULAB_SOURCES}
     ${MPY_OPENMV_SOURCES}
+    # tflm_backend.cc (patched -- see its own header comment) is NOT
+    # picked up by MPY_OPENMV_SOURCES above (that glob only matches
+    # *.c, this is a real .cc needing TFLM's own C++ headers) -- listed
+    # explicitly, same tier as tf_module.cpp/rt_module.cpp just above.
+    # Its own extra include path (tflm/) is scoped to just this one
+    # file via set_source_files_properties below, not added project-wide.
+    micropython_embed/openmv/tflm_backend.cc
 )
 
 target_include_directories(upy_engine PRIVATE
@@ -107,6 +114,116 @@ target_compile_options(upy_engine PRIVATE
     -fno-common
 )
 
+# TFLM (TensorFlow Lite Micro) -- the real interpreter + reference-kernel
+# backend behind `import ml`/`import tf` (py_ml.c/tflm_backend.cc, see
+# mpconfigport.h's own MICROPY_PY_ML comment). Vendored pristine source
+# at tflm/ (gitignored, fetched fresh at the pinned TFLM_SHA -- see
+# .gitignore/Dockerfile), bypassing TFLM's own Makefile/toolchain
+# machinery entirely, same "vendor + compile under our own build"
+# pattern as ulab/imlib.
+#
+# Built as its OWN isolated static library, NOT folded into upy_engine's
+# main source list: android.tf/android.rt/litert (all still alive per
+# this project's established sequencing policy, see SESSION_STATE.yaml)
+# already link a real TfLite*/tflite:: symbol surface from the prebuilt
+# libLiteRt.so, and TFLM's own reference-kernel tree defines the SAME
+# C++ namespace (tflite::) and C API names (TfLiteIntArrayCreate,
+# TfLiteTypeGetName, etc.) under different (TF_LITE_STATIC_MEMORY)
+# semantics -- a real collision risk, not hypothetical, since both end
+# up loaded in the same process. -fvisibility=hidden here means none of
+# TFLM's own symbols are ever exported into upy_engine.so's dynamic
+# symbol table at all, even though they're statically linked in --
+# that's the actual defense (not just the -Wl,--exclude-libs belt-and-
+# suspenders on upy_engine's own link step below). See SESSION_STATE.yaml
+# for the nm verification steps this was checked against, not just
+# reasoned about.
+file(GLOB_RECURSE TFLM_SOURCES tflm/*.cc tflm/*.c)
+add_library(tflm STATIC ${TFLM_SOURCES})
+target_include_directories(tflm PRIVATE
+    tflm
+    tflm/third_party/gemmlowp
+    tflm/third_party/flatbuffers/include
+    tflm/third_party/ruy
+    tflm/third_party/kissfft
+)
+target_compile_options(tflm PRIVATE
+    -O2
+    -fvisibility=hidden
+    -fvisibility-inlines-hidden
+)
+# MicroMutableOpResolver<113> and friends need real templates -- matches
+# the c++17 standard this tree was already host-compile-verified against
+# (see SESSION_STATE.yaml) rather than relying on whatever gnu++??
+# default the NDK's own CMake toolchain file happens to pick.
+target_compile_features(tflm PRIVATE cxx_std_17)
+# TF_LITE_STATIC_MEMORY: the one load-bearing define from TFLM's own
+# Makefile default BUILD_TYPE (confirmed by reading it directly, not
+# guessed) -- TfLiteIntArray and other core structs have a genuinely
+# different (fixed-size, no heap) layout under this macro. Must apply
+# identically here AND on tflm_backend.cc below (both touch these
+# structs), and must NOT apply to anything else in upy_engine, whose
+# other files (tf_module.cpp/rt_module.cpp/litert_module.cpp) link
+# against the prebuilt libLiteRt.so's own regular (non-static-memory)
+# struct layout. -DNDEBUG/-DTF_LITE_STRIP_ERROR_STRINGS deliberately
+# NOT added -- those are the Makefile's "release" BUILD_TYPE only; the
+# default keeps real error strings, which is what makes tflm_backend.cc's
+# RegisterDebugLogCallback(ml_backend_log_handler) routing actually
+# useful (real messages in script output, not blanked-out ones).
+target_compile_definitions(tflm PRIVATE
+    TF_LITE_STATIC_MEMORY
+    TF_LITE_DISABLE_X86_NEON
+)
+
+# tflm_backend.cc's own #include "tensorflow/lite/micro/..." lines need
+# the tflm/ root -- scoped to just this one file, not added to
+# upy_engine's own target_include_directories below, so the rest of
+# upy_engine's sources (tf_module.cpp/rt_module.cpp/litert_module.cpp,
+# which resolve their own tflite/c/*.h and litert/c/*.h via litert/include
+# instead) never see TFLM's header tree at all. Same TF_LITE_STATIC_MEMORY
+# define as the tflm target above -- see that target's own comment.
+#
+# MICROPY_PY_ML_TFLM must ALSO be a command-line define here, not just
+# set in mpconfigport.h -- REAL BUG, caught by a real undefined-symbol
+# link error, not spotted by inspection: unlike py_ml.c (whose own
+# #if MICROPY_PY_ML guard comes AFTER its #include "py/runtime.h", so
+# mpconfigport.h's define is already visible by then), tflm_backend.cc's
+# #if MICROPY_PY_ML_TFLM is the file's very FIRST line, wrapping even
+# its own #include "py/runtime.h" -- so mpconfigport.h's define (only
+# reachable transitively THROUGH that include) is never seen in time,
+# and the whole file's real content (including ml_backend_init_model
+# and the other 3 functions py_ml.c calls) silently compiles out to an
+# empty translation unit. No compile error, no warning -- only shows up
+# as "undefined symbol: ml_backend_init_model" at link time.
+# All four -I paths, matching the exact set the host-compile smoke test
+# (SESSION_STATE.yaml) needed -- MicroMutableOpResolver<113>'s own
+# AddXxx() declarations reach real kernel headers (e.g. kernels/
+# pooling.h -> integer_ops/pooling.h -> gemmlowp's fixedpoint.h), not
+# just forward declarations, so this file needs the same third_party
+# surface as the tflm target itself, just scoped to this one file
+# rather than project-wide.
+# common-shim: tflm_backend.cc's own #include "common/omv_profiler.h"
+# (its real upstream path) doesn't resolve against this project's
+# flattened openmv/ tree -- same bridging pattern as ulab-shim/ulab/
+# code/ndarray.h (see my-overrides/openmv/common-shim/common/
+# omv_profiler.h's own header comment).
+set_source_files_properties(micropython_embed/openmv/tflm_backend.cc
+    PROPERTIES
+    INCLUDE_DIRECTORIES "${CMAKE_CURRENT_SOURCE_DIR}/tflm;${CMAKE_CURRENT_SOURCE_DIR}/tflm/third_party/gemmlowp;${CMAKE_CURRENT_SOURCE_DIR}/tflm/third_party/flatbuffers/include;${CMAKE_CURRENT_SOURCE_DIR}/tflm/third_party/ruy;${CMAKE_CURRENT_SOURCE_DIR}/micropython_embed/openmv/common-shim"
+    COMPILE_DEFINITIONS "TF_LITE_STATIC_MEMORY;TF_LITE_DISABLE_X86_NEON;MICROPY_PY_ML_TFLM=1"
+    # REAL GAP, caught by the nm verification, not by inspection: this
+    # file is the one that actually INSTANTIATES MicroMutableOpResolver
+    # <113>'s template methods (typedef MicroOpsResolver + resolver->
+    # AddAbs() etc) -- each TU that instantiates a template generates
+    # its own weak-linkage copy, and this TU is compiled as part of
+    # upy_engine (default visibility), not the tflm target (hidden) --
+    # so without repeating the same visibility flags here, this file's
+    # own instantiations still leaked tflite::/TfLiteIntArray/abort/
+    # operator-delete symbols into libupy_engine.so's dynamic symbol
+    # table (confirmed via nm -D, not assumed fixed once) regardless of
+    # the tflm target's own -fvisibility=hidden.
+    COMPILE_OPTIONS "-fvisibility=hidden;-fvisibility-inlines-hidden"
+)
+
 # LiteRT (android.tf module, see SESSION_STATE.yaml's design discussion)
 # -- this project's first PREBUILT BINARY dependency (see NOTICE.md),
 # fetched by native-bringup/fetch-litert.sh (run it before building if
@@ -134,7 +251,7 @@ set_target_properties(litert PROPERTIES
 # present on every device this app can install on. The specific
 # device-enumeration functions used are still API 29-only regardless,
 # guarded by a runtime check in tf_module.cpp, not a build-time one.
-target_link_libraries(upy_engine log m camera2ndk mediandk android litert neuralnetworks)
+target_link_libraries(upy_engine log m camera2ndk mediandk android litert neuralnetworks tflm)
 
 # Linker map for libupy_engine.so -- static-link internals only (which
 # MicroPython/ulab/openmv/our own object files pulled in, section sizes,
@@ -148,4 +265,10 @@ target_link_libraries(upy_engine log m camera2ndk mediandk android litert neural
 # ephemeral treatment as every other build artifact.
 target_link_options(upy_engine PRIVATE
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/upy_engine.map
+    # Belt-and-suspenders on top of the tflm target's own
+    # -fvisibility=hidden (see that target's own comment) -- tells the
+    # linker to never export a symbol originating from libtflm.a into
+    # upy_engine.so's dynamic symbol table, regardless of that symbol's
+    # own visibility attribute.
+    -Wl,--exclude-libs,libtflm.a
 )

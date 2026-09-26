@@ -40,6 +40,14 @@ native-bringup/vendor/
 # rather than building it.
 app/src/main/cpp/litert/
 
+# TFLM (TensorFlow Lite Micro) reference-kernel interpreter -- pristine
+# upstream source (tensorflow/tflite-micro, pinned TFLM_SHA), same
+# "fetched fresh, never vendored into this repo's own git history"
+# treatment as native-bringup/vendor/tflm/ above, just copied one level
+# further into the app's own source tree (same relationship as
+# app/src/main/cpp/micropython_embed/ to native-bringup/micropython_embed/).
+app/src/main/cpp/tflm/
+
 # libLiteRtClGlAccelerator.so, staged here by fetch-litert.sh (AGP scans
 # jniLibs/<abi>/ by convention) -- same ephemeral/regenerated-by-script
 # treatment as app/src/main/cpp/litert/ above.

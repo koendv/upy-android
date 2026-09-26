@@ -7,11 +7,12 @@
 // this project's own modtime_android.c.
 //
 // Confirmed via grep (SESSION_STATE.yaml) that only uma_malloc/calloc/
-// realloc/free/avail are actually called anywhere in this port's vendored
-// file set -- the pool-management/stats functions (uma_pool_*, uma_*_stats,
-// uma_collect*) are declared in umalloc.h but never referenced, so they're
-// deliberately NOT implemented here; if a later addition needs one, the
-// linker will say so precisely.
+// realloc/free/avail/malign are actually called anywhere in this port's
+// vendored file set -- the pool-management/stats functions (uma_pool_*,
+// uma_*_stats, uma_collect*) are declared in umalloc.h but never
+// referenced, so they're deliberately NOT implemented here; if a later
+// addition needs one, the linker will say so precisely.
+// see session-state: umalloc_android.c#uma_malign
 #include <stdlib.h>
 #include "umalloc.h"
 
@@ -32,6 +33,21 @@ void *uma_realloc(void *ptr, size_t size, uint32_t flags) {
 
 void uma_free(void *ptr) {
     free(ptr);
+}
+
+// Added for py_ml.c's model-loading fallback path (calls uma_malign()
+// only when the primary GC-heap allocation fails, then uma_free() on
+// the same pointer later) -- not part of the original Android
+// replacement set above, which predates py_ml.c's own addition to this
+// port. Same posix_memalign-based pattern rt_module.cpp's
+// rt_create_host_buffer() already uses for aligned host tensor buffers.
+void *uma_malign(size_t size, size_t align, uint32_t flags) {
+    (void) flags;
+    void *ptr = NULL;
+    if (posix_memalign(&ptr, align, size) != 0) {
+        return NULL;
+    }
+    return ptr;
 }
 
 size_t uma_avail(uint32_t flags) {
