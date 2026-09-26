@@ -19,6 +19,32 @@ import eu.kdvelectronics.upyandroid.managers.SettingsManager
 // see session-state: EngineService.kt#EngineService
 // see session-state: IEngine.aidl#reset
 class EngineService : Service() {
+    // Holds the fileprovider share-request listener as a static, not an
+    // instance field: android.fileprovider's native bridge (running on
+    // :engine's worker thread) reaches it via FindClass+GetStaticMethodID
+    // on this class, the same way engine_jni.cpp's other JNI bridges
+    // reach a known class -- there being only one EngineService instance
+    // alive per process makes this equivalent to an instance field in
+    // practice. @JvmStatic is required for the method to compile to a
+    // real static method JNI can find, not a Companion-instance method.
+    // see session-state: EngineService.kt#Companion
+    companion object {
+        @Volatile
+        private var shareListener: IEngineShareListener? = null
+
+        @JvmStatic
+        fun requestShare(path: String, mimeType: String) {
+            try {
+                shareListener?.onShareRequest(path, mimeType)
+            } catch (e: RemoteException) {
+                // Main process is gone or unresponsive. Drop the
+                // request; the script's share() call still returns
+                // normally either way (fire-and-forget, matching the
+                // oneway AIDL interface).
+            }
+        }
+    }
+
     // Constructed in onCreate(), not as a property initializer. filesDir,
     // like other Context methods, is not safely available during a
     // Service's own constructor, only from onCreate() onward.
@@ -56,6 +82,10 @@ class EngineService : Service() {
 
         override fun setOutputListener(listener: IEngineOutputListener?) {
             outputListener = listener
+        }
+
+        override fun setShareListener(listener: IEngineShareListener?) {
+            shareListener = listener
         }
 
         // Deliberately not queued through worker.taskQueue like every

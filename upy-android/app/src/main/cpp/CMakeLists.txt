@@ -58,6 +58,8 @@ add_library(upy_engine SHARED
     litert_jni_bridge.cpp
     mediastore_module.cpp
     mediastore_jni_bridge.cpp
+    fileprovider_module.cpp
+    fileprovider_jni_bridge.cpp
     ${MPY_PY_SOURCES}
     ${MPY_PORT_SOURCES}
     ${MPY_SHARED_SOURCES}

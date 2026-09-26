@@ -34,6 +34,23 @@
             android:process=":engine"
             android:exported="false" />
 
+        <!-- android.fileprovider (Part 7). Exposes the same VFS root
+             Explorer/Import/Export already treat as user-visible via a
+             content:// URI, for sharing a script-produced file into
+             another app's ACTION_SEND target. exported="false" plus
+             grantUriPermissions is the standard FileProvider pattern:
+             access is per-URI, granted only to whichever app the share
+             chooser hands the URI to, not a blanket cross-app grant. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+
         <!-- adb-driven one-shot MicroPython exec. See AdbExecProvider.kt. -->
         <provider
             android:name=".AdbExecProvider"

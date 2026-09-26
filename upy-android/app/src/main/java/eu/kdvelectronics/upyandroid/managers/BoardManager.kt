@@ -12,6 +12,7 @@ import android.view.Surface
 import eu.kdvelectronics.upyandroid.EngineService
 import eu.kdvelectronics.upyandroid.IEngine
 import eu.kdvelectronics.upyandroid.IEngineOutputListener
+import eu.kdvelectronics.upyandroid.IEngineShareListener
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
 
 /**
@@ -50,6 +51,21 @@ class BoardManager(
         }
     }
 
+    // Same single-slot-collision reasoning as chunkListener/
+    // registerOutputListener above applies here too (EngineService holds
+    // exactly one share-listener registration, last one wins), so this
+    // reuses the same registerOutputListener flag rather than adding a
+    // second one -- both flags mean the same thing in practice: "is this
+    // the primary, UI-owned BoardManager instance".
+    @Volatile
+    private var shareRequestListener: ((path: String, mimeType: String) -> Unit)? = null
+
+    private val shareListenerStub = object : IEngineShareListener.Stub() {
+        override fun onShareRequest(path: String, mimeType: String) {
+            shareRequestListener?.invoke(path, mimeType)
+        }
+    }
+
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             engine = IEngine.Stub.asInterface(binder)
@@ -59,6 +75,7 @@ class BoardManager(
             pushSettings()
             if (registerOutputListener) {
                 engine?.setOutputListener(outputListenerStub)
+                engine?.setShareListener(shareListenerStub)
             }
             onStatusChanges?.invoke(ConnectionStatus.Connected)
         }
@@ -131,6 +148,16 @@ class BoardManager(
      */
     fun setOutputListener(listener: ((String) -> Unit)?) {
         chunkListener = listener
+    }
+
+    /**
+     * Registers a callback for android.fileprovider.share() requests
+     * raised from a running script (path + MIME type of the file to
+     * share), delivered on a Binder thread pool thread. Pass null to
+     * stop listening.
+     */
+    fun setShareRequestListener(listener: ((path: String, mimeType: String) -> Unit)?) {
+        shareRequestListener = listener
     }
 
     /**

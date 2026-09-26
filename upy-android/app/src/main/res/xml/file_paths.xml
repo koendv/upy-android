@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- path="." exposes the whole VFS root (filesDir), matching mediastore
+     and Explorer/Import/Export's own scope. See AndroidManifest.xml's
+     fileprovider provider comment. -->
+<paths>
+    <files-path name="root" path="." />
+</paths>

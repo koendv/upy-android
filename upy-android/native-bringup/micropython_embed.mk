@@ -270,5 +270,12 @@ SRC_QSTR += ../app/src/main/cpp/settings_module.cpp
 # bridge.cpp/engine_jni.cpp's own exclusion from this list.
 SRC_QSTR += ../app/src/main/cpp/mediastore_module.cpp
 
+# fileprovider_module.cpp -- OUR OWN native module (android.fileprovider,
+# Part 7, see that file's own header comment). Same minimal case as
+# mediastore_module.cpp above. fileprovider_jni_bridge.cpp is
+# deliberately NOT listed here -- it #includes <jni.h>, same exclusion
+# reasoning as mediastore_jni_bridge.cpp above.
+SRC_QSTR += ../app/src/main/cpp/fileprovider_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk

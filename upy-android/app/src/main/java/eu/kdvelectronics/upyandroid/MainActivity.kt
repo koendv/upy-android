@@ -17,6 +17,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import eu.kdvelectronics.upyandroid.fileprovider.shareFile
 import eu.kdvelectronics.upyandroid.managers.BoardManager
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
@@ -67,6 +68,11 @@ class MainActivity : ComponentActivity() {
         // straight to terminalOutput covers every caller. Re-applied to
         // the engine automatically on every BoardManager (re)connect.
         boardManager.setOutputListener { chunk -> viewModel.terminalOutput.value += chunk }
+        // android.fileprovider.share() requests, routed here (the
+        // main/UI process) from :engine -- see the plan's own Part 7
+        // cross-process constraint. this is a real Activity Context,
+        // required by FileProviderShim.shareFile()'s startActivity().
+        boardManager.setShareRequestListener { path, mimeType -> shareFile(this, path, mimeType) }
         terminalManager = TerminalManager(boardManager)
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)

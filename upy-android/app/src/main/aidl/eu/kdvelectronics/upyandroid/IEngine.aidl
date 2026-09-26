@@ -3,6 +3,7 @@ package eu.kdvelectronics.upyandroid;
 import android.os.Bundle;
 import android.view.Surface;
 import eu.kdvelectronics.upyandroid.IEngineOutputListener;
+import eu.kdvelectronics.upyandroid.IEngineShareListener;
 
 // Typed AIDL surface for the MicroPython engine running in the :engine
 // process. Not the raw-REPL byte protocol micro-repl's CommandsManager
@@ -29,6 +30,12 @@ interface IEngine {
     // :engine process, since the listener lives in the new EngineService
     // instance.
     void setOutputListener(IEngineOutputListener listener);
+
+    // Registers (or, with null, unregisters) a live listener for
+    // android.fileprovider.share() requests raised from a running
+    // script. Same reconnect caveat as setOutputListener above.
+    // see session-state: IEngine.aidl#setShareListener
+    void setShareListener(IEngineShareListener listener);
 
     // Hands :engine a Surface to draw into (Surface is Parcelable) for
     // display.SPIDisplay.write(). Pass null when the fourth screen's
