@@ -9,6 +9,13 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
+    <!-- umqtt (Part 7) is the first module in this project that needs a
+         real network socket: HiveMQ MQTT Client opens a plain TCP
+         connection to a user-specified broker. No other module needs
+         this (mediastore/fileprovider/litert/tf/rt are all purely
+         on-device). -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:label="upy-android"
         android:icon="@mipmap/ic_launcher"

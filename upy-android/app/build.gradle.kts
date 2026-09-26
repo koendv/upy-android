@@ -72,6 +72,21 @@ android {
         compose = true
     }
 
+    // HiveMQ MQTT Client (umqtt module) pulls in Netty transitively;
+    // several of its jars (netty-handler/codec/transport/buffer/
+    // resolver/common/transport-native-unix-common) each ship their own
+    // copy of these two plain metadata files, which AGP's resource
+    // merger refuses to pick one of automatically. Neither is
+    // functional at runtime (INDEX.LIST is a JAR-indexing optimization
+    // for applet-style classpath scanning; io.netty.versions.properties
+    // is a diagnostic version-reporting file) -- safe to drop entirely.
+    packaging {
+        resources {
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+        }
+    }
+
     // libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate) is staged
     // directly into src/main/jniLibs/arm64-v8a/ by native-bringup/
     // fetch-litert.sh, not sourced from an AAR's own jni/ folder any
@@ -135,4 +150,13 @@ dependencies {
     // first prebuilt-binary native dependency (see NOTICE.md) --
     // everything else vendored is compiled from source.
     implementation("com.google.ai.edge.litert:litert-api:2.2.0")
+    // umqtt module (umqtt_module.cpp/MqttShim.kt) -- Part 7. Chosen over
+    // Eclipse Paho Android: Paho Android has zero tagged GitHub releases
+    // (Maven-only publishing), 241 open issues/29 open PRs, and a dual
+    // EPL-1.0/EDL-1.0 license (not this project's usual MIT/Apache-2.0).
+    // HiveMQ's client is Apache-2.0, actively released, a plain library
+    // call with no Service+bound-service ceremony, and its stated minSdk
+    // (19+) is already below this project's own (27). See
+    // SESSION_STATE.yaml for the full comparison.
+    implementation("com.hivemq:hivemq-mqtt-client:1.4.0")
 }

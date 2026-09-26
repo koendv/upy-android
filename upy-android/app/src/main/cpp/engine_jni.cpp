@@ -19,6 +19,7 @@ extern "C" {
 #include "imu_module.h"
 #include "litert_module.h"
 #include "mediastore_module.h"
+#include "mqtt_module.h"
 #include "rt_module.h"
 #include "settings_state.h"
 #include "tf_module.h"
@@ -102,6 +103,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint s
         litert_bridge_init(env);
         mediastore_bridge_init(env, applicationContext);
         fileprovider_bridge_init(env);
+        mqtt_bridge_init(env);
     }
     const char *root_path_chars = env->GetStringUTFChars(rootPath, nullptr);
     allocate_heap(static_cast<int>(heapSizeMb));
@@ -163,6 +165,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint 
     tf_close_all();
     rt_close_all();
     litert_close_all();
+    mqtt_close_all();
 
     if (g_initialized) {
         mp_embed_deinit();
@@ -185,6 +188,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
     tf_close_all();
     rt_close_all();
     litert_close_all();
+    mqtt_close_all();
     if (g_initialized) {
         mp_embed_deinit();
         g_initialized = false;

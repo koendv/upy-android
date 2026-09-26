@@ -277,5 +277,12 @@ SRC_QSTR += ../app/src/main/cpp/mediastore_module.cpp
 # reasoning as mediastore_jni_bridge.cpp above.
 SRC_QSTR += ../app/src/main/cpp/fileprovider_module.cpp
 
+# mqtt_module.cpp -- OUR OWN native module (top-level umqtt, Part 7, see
+# that file's own header comment). Same minimal case as mediastore_
+# module.cpp above. mqtt_jni_bridge.cpp is deliberately NOT listed here --
+# it #includes <jni.h>, same exclusion reasoning as mediastore_jni_
+# bridge.cpp above.
+SRC_QSTR += ../app/src/main/cpp/mqtt_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk
