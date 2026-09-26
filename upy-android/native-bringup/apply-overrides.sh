@@ -33,13 +33,23 @@ cp my-overrides/shared-timeutils/timeutils.h micropython_embed/shared/timeutils/
 # preserves the full tree; micropython_embed/ulab/ is untouched by every
 # existing CMakeLists.txt glob (py/*.c, port/*.c, shared/runtime/*.c,
 # extmod/*.c), same reasoning as modtime_android.c's placement above.
+# Merges the pristine upstream tree (vendor/ulab/, fetched fresh, never
+# committed -- see .gitignore) with our own ulab_config.h (my-overrides/
+# ulab/, the only file in that directory -- everything else there is
+# vendor/'s job).
 rm -rf micropython_embed/ulab
-cp -r my-overrides/ulab micropython_embed/ulab
+cp -r vendor/ulab micropython_embed/ulab
+cp my-overrides/ulab/ulab_config.h micropython_embed/ulab/ulab_config.h
 # OpenMV imlib/py_image -- same reasoning/placement as ulab above. Flat
 # (not deeply nested like ulab), but still copied wholesale with -r for
 # the one nested exception: ulab-shim/ulab/code/ndarray.h (a shim path
 # py_image.c's own ulab integration expects, see SESSION_STATE.yaml).
+# Same vendor/+my-overrides/ merge as ulab above: vendor/openmv/ holds
+# the 68 pristine upstream files, my-overrides/openmv/ holds our own 14
+# replacement headers/glue (board_config.h, arm_math.h, ulab-shim/,
+# etc.) -- merged flat into one directory, as the build expects.
 rm -rf micropython_embed/openmv
-cp -r my-overrides/openmv micropython_embed/openmv
+cp -r vendor/openmv micropython_embed/openmv
+cp -r my-overrides/openmv/. micropython_embed/openmv/
 
 echo "overrides reapplied"

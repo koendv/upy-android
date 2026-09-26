@@ -5,3 +5,11 @@ upy-android/.gradle
 upy-android/.kotlin
 upy-android/local.properties
 *.apk
+
+# Fetched fresh inside the build (git clone + cp -- see Dockerfile's
+# header comment); excluded here so a stale local copy on the host
+# can never be silently substituted for the pinned-commit fetch.
+upy-android/native-bringup/vendor
+upy-android/native-bringup/micropython_embed
+upy-android/app/src/main/cpp/micropython_embed
+upy-android/app/src/main/cpp/litert

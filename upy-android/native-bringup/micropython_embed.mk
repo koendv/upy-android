@@ -24,11 +24,12 @@ include embed-android.mk
 # numerical computing extension. NOT a core MicroPython module: normally
 # integrated via the "user C modules" mechanism (USER_C_MODULES=, a
 # code/micropython.mk fragment the top-level Makefile includes), which this
-# hand-rolled build doesn't use. Point qstr-scanning directly at our own
-# vendored copy (my-overrides/ulab/, committed separately, see "Vendor ulab
-# source tree" commit) -- there is no separate "pristine upstream original"
-# to point at the way extmod/*.c files above do, since embed.mk has no
-# knowledge of ulab at all.
+# hand-rolled build doesn't use. Point qstr-scanning directly at the
+# pristine upstream copy (vendor/ulab/, fetched fresh at build time --
+# see Dockerfile/.gitignore -- never committed to this repo's own git
+# history) -- there is no separate "pristine upstream original" to point
+# at the way extmod/*.c files above do, since embed.mk has no knowledge
+# of ulab at all.
 #
 # Deliberately staged in two steps: this SRC_QSTR wiring lands first, on its
 # own, so `make -f micropython_embed.mk` can be run and genhdr/qstrdefs
@@ -38,39 +39,39 @@ include embed-android.mk
 # by 33 simultaneous "MP_QSTR_* undeclared" compile errors -- much harder to
 # debug in one shot than confirming genhdr content first (same class of
 # mistake as the extmod/modtime.c SRC_QSTR-without-vendoring bug).
-SRC_QSTR += my-overrides/ulab/ndarray.c
-SRC_QSTR += my-overrides/ulab/ndarray_operators.c
-SRC_QSTR += my-overrides/ulab/ndarray_properties.c
-SRC_QSTR += my-overrides/ulab/ulab.c
-SRC_QSTR += my-overrides/ulab/ulab_tools.c
-SRC_QSTR += my-overrides/ulab/user/user.c
-SRC_QSTR += my-overrides/ulab/utils/utils.c
-SRC_QSTR += my-overrides/ulab/numpy/numpy.c
-SRC_QSTR += my-overrides/ulab/numpy/approx.c
-SRC_QSTR += my-overrides/ulab/numpy/bitwise.c
-SRC_QSTR += my-overrides/ulab/numpy/compare.c
-SRC_QSTR += my-overrides/ulab/numpy/create.c
-SRC_QSTR += my-overrides/ulab/numpy/filter.c
-SRC_QSTR += my-overrides/ulab/numpy/numerical.c
-SRC_QSTR += my-overrides/ulab/numpy/poly.c
-SRC_QSTR += my-overrides/ulab/numpy/stats.c
-SRC_QSTR += my-overrides/ulab/numpy/transform.c
-SRC_QSTR += my-overrides/ulab/numpy/vector.c
-SRC_QSTR += my-overrides/ulab/numpy/carray/carray.c
-SRC_QSTR += my-overrides/ulab/numpy/carray/carray_tools.c
-SRC_QSTR += my-overrides/ulab/numpy/fft/fft.c
-SRC_QSTR += my-overrides/ulab/numpy/fft/fft_tools.c
-SRC_QSTR += my-overrides/ulab/numpy/io/io.c
-SRC_QSTR += my-overrides/ulab/numpy/linalg/linalg.c
-SRC_QSTR += my-overrides/ulab/numpy/linalg/linalg_tools.c
-SRC_QSTR += my-overrides/ulab/numpy/ndarray/ndarray_iter.c
-SRC_QSTR += my-overrides/ulab/numpy/random/random.c
-SRC_QSTR += my-overrides/ulab/scipy/scipy.c
-SRC_QSTR += my-overrides/ulab/scipy/integrate/integrate.c
-SRC_QSTR += my-overrides/ulab/scipy/linalg/linalg.c
-SRC_QSTR += my-overrides/ulab/scipy/optimize/optimize.c
-SRC_QSTR += my-overrides/ulab/scipy/signal/signal.c
-SRC_QSTR += my-overrides/ulab/scipy/special/special.c
+SRC_QSTR += vendor/ulab/ndarray.c
+SRC_QSTR += vendor/ulab/ndarray_operators.c
+SRC_QSTR += vendor/ulab/ndarray_properties.c
+SRC_QSTR += vendor/ulab/ulab.c
+SRC_QSTR += vendor/ulab/ulab_tools.c
+SRC_QSTR += vendor/ulab/user/user.c
+SRC_QSTR += vendor/ulab/utils/utils.c
+SRC_QSTR += vendor/ulab/numpy/numpy.c
+SRC_QSTR += vendor/ulab/numpy/approx.c
+SRC_QSTR += vendor/ulab/numpy/bitwise.c
+SRC_QSTR += vendor/ulab/numpy/compare.c
+SRC_QSTR += vendor/ulab/numpy/create.c
+SRC_QSTR += vendor/ulab/numpy/filter.c
+SRC_QSTR += vendor/ulab/numpy/numerical.c
+SRC_QSTR += vendor/ulab/numpy/poly.c
+SRC_QSTR += vendor/ulab/numpy/stats.c
+SRC_QSTR += vendor/ulab/numpy/transform.c
+SRC_QSTR += vendor/ulab/numpy/vector.c
+SRC_QSTR += vendor/ulab/numpy/carray/carray.c
+SRC_QSTR += vendor/ulab/numpy/carray/carray_tools.c
+SRC_QSTR += vendor/ulab/numpy/fft/fft.c
+SRC_QSTR += vendor/ulab/numpy/fft/fft_tools.c
+SRC_QSTR += vendor/ulab/numpy/io/io.c
+SRC_QSTR += vendor/ulab/numpy/linalg/linalg.c
+SRC_QSTR += vendor/ulab/numpy/linalg/linalg_tools.c
+SRC_QSTR += vendor/ulab/numpy/ndarray/ndarray_iter.c
+SRC_QSTR += vendor/ulab/numpy/random/random.c
+SRC_QSTR += vendor/ulab/scipy/scipy.c
+SRC_QSTR += vendor/ulab/scipy/integrate/integrate.c
+SRC_QSTR += vendor/ulab/scipy/linalg/linalg.c
+SRC_QSTR += vendor/ulab/scipy/optimize/optimize.c
+SRC_QSTR += vendor/ulab/scipy/signal/signal.c
+SRC_QSTR += vendor/ulab/scipy/special/special.c
 
 # extmod/modtime.c #includes MICROPY_PY_TIME_INCLUDEFILE ("port/
 # modtime_android.c", mpconfigport.h) -- OUR OWN file, no upstream
@@ -88,33 +89,40 @@ SRC_QSTR += my-overrides/ulab/scipy/special/special.c
 # ordering rule as SRC_QSTR above: must come before `include embed.mk`,
 # since CFLAGS is captured at mkrules.mk's parse point.
 CFLAGS += -Imy-overrides
+# Same role as -Imy-overrides above, but for the vendor/ tree -- needed
+# by ulab-shim/ulab/code/ndarray.h's own "ulab/ndarray.h" passthrough
+# (see the -Imy-overrides/openmv/ulab-shim comment below), which must
+# resolve to vendor/ulab/ndarray.h now that ulab is split vendor/+
+# my-overrides/ instead of one flat directory.
+CFLAGS += -Ivendor
 # ulab's own files #include each other relative to their code/ root (e.g.
-# ulab.c: #include "ndarray.h", "numpy/numpy.h") -- one -I at our vendored
-# ulab/ root (my-overrides/ulab/, mirroring their code/ root exactly) is
-# enough for every such include across all 33 files, no per-file/per-
-# subdirectory -I entries needed. Same before-the-include ordering
-# requirement as every other CFLAGS/SRC_QSTR line above.
+# ulab.c: #include "ndarray.h", "numpy/numpy.h") -- one -I at the pristine
+# vendor/ulab/ root (mirroring their code/ root exactly) is enough for
+# every such include across all 33 files, no per-file/per-subdirectory -I
+# entries needed. Same before-the-include ordering requirement as every
+# other CFLAGS/SRC_QSTR line above. -Imy-overrides/ulab is still needed
+# separately, for ULAB_CONFIG_FILE's own "ulab_config.h" (OUR OWN file,
+# not vendored -- see CMakeLists.txt's own target_compile_definitions).
 CFLAGS += -Imy-overrides/ulab
+CFLAGS += -Ivendor/ulab
 
 # OpenMV imlib/py_image -- machine vision extension, same "not a core
-# MicroPython module" tier as ulab above. Vendored in two stages (see
-# SESSION_STATE.yaml, "Vendor OpenMV stub headers"/"Vendor OpenMV
-# imlib/common/modules" commits): my-overrides/openmv/ holds both our own
-# Camera2-era replacement headers (arm_math.h, framebuffer.h, etc.) AND
-# the pristine upstream imlib/common/modules/*.c -- flat, not mirrored
-# into subdirectories, confirmed safe before vendoring (every #include
-# across the tree is unqualified except two dead-code ones behind
-# #if OMV_PROFILER_ENABLE, never defined).
+# MicroPython module" tier as ulab above. my-overrides/openmv/ holds our
+# own Camera2-era replacement headers (arm_math.h, framebuffer.h, etc.);
+# vendor/openmv/ holds the pristine upstream imlib/common/modules/*.c --
+# flat, not mirrored into subdirectories, confirmed safe before vendoring
+# (every #include across the tree is unqualified except two dead-code
+# ones behind #if OMV_PROFILER_ENABLE, never defined).
 # Only the modules/*.c files (py_image.c etc) actually use MP_QSTR_* --
 # the imlib/common files underneath are C-only, no qstr surface of their
 # own -- but SRC_QSTR only needs the ones with real usage, same as ulab's
 # own SRC_QSTR list above only listing user-facing files, not every
 # internal .c ulab vendors.
-SRC_QSTR += my-overrides/openmv/py_image.c
-SRC_QSTR += my-overrides/openmv/py_helper.c
-SRC_QSTR += my-overrides/openmv/py_image_descriptor.c
-SRC_QSTR += my-overrides/openmv/py_imageio.c
-SRC_QSTR += my-overrides/openmv/py_image_stats.c
+SRC_QSTR += vendor/openmv/py_image.c
+SRC_QSTR += vendor/openmv/py_helper.c
+SRC_QSTR += vendor/openmv/py_image_descriptor.c
+SRC_QSTR += vendor/openmv/py_imageio.c
+SRC_QSTR += vendor/openmv/py_image_stats.c
 # py_clock.c (time.clock() -- OpenMV script compatibility, see
 # SESSION_STATE.yaml) -- not imlib/vision code, but same vendored
 # location and same "separate translation unit needs its own SRC_QSTR
@@ -122,7 +130,7 @@ SRC_QSTR += my-overrides/openmv/py_image_stats.c
 # this file's own locals_dict_table, not in modtime_android.c (which
 # only references &py_clock_type and the exposed `clock` name -- see
 # that file's own MICROPY_PY_TIME_EXTRA_GLOBALS entry).
-SRC_QSTR += my-overrides/openmv/py_clock.c
+SRC_QSTR += vendor/openmv/py_clock.c
 # CMSIS_MCU_H: real boards point this at their vendor MCU header (e.g.
 # stm32h7xx.h); nothing we compile needs real CMSIS SFR/intrinsic
 # definitions once __ARM_ARCH is forced below 7/8 (see arm_math.h) --
@@ -131,14 +139,20 @@ SRC_QSTR += my-overrides/openmv/py_clock.c
 # includes fmath.h (which needs it) BEFORE it includes board_config.h,
 # so a #define there would always be too late (see board_config.h).
 CFLAGS += -DCMSIS_MCU_H='"cmsis_mcu_stub.h"'
-# One -I covers both our replacement headers and the vendored imlib/
-# common/modules .c/.h files, same flat-directory reasoning as ulab's
-# single -Imy-overrides/ulab above.
+# One -I each for our replacement headers and the vendored imlib/
+# common/modules .c/.h files -- same flat-directory reasoning as ulab's
+# my-overrides/ulab + vendor/ulab pair above.
 CFLAGS += -Imy-overrides/openmv
-# ulab's own code/ndarray.h, referenced by py_image.c's ulab integration
-# via #include "ulab/code/ndarray.h" -- a separate shim root from the
-# -Imy-overrides/ulab above, which resolves the flat ndarray.h spelling
-# ulab's own files use internally, not this path-qualified one.
+CFLAGS += -Ivendor/openmv
+# py_image.c's own "ulab/code/ndarray.h" include doesn't resolve against
+# this project's flattened ulab tree as-is; ulab-shim/ulab/code/ndarray.h
+# is a one-line passthrough (#include "ulab/ndarray.h") bridging the two
+# layouts -- see that file's own header comment. -Imy-overrides/openmv/
+# ulab-shim makes py_image.c's own include resolve to the shim; the
+# shim's own "ulab/ndarray.h" then needs -Ivendor (added below with
+# modtime_android.c's -Imy-overrides, same qualified-relative-include
+# role, one for our own tree and one for the vendor tree) to resolve to
+# vendor/ulab/ndarray.h, the real (post-rename) file.
 CFLAGS += -Imy-overrides/openmv/ulab-shim
 
 # camera_module.cpp -- OUR OWN native csi (camera) module, NOT vendored

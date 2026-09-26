@@ -20,90 +20,16 @@ native-bringup/embed-arm64
 # native-bringup/micropython_embed/ above.
 app/src/main/cpp/micropython_embed/
 
-# ulab (numpy/scipy-like extension): pristine upstream source, fetched
-# fresh at the pinned ULAB_SHA by the Dockerfile (git clone + cp), never
-# vendored into this repo's own git history (see Dockerfile's own header
-# comment and tools/sync-upy-android.sh, which strips this same
-# directory back out of a fresh archive). ulab_config.h (OUR OWN file)
-# already lives elsewhere in my-overrides/ and is unaffected.
-native-bringup/my-overrides/ulab/
-
-# OpenMV imlib/common/modules: the 68 files below are confirmed
-# byte-identical to a real OpenMV upstream path (see
-# tools/docker/openmv-manifest.tsv), fetched fresh at the pinned
-# OPENMV_SHA by the Dockerfile, same "not vendored into this repo's own
-# git history" treatment as ulab/ above. The remaining ~14 files in this
-# same directory (board_config.h, arm_math.h, link_stubs.c, etc.) are
-# OUR OWN replacement headers/glue with no upstream equivalent and stay
-# tracked -- hence a per-file list here, not a whole-directory ignore.
-native-bringup/my-overrides/openmv/array.c
-native-bringup/my-overrides/openmv/array.h
-native-bringup/my-overrides/openmv/bayer.c
-native-bringup/my-overrides/openmv/binary.c
-native-bringup/my-overrides/openmv/blob.c
-native-bringup/my-overrides/openmv/bmp.c
-native-bringup/my-overrides/openmv/clahe.c
-native-bringup/my-overrides/openmv/collections.c
-native-bringup/my-overrides/openmv/collections.h
-native-bringup/my-overrides/openmv/draw.c
-native-bringup/my-overrides/openmv/edge.c
-native-bringup/my-overrides/openmv/eye.c
-native-bringup/my-overrides/openmv/fast.c
-native-bringup/my-overrides/openmv/fft.c
-native-bringup/my-overrides/openmv/fft.h
-native-bringup/my-overrides/openmv/file_utils.c
-native-bringup/my-overrides/openmv/file_utils.h
-native-bringup/my-overrides/openmv/filter.c
-native-bringup/my-overrides/openmv/fmath.c
-native-bringup/my-overrides/openmv/fmath.h
-native-bringup/my-overrides/openmv/font.c
-native-bringup/my-overrides/openmv/font.h
-native-bringup/my-overrides/openmv/fsort.c
-native-bringup/my-overrides/openmv/fsort.h
-native-bringup/my-overrides/openmv/imlib.c
-native-bringup/my-overrides/openmv/imlib.h
-native-bringup/my-overrides/openmv/integral.c
-native-bringup/my-overrides/openmv/integral_mw.c
-native-bringup/my-overrides/openmv/jpegd.c
-native-bringup/my-overrides/openmv/jpege.c
-native-bringup/my-overrides/openmv/lab_tab.c
-native-bringup/my-overrides/openmv/line.c
-native-bringup/my-overrides/openmv/lodepng.c
-native-bringup/my-overrides/openmv/lodepng.h
-native-bringup/my-overrides/openmv/mathop.c
-native-bringup/my-overrides/openmv/memcpy.c
-native-bringup/my-overrides/openmv/memcpy.h
-native-bringup/my-overrides/openmv/omv_common.h
-native-bringup/my-overrides/openmv/omv_profiler.h
-native-bringup/my-overrides/openmv/orb.c
-native-bringup/my-overrides/openmv/png.c
-native-bringup/my-overrides/openmv/point.c
-native-bringup/my-overrides/openmv/ppm.c
-native-bringup/my-overrides/openmv/py_assert.h
-native-bringup/my-overrides/openmv/py_clock.c
-native-bringup/my-overrides/openmv/py_clock.h
-native-bringup/my-overrides/openmv/py_helper.c
-native-bringup/my-overrides/openmv/py_helper.h
-native-bringup/my-overrides/openmv/py_image.c
-native-bringup/my-overrides/openmv/py_image_descriptor.c
-native-bringup/my-overrides/openmv/py_image_descriptor.h
-native-bringup/my-overrides/openmv/py_image.h
-native-bringup/my-overrides/openmv/py_imageio.c
-native-bringup/my-overrides/openmv/py_imageio.h
-native-bringup/my-overrides/openmv/py_image_stats.c
-native-bringup/my-overrides/openmv/py_image_stats.h
-native-bringup/my-overrides/openmv/qrcode.c
-native-bringup/my-overrides/openmv/qsort.c
-native-bringup/my-overrides/openmv/rainbow_tab.c
-native-bringup/my-overrides/openmv/rectangle.c
-native-bringup/my-overrides/openmv/simd.h
-native-bringup/my-overrides/openmv/sincos_tab.c
-native-bringup/my-overrides/openmv/stats.c
-native-bringup/my-overrides/openmv/template.c
-native-bringup/my-overrides/openmv/umalloc.h
-native-bringup/my-overrides/openmv/xyz_tab.c
-native-bringup/my-overrides/openmv/yuv.c
-native-bringup/my-overrides/openmv/zbar.c
+# Pristine upstream source (ulab, OpenMV imlib/common/modules), fetched
+# fresh at the pinned ULAB_SHA/OPENMV_SHA by the Dockerfile (git clone +
+# cp -- see tools/docker/openmv-manifest.tsv), never vendored into this
+# repo's own git history (see Dockerfile's own header comment and
+# tools/sync-upy-android.sh, which strips this same directory back out
+# of a fresh archive). OUR OWN replacement/glue files with no upstream
+# equivalent (ulab_config.h, board_config.h, arm_math.h, link_stubs.c,
+# etc.) live in the sibling my-overrides/ulab/ and my-overrides/openmv/
+# and stay tracked.
+native-bringup/vendor/
 
 # LiteRT prebuilt .so + headers -- fetched fresh by
 # native-bringup/fetch-litert.sh, same ephemeral treatment as

@@ -129,23 +129,23 @@ RUN git clone https://github.com/v923z/micropython-ulab.git /home/devuser/ulab \
     && git -C /home/devuser/ulab checkout $ULAB_SHA
 
 # upy-android's own sources, embedded in this repo, not cloned (see
-# header comment). This includes the 14 my-overrides/openmv/ files with
-# no fetchable upstream equivalent, but NOT the 68 genuinely-vendored
-# ones, and NOT my-overrides/ulab/ at all. Those are populated from the
+# header comment). This includes my-overrides/openmv/'s 14 files with no
+# fetchable upstream equivalent and my-overrides/ulab/'s one (ulab_
+# config.h) -- native-bringup/vendor/{openmv,ulab}/ is gitignored (see
+# .gitignore) and not part of this COPY at all; populated from the
 # clones above, next.
 COPY --chown=devuser:devuser upy-android /home/devuser/upy-android
 COPY --chown=devuser:devuser tools/docker/openmv-manifest.tsv /home/devuser/openmv-manifest.tsv
 
 WORKDIR /home/devuser/upy-android/native-bringup
 
-# Populate my-overrides/openmv/ with the 68 confirmed-pristine files from
-# the pinned OpenMV clone, per-file (not a directory copy). The manifest
-# maps this flat directory's filenames back to their real, differently
-# structured upstream paths, e.g. lib/imlib/blob.c -> blob.c. The 14
-# files already embedded (link_stubs.c, board_config.h, etc.) are left
-# untouched.
-RUN while IFS=$(printf '\t') read -r src dest; do \
-        cp "/home/devuser/openmv/$src" "my-overrides/openmv/$dest"; \
+# Populate vendor/openmv/ with the 68 confirmed-pristine files from the
+# pinned OpenMV clone, per-file (not a directory copy). The manifest maps
+# this flat directory's filenames back to their real, differently
+# structured upstream paths, e.g. lib/imlib/blob.c -> blob.c.
+RUN mkdir -p vendor/openmv \
+    && while IFS=$(printf '\t') read -r src dest; do \
+        cp "/home/devuser/openmv/$src" "vendor/openmv/$dest"; \
     done < /home/devuser/openmv-manifest.tsv
 
 # LiteRT (android.tf module): this project's first PREBUILT BINARY
@@ -157,13 +157,13 @@ RUN while IFS=$(printf '\t') read -r src dest; do \
 # app/src/main/cpp/litert/include to already exist.
 RUN ./fetch-litert.sh
 
-# Populate my-overrides/ulab/ wholesale. Confirmed byte-identical to the
+# Populate vendor/ulab/ wholesale. Confirmed byte-identical to the
 # pinned ulab clone's code/ directory, minus two build-integration files
 # (micropython.cmake/micropython.mk, its generic "user C module" build
 # integration) this project's own hand-rolled CMakeLists.txt doesn't use.
-RUN mkdir -p my-overrides/ulab \
-    && cp /home/devuser/ulab/code/*.c /home/devuser/ulab/code/*.h my-overrides/ulab/ \
-    && find /home/devuser/ulab/code -mindepth 1 -maxdepth 1 -type d -exec cp -r {} my-overrides/ulab/ \;
+RUN mkdir -p vendor/ulab \
+    && cp /home/devuser/ulab/code/*.c /home/devuser/ulab/code/*.h vendor/ulab/ \
+    && find /home/devuser/ulab/code -mindepth 1 -maxdepth 1 -type d -exec cp -r {} vendor/ulab/ \;
 
 # Regenerate the MicroPython embed-port tree fresh from the pinned
 # upstream clone, then reapply our own override/new files on top. Same

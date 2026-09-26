@@ -16,6 +16,13 @@
 #    byte-identical copy of ulab's own code/ directory, the Dockerfile
 #    clones ulab and copies it in wholesale.
 #
+# NOTE: this repo's OWN native-bringup/ now splits these into
+# vendor/{openmv,ulab}/ (gitignored, pristine) vs my-overrides/{openmv,
+# ulab}/ (tracked, ours-only) -- see .gitignore. The strip paths above
+# still target the SOURCE repo's own (flat, unsplit) layout, since that
+# repo has not been touched here (see project memory: never edit/sync
+# it). If it's ever restructured to match, update the paths above too.
+#
 # Usage: ./tools/sync-upy-android.sh [path-to-real-upy-android-repo]
 # Defaults to ../repos/upy-android if not given.
 
