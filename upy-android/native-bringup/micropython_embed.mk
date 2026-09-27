@@ -161,6 +161,11 @@ SRC_QSTR += vendor/openmv/py_ml.c
 # files win. gif.c itself (lib/imlib/) needs no SRC_QSTR entry, same
 # "C-only, no qstr surface" reasoning as the comment above.
 SRC_QSTR += vendor/openmv/py_gif.c
+# py_mjpeg.c (import mjpeg -- same IMLIB_ENABLE_IMAGE_FILE_IO gate as
+# gif, same "qstr-scan reads the pristine vendor/ copy, the real compile
+# picks up my-overrides/openmv/py_mjpeg.c's patched override" reasoning
+# as py_gif.c's own comment just above.
+SRC_QSTR += vendor/openmv/py_mjpeg.c
 # CMSIS_MCU_H: real boards point this at their vendor MCU header (e.g.
 # stm32h7xx.h); nothing we compile needs real CMSIS SFR/intrinsic
 # definitions once __ARM_ARCH is forced below 7/8 (see arm_math.h) --

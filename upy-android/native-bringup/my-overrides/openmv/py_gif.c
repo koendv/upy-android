@@ -29,18 +29,17 @@
  * OpenMV's live sensor-capture framebuffer singleton when those kwargs
  * are omitted (the real upstream example script always omits them:
  * `gif.Gif("example.gif", loop=True)`). This port has no such singleton
- * -- our own csi module returns explicit image_t objects from
- * csi0.snapshot(), never a persistent "current frame" registry -- so
- * framebuffer.h is only a stub here (my-overrides/openmv/framebuffer.h)
- * whose framebuffer_get() aborts unconditionally if actually called
- * (link_stubs.c). Calling it eagerly at Gif() construction time, even
- * when width/height/color are all given explicitly, would abort every
- * single use. Patched to require width/height explicitly and default
- * color to true (the common case) instead -- a genuine, small
- * compatibility deviation from the unmodified script above: this port's
- * scripts must call gif.Gif(path, width=img.width(), height=img.height())
- * using an image already in hand (e.g. from csi0.snapshot()), not rely
- * on an implicit "current sensor frame" default.
+ * -- framebuffer.h is only a stub here (my-overrides/openmv/
+ * framebuffer.h) whose framebuffer_get() aborts unconditionally if
+ * actually called (link_stubs.c). Patched to default from our own
+ * camera_module.cpp's camera_get_current_size() instead (the csi
+ * module's own currently-configured width/height/pixfmt -- set via
+ * csi.framesize()/csi.pixformat(), always a sane default even before
+ * reset()) -- this restores the exact unmodified-script call
+ * convention (gif.Gif(path, loop=True), no explicit width=/height=/
+ * color= needed) rather than requiring callers to pass an image's own
+ * dimensions by hand. Explicit width=/height=/color= kwargs, when
+ * given, still take precedence over this default.
  */
 #include "imlib_config.h"
 #if defined(IMLIB_ENABLE_IMAGE_FILE_IO)
@@ -48,6 +47,7 @@
 #include "py/mphal.h"
 #include "py/runtime.h"
 
+#include "camera_module.h"
 #include "file_utils.h"
 #include "imlib.h"
 #include "py_assert.h"
@@ -147,23 +147,19 @@ static mp_obj_t py_gif_open(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
-    // upy-android PATCH: no framebuffer_get(FB_MAINFB_ID) to default from
-    // (see this file's own header comment) -- width/height must be given
-    // explicitly (e.g. from an image already in hand: img.width(),
-    // img.height()); color defaults to true (RGB565), the common case,
-    // since there is no sensor bpp to infer it from either.
-    if (args[ARG_width].u_int == -1 || args[ARG_height].u_int == -1) {
-        mp_raise_ValueError(MP_ERROR_TEXT(
-            "gif.Gif() needs explicit width= and height= on this port "
-            "(no live camera framebuffer to default from) -- pass an "
-            "image's own img.width()/img.height(), e.g. from csi0.snapshot()"));
-    }
+    // upy-android PATCH: default from the csi module's own currently
+    // -configured size/format (camera_module.cpp, see this file's own
+    // header comment) instead of OpenMV's framebuffer_get(FB_MAINFB_ID)
+    // -- explicit width=/height=/color= kwargs still win when given.
+    int32_t cam_width, cam_height;
+    bool cam_color;
+    camera_get_current_size(&cam_width, &cam_height, &cam_color);
 
     py_gif_obj_t *gif = mp_obj_malloc_with_finaliser(py_gif_obj_t, &py_gif_type);
 
-    gif->width = args[ARG_width].u_int;
-    gif->height = args[ARG_height].u_int;
-    gif->color = (args[ARG_color].u_int == -1) ? true : args[ARG_color].u_bool;
+    gif->width = (args[ARG_width].u_int == -1) ? cam_width : args[ARG_width].u_int;
+    gif->height = (args[ARG_height].u_int == -1) ? cam_height : args[ARG_height].u_int;
+    gif->color = (args[ARG_color].u_int == -1) ? cam_color : args[ARG_color].u_bool;
     gif->loop = args[ARG_loop].u_bool;
 
     file_open(&gif->fp, path, FA_WRITE | FA_CREATE_ALWAYS);

@@ -38,6 +38,7 @@ common/memcpy.h	memcpy.h
 common/omv_common.h	omv_common.h
 common/omv_profiler.h	omv_profiler.h
 lib/imlib/gif.c	gif.c
+lib/imlib/mjpeg.c	mjpeg.c
 lib/imlib/orb.c	orb.c
 lib/imlib/png.c	png.c
 lib/imlib/point.c	point.c
@@ -47,6 +48,7 @@ modules/py_clock.c	py_clock.c
 modules/py_clock.h	py_clock.h
 modules/py_gif.c	py_gif.c
 modules/py_helper.c	py_helper.c
+modules/py_mjpeg.c	py_mjpeg.c
 modules/py_helper.h	py_helper.h
 modules/py_image.c	py_image.c
 modules/py_image_descriptor.c	py_image_descriptor.c

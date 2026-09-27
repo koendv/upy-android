@@ -722,3 +722,9 @@ extern "C" void camera_interrupt_active_wait(void) {
         sem_post(g_cam.active_wait_sem);
     }
 }
+
+extern "C" void camera_get_current_size(int32_t *width, int32_t *height, bool *color) {
+    *width = g_cam.width;
+    *height = g_cam.height;
+    *color = (g_cam.pixfmt == PIXFORMAT_RGB565);
+}
