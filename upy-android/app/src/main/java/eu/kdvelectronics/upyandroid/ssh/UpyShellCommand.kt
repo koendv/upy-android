@@ -93,7 +93,7 @@ class UpyShellCommand(private val context: Context) : Command {
     }
 
     private fun runLoop() {
-        write("upy-android SSH shell. Blank line runs the buffer, Ctrl+C interrupts, Ctrl+D resets.\r\n>>> ")
+        write("upy shell\r\nblank line runs the buffer, ctrl+c interrupts, ctrl+d resets.\r\n>>> ")
         val lineBuf = StringBuilder()
         val bufferedLines = StringBuilder()
         try {
