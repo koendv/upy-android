@@ -142,8 +142,16 @@ fun Symbol(
 // sighted user -- it only reaches TalkBack. This is the same label
 // shown as a real Material3 tooltip on long-press (touch) or hover
 // (mouse/stylus), so an icon-only action row (the terminal's history/
-// interrupt/reset/clear row, e.g.) gets a visible text hint without
+// interrupt/reset/clear row, Files' own toolbar, Camera's interrupt
+// button, About's back arrow, etc.) gets a visible text hint without
 // needing a second, separately-maintained label string.
+//
+// Codepoint overload: the common case, this app's own Symbol() font
+// glyph. Content-lambda overload underneath: for the rare icon that
+// isn't (yet) in this app's own subsetted font -- e.g. Files' own
+// Import button, still Icons.Filled.UploadFile (material-icons-
+// extended), since SymbolIcon has no matching codepoint -- so a
+// tooltip doesn't require first migrating every icon to Symbol().
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TooltipIconButton(
@@ -151,6 +159,19 @@ fun TooltipIconButton(
     label: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) = TooltipIconButton(label = label, onClick = onClick, modifier = modifier, enabled = enabled) {
+    Symbol(icon, contentDescription = label)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TooltipIconButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: @Composable () -> Unit,
 ) {
     TooltipBox(
         positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
@@ -158,8 +179,8 @@ fun TooltipIconButton(
         state = rememberTooltipState(),
         modifier = modifier,
     ) {
-        IconButton(onClick = onClick) {
-            Symbol(icon, contentDescription = label)
+        IconButton(onClick = onClick, enabled = enabled) {
+            icon()
         }
     }
 }

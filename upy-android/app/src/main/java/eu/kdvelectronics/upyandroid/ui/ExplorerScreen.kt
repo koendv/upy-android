@@ -21,7 +21,6 @@ import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -224,21 +223,30 @@ fun ExplorerScreen(
                 TopAppBar(
                     title = { Text("Files") },
                     actions = {
-                        IconButton(onClick = { up() }, enabled = path.isNotEmpty()) {
-                            Symbol(SymbolIcon.DRIVE_FOLDER_UPLOAD, contentDescription = "Directory up")
-                        }
-                        IconButton(onClick = { importPicker.launch("*/*") }) {
+                        TooltipIconButton(
+                            icon = SymbolIcon.DRIVE_FOLDER_UPLOAD,
+                            label = "Directory up",
+                            onClick = { up() },
+                            enabled = path.isNotEmpty(),
+                        )
+                        TooltipIconButton(label = "Import", onClick = { importPicker.launch("*/*") }) {
                             Icon(Icons.Filled.UploadFile, contentDescription = "Import")
                         }
-                        IconButton(onClick = { showNewFile = true }) {
-                            Symbol(SymbolIcon.NOTE_ADD, contentDescription = "New file")
-                        }
-                        IconButton(onClick = { showNewFolder = true }) {
-                            Symbol(SymbolIcon.CREATE_NEW_FOLDER, contentDescription = "New folder")
-                        }
-                        IconButton(onClick = { refresh() }) {
-                            Symbol(SymbolIcon.REFRESH, contentDescription = "Refresh")
-                        }
+                        TooltipIconButton(
+                            icon = SymbolIcon.NOTE_ADD,
+                            label = "New file",
+                            onClick = { showNewFile = true },
+                        )
+                        TooltipIconButton(
+                            icon = SymbolIcon.CREATE_NEW_FOLDER,
+                            label = "New folder",
+                            onClick = { showNewFolder = true },
+                        )
+                        TooltipIconButton(
+                            icon = SymbolIcon.REFRESH,
+                            label = "Refresh",
+                            onClick = { refresh() },
+                        )
                     }
                 )
                 Text(
