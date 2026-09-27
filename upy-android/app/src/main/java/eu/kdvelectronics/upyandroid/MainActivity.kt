@@ -86,6 +86,11 @@ private fun NavHostController.navigateToTab(route: String) {
 // demo script reach existing installs too, not just fresh ones.
 private const val CURRENT_DEMO_SCRIPTS_VERSION = 1
 
+// Bumped whenever the bundled `ml` library package's own content
+// changes -- see seedMlLibraryIfNeeded() below. Same reasoning as
+// CURRENT_DEMO_SCRIPTS_VERSION.
+private const val CURRENT_ML_LIBRARY_VERSION = 1
+
 @OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class, ExperimentalLayoutApi::class)
 class MainActivity : ComponentActivity() {
     private lateinit var boardManager: BoardManager
@@ -126,6 +131,7 @@ class MainActivity : ComponentActivity() {
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)
         seedDemoScriptsIfNeeded()
+        seedMlLibraryIfNeeded()
         // Lives in this (default/UI) process, not :engine -- see
         // HttpServerManager.kt's own header comment. A process-wide
         // singleton (not a per-Activity instance): deliberately never
@@ -286,5 +292,28 @@ class MainActivity : ComponentActivity() {
             }
         }
         settingsManager.demoScriptsVersion = CURRENT_DEMO_SCRIPTS_VERSION
+    }
+
+    // Seeds the `ml` library package into VFS ROOT (filesDir directly,
+    // NOT a subdirectory like examples/) -- a deliberate exception to
+    // seedDemoScriptsIfNeeded()'s own "never VFS root" convention: this
+    // package must sit at "/ml/" for `import ml` to resolve to it at all.
+    // MicroPython's own module resolution checks non-extensible
+    // built-ins, then the filesystem (this port's own sys.path is just
+    // ["/"]), then extensible built-ins last -- so a real "/ml/__init__.py"
+    // here transparently shadows OpenMV's own extensible `ml`/`tf`
+    // built-in (still vendored, still non-commercially licensed --
+    // see SESSION_STATE.yaml), with no other change needed. Version-
+    // stamped, same reasoning as seedDemoScriptsIfNeeded().
+    private fun seedMlLibraryIfNeeded() {
+        if (settingsManager.mlLibraryVersion >= CURRENT_ML_LIBRARY_VERSION) return
+
+        val mlDir = File(filesDir, "ml").apply { mkdirs() }
+        assets.open("ml/__init__.py").use { input ->
+            File(mlDir, "__init__.py").outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        settingsManager.mlLibraryVersion = CURRENT_ML_LIBRARY_VERSION
     }
 }

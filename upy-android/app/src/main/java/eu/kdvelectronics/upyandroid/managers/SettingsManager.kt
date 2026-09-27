@@ -81,6 +81,13 @@ class SettingsManager(context: Context) {
         get() = prefs.getInt(KEY_DEMO_SCRIPTS_VERSION, 0)
         set(value) = prefs.edit().putInt(KEY_DEMO_SCRIPTS_VERSION, value).apply()
 
+    // Same version-stamped-not-one-shot reasoning as demoScriptsVersion
+    // above, but for the `ml` library package (seeded to VFS ROOT, not
+    // /examples/ -- see seedMlLibraryIfNeeded()'s own comment for why).
+    var mlLibraryVersion: Int
+        get() = prefs.getInt(KEY_ML_LIBRARY_VERSION, 0)
+        set(value) = prefs.edit().putInt(KEY_ML_LIBRARY_VERSION, value).apply()
+
     companion object {
         private const val PREFS_NAME = "upy_android_settings"
         private const val KEY_ASKED_CAMERA_PERMISSION = "asked_camera_permission"
@@ -96,5 +103,6 @@ class SettingsManager(context: Context) {
         private const val KEY_HTTP_PRIVATE_FILES_ENABLED = "http_private_files_enabled"
         private const val KEY_LITERT_PLAYSTORE_ENABLED = "litert_playstore_enabled"
         private const val KEY_DEMO_SCRIPTS_VERSION = "demo_scripts_version"
+        private const val KEY_ML_LIBRARY_VERSION = "ml_library_version"
     }
 }

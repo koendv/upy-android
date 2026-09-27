@@ -120,8 +120,22 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }
 
+// The `ml` library package, seeded into the VFS ROOT (not /examples/ --
+// a deliberate, documented exception to that convention) by
+// MainActivity's own seedMlLibraryIfNeeded(): it must live at VFS root
+// for `import ml` to resolve to it at all (MicroPython's own module
+// resolution -- non-extensible builtins, then filesystem, then
+// extensible builtins -- only shadows OpenMV's own extensible `ml`/`tf`
+// built-in when the filesystem package sits at a location already on
+// sys.path, which this port sets to just ['/']). Same "one real copy,
+// not hand-duplicated" reasoning as copyNotice/copyDemoScripts above.
+val copyMlLibrary = tasks.register<Copy>("copyMlLibrary") {
+    from(rootProject.file("libraries/ml/__init__.py"))
+    into(layout.projectDirectory.dir("src/main/assets/ml"))
+}
+
 tasks.named("preBuild") {
-    dependsOn(copyNotice, copyDemoScripts)
+    dependsOn(copyNotice, copyDemoScripts, copyMlLibrary)
 }
 
 dependencyLocking {
