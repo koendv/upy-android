@@ -2,8 +2,15 @@ package eu.kdvelectronics.upyandroid.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -128,5 +135,31 @@ fun Symbol(
             softWrap = false,
             color = tint,
         )
+    }
+}
+
+// An icon-only IconButton's own contentDescription is invisible to a
+// sighted user -- it only reaches TalkBack. This is the same label
+// shown as a real Material3 tooltip on long-press (touch) or hover
+// (mouse/stylus), so an icon-only action row (the terminal's history/
+// interrupt/reset/clear row, e.g.) gets a visible text hint without
+// needing a second, separately-maintained label string.
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun TooltipIconButton(
+    icon: Int,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
+        modifier = modifier,
+    ) {
+        IconButton(onClick = onClick) {
+            Symbol(icon, contentDescription = label)
+        }
     }
 }

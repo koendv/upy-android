@@ -14,7 +14,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -122,22 +121,34 @@ fun TerminalScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-                IconButton(onClick = {
-                    viewModel.history.up()?.let { input = it }
-                }) { Symbol(SymbolIcon.KEYBOARD_ARROW_UP, contentDescription = "Previous line") }
-                IconButton(onClick = {
-                    viewModel.history.down()?.let { input = it }
-                }) { Symbol(SymbolIcon.KEYBOARD_ARROW_DOWN, contentDescription = "Next line") }
-                IconButton(onClick = { terminalManager.terminateExecution() }) {
-                    Symbol(SymbolIcon.STOP, contentDescription = "Interrupt")
-                }
-                IconButton(onClick = {
-                    coroutineScope.launch(Dispatchers.IO) { terminalManager.reset() }
-                    TerminalLog.clear()
-                }) { Symbol(SymbolIcon.RESTART_ALT, contentDescription = "Reset") }
-                IconButton(onClick = { TerminalLog.clear() }) {
-                    Symbol(SymbolIcon.DELETE_SWEEP, contentDescription = "Clear")
-                }
+                TooltipIconButton(
+                    icon = SymbolIcon.KEYBOARD_ARROW_UP,
+                    label = "Previous line",
+                    onClick = { viewModel.history.up()?.let { input = it } },
+                )
+                TooltipIconButton(
+                    icon = SymbolIcon.KEYBOARD_ARROW_DOWN,
+                    label = "Next line",
+                    onClick = { viewModel.history.down()?.let { input = it } },
+                )
+                TooltipIconButton(
+                    icon = SymbolIcon.STOP,
+                    label = "Interrupt",
+                    onClick = { terminalManager.terminateExecution() },
+                )
+                TooltipIconButton(
+                    icon = SymbolIcon.RESTART_ALT,
+                    label = "Reset",
+                    onClick = {
+                        coroutineScope.launch(Dispatchers.IO) { terminalManager.reset() }
+                        TerminalLog.clear()
+                    },
+                )
+                TooltipIconButton(
+                    icon = SymbolIcon.DELETE_SWEEP,
+                    label = "Clear",
+                    onClick = { TerminalLog.clear() },
+                )
             }
 
             Row(
