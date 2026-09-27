@@ -70,6 +70,17 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_LITERT_PLAYSTORE_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_LITERT_PLAYSTORE_ENABLED, value).apply()
 
+    // Last bundled-demo-scripts version actually copied into the VFS's
+    // own /examples/ directory -- see MainActivity's own
+    // seedDemoScriptsIfNeeded(). 0 (never seeded) on a fresh install.
+    // Deliberately a version int, not a one-shot boolean: bumping
+    // CURRENT_DEMO_SCRIPTS_VERSION lets a later app update that fixes a
+    // bundled demo script reach existing installs too, not just new
+    // ones -- an already-seeded copy gets overwritten again once.
+    var demoScriptsVersion: Int
+        get() = prefs.getInt(KEY_DEMO_SCRIPTS_VERSION, 0)
+        set(value) = prefs.edit().putInt(KEY_DEMO_SCRIPTS_VERSION, value).apply()
+
     companion object {
         private const val PREFS_NAME = "upy_android_settings"
         private const val KEY_ASKED_CAMERA_PERMISSION = "asked_camera_permission"
@@ -84,5 +95,6 @@ class SettingsManager(context: Context) {
         private const val KEY_HTTP_PASSWORD = "http_password"
         private const val KEY_HTTP_PRIVATE_FILES_ENABLED = "http_private_files_enabled"
         private const val KEY_LITERT_PLAYSTORE_ENABLED = "litert_playstore_enabled"
+        private const val KEY_DEMO_SCRIPTS_VERSION = "demo_scripts_version"
     }
 }

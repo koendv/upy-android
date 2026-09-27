@@ -44,6 +44,7 @@ import eu.kdvelectronics.upyandroid.ui.Symbol
 import eu.kdvelectronics.upyandroid.ui.SymbolIcon
 import eu.kdvelectronics.upyandroid.ui.TerminalScreen
 import eu.kdvelectronics.upyandroid.ui.UpyTheme
+import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -80,6 +81,11 @@ private fun NavHostController.navigateToTab(route: String) {
 // I/O rooted at the same filesDir the :engine process mounts as VFS
 // "/", so browsing and editing never need AIDL. Only "Run" does, via
 // the same terminalManager.eval() the terminal screen itself uses.
+// Bumped whenever a bundled demo script's own content changes -- see
+// seedDemoScriptsIfNeeded() below. Lets an app update that fixes a
+// demo script reach existing installs too, not just fresh ones.
+private const val CURRENT_DEMO_SCRIPTS_VERSION = 1
+
 @OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class, ExperimentalLayoutApi::class)
 class MainActivity : ComponentActivity() {
     private lateinit var boardManager: BoardManager
@@ -119,6 +125,7 @@ class MainActivity : ComponentActivity() {
         terminalManager = TerminalManager(boardManager)
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)
+        seedDemoScriptsIfNeeded()
         // Lives in this (default/UI) process, not :engine -- see
         // HttpServerManager.kt's own header comment. A process-wide
         // singleton (not a per-Activity instance): deliberately never
@@ -258,5 +265,26 @@ class MainActivity : ComponentActivity() {
 
         settingsManager.askedCameraPermission = true
         cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+    }
+
+    // Bundled demo scripts (build.gradle.kts's own copyDemoScripts task
+    // copies them from the repo's own tracked examples/ into
+    // src/main/assets/examples/) seeded into the VFS's own /examples/
+    // subdirectory -- a dedicated, clearly app-managed location, never
+    // VFS root, so this can never collide with or overwrite anything
+    // the user creates themselves. Version-stamped, not a one-shot
+    // boolean (see demoScriptsVersion's own comment): re-seeds (only
+    // this subdirectory, only these known filenames) whenever the
+    // bundled version is newer than what's already been seeded.
+    private fun seedDemoScriptsIfNeeded() {
+        if (settingsManager.demoScriptsVersion >= CURRENT_DEMO_SCRIPTS_VERSION) return
+
+        val examplesDir = File(filesDir, "examples").apply { mkdirs() }
+        assets.open("examples/lcd_shield.py").use { input ->
+            File(examplesDir, "lcd_shield.py").outputStream().use { output ->
+                input.copyTo(output)
+            }
+        }
+        settingsManager.demoScriptsVersion = CURRENT_DEMO_SCRIPTS_VERSION
     }
 }

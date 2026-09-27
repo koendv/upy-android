@@ -109,8 +109,19 @@ val copyNotice = tasks.register<Copy>("copyNotice") {
     from(rootProject.file("NOTICE.html"))
     into(layout.projectDirectory.dir("src/main/assets"))
 }
+
+// Bundled demo script(s), seeded into the VFS's own /examples/ on first
+// launch (or after a version bump) by MainActivity's own
+// seedDemoScriptsIfNeeded() -- copied here from the repo's own tracked
+// examples/ tree, same "one real copy, not hand-duplicated" reasoning
+// as copyNotice above.
+val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
+    from(rootProject.file("examples/lcd_shield/lcd_shield.py"))
+    into(layout.projectDirectory.dir("src/main/assets/examples"))
+}
+
 tasks.named("preBuild") {
-    dependsOn(copyNotice)
+    dependsOn(copyNotice, copyDemoScripts)
 }
 
 dependencyLocking {
