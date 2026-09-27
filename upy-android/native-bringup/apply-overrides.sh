@@ -45,9 +45,12 @@ cp my-overrides/ulab/ulab_config.h micropython_embed/ulab/ulab_config.h
 # the one nested exception: ulab-shim/ulab/code/ndarray.h (a shim path
 # py_image.c's own ulab integration expects, see SESSION_STATE.yaml).
 # Same vendor/+my-overrides/ merge as ulab above: vendor/openmv/ holds
-# the 68 pristine upstream files, my-overrides/openmv/ holds our own 14
+# the 70 pristine upstream files, my-overrides/openmv/ holds our own 15
 # replacement headers/glue (board_config.h, arm_math.h, ulab-shim/,
-# etc.) -- merged flat into one directory, as the build expects.
+# py_gif.c, etc.) -- merged flat into one directory, as the build
+# expects. py_gif.c is a patched OVERRIDE of a same-named vendor file
+# (see its own header comment for why), not a from-scratch replacement
+# like board_config.h -- the cp -r below intentionally lets it win.
 rm -rf micropython_embed/openmv
 cp -r vendor/openmv micropython_embed/openmv
 cp -r my-overrides/openmv/. micropython_embed/openmv/

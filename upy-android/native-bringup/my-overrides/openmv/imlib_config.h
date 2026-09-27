@@ -27,4 +27,13 @@
 #define IMLIB_ENABLE_FIND_KEYPOINTS
 #define IMLIB_ENABLE_FAST
 
+// import gif (gif.c/py_gif.c, MIT) -- file_utils.c (already vendored,
+// gated on this same flag) already talks to MicroPython's own VFS, not
+// hardware FatFS, so this is a genuinely portable flag flip. Also
+// activates a handful of other IMLIB_ENABLE_IMAGE_FILE_IO-gated file
+// save/load code paths inside py_image.c/py_image_descriptor.h -- not
+// exercised/verified beyond gif itself, since nothing else currently
+// asks for them.
+#define IMLIB_ENABLE_IMAGE_FILE_IO
+
 #endif

@@ -150,6 +150,17 @@ SRC_QSTR += vendor/openmv/py_clock.c
 # patched) is NOT listed here -- it has zero MP_QSTR_* usage of its own
 # (confirmed via grep), same "no qstr surface" case as litert_jni_bridge.cpp.
 SRC_QSTR += vendor/openmv/py_ml.c
+# py_gif.c (import gif -- IMLIB_ENABLE_IMAGE_FILE_IO, see
+# imlib_config.h's own comment) -- same vendored-location reasoning as
+# the other modules/*.c files above. The qstr-scan reads this PRISTINE
+# vendor/ copy (fine: my-overrides/openmv/py_gif.c's own patch changes
+# no MP_QSTR_*-visible names, only py_gif_open()'s internal framebuffer
+# handling -- see that file's own header comment); the actual compile
+# picks up the patched override instead, via apply-overrides.sh's
+# cp -r my-overrides/openmv/. (after vendor/openmv/) letting same-named
+# files win. gif.c itself (lib/imlib/) needs no SRC_QSTR entry, same
+# "C-only, no qstr surface" reasoning as the comment above.
+SRC_QSTR += vendor/openmv/py_gif.c
 # CMSIS_MCU_H: real boards point this at their vendor MCU header (e.g.
 # stm32h7xx.h); nothing we compile needs real CMSIS SFR/intrinsic
 # definitions once __ARM_ARCH is forced below 7/8 (see arm_math.h) --
