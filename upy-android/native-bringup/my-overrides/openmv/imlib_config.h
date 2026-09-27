@@ -36,4 +36,9 @@
 // asks for them.
 #define IMLIB_ENABLE_IMAGE_FILE_IO
 
+// find_line_segments() -- edl.c (LSD, MIT), self-contained -- no
+// companion flag/dependency, confirmed by reading every
+// IMLIB_ENABLE_FIND_LINE_SEGMENTS site in modules/py_image.c directly.
+#define IMLIB_ENABLE_FIND_LINE_SEGMENTS
+
 #endif

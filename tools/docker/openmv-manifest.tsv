@@ -9,6 +9,7 @@ lib/imlib/collections.c	collections.c
 lib/imlib/collections.h	collections.h
 lib/imlib/draw.c	draw.c
 lib/imlib/edge.c	edge.c
+lib/imlib/edl.c	edl.c
 lib/imlib/eye.c	eye.c
 lib/imlib/fast.c	fast.c
 lib/imlib/fft.c	fft.c
