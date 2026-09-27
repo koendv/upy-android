@@ -4,11 +4,12 @@
 # shows first; Camera's SurfaceView only receives frames while its own
 # tab is actually composed and visible, per CameraScreen.kt's own
 # design). Interrupt via the Camera screen's own Stop button, same as
-# hitting Ctrl+C on real OpenMV hardware. Only one line changed from the
+# hitting Ctrl+C on real OpenMV hardware. Two lines changed from the
 # real upstream script below: csi0.framesize() picks this device's own
 # smallest supported resolution instead of a fixed literal, since real
 # phone cameras (unlike every real OpenMV board) don't all support the
-# same fixed small sizes -- see that line's own comment.
+# same fixed small sizes -- see that line's own comment; and the fps
+# print includes a " fps" unit label.
 #
 # This work is licensed under the MIT license.
 # Copyright (c) 2013-2025 OpenMV LLC. All rights reserved.
@@ -50,4 +51,4 @@ clock = time.clock()
 while True:
     clock.tick()
     lcd.write(csi0.snapshot(), hint=image.CENTER | image.SCALE_ASPECT_KEEP)
-    print(clock.fps())
+    print(clock.fps(), "fps")
