@@ -218,30 +218,21 @@ unsigned long mp_android_random_seed_init(void);
 #define MICROPY_PY_BUILTINS_HELP                 (1)
 #define MICROPY_PY_BUILTINS_HELP_MODULES         (1)
 
-// OpenMV's own py_ml.c (vendor/openmv/py_ml.c) -- NOT a core MicroPython
-// flag, no fallback exists in py/mpconfig.h; OpenMV's own board configs
-// define it directly, same as this project's own IMLIB_ENABLE_* flags
-// (imlib_config.h) do for imlib. Registers as `import tf` (legacy
-// alias) and `import ml` (current name), both top-level, matching real
-// unmodified OpenMV scripts -- see SESSION_STATE.yaml's Part 5 entry
-// for the full research (including why OpenMV's own scripts/libraries/
-// ml/ml-core Python wrapper package is deliberately NOT vendored:
-// stale/pre-consolidation at this pin, `ml` is already the complete,
-// current design in C).
-#define MICROPY_PY_ML                            (1)
-// MICROPY_PY_ML_TFLM is deliberately NOT defined here -- tflm_backend.cc
-// (my-overrides/openmv/, patched) checks it as the very first line of
-// the file, wrapping even its own #include "py/runtime.h", so a define
-// reachable only transitively through that include (i.e. one placed
-// here) is never visible in time; it must be a command-line -D instead
-// (see CMakeLists.txt's set_source_files_properties for that file --
-// found via a real undefined-symbol link error, not by inspection).
-// A #define here too would just silently redefine the same value and
-// trigger a harmless but confusing -Wmacro-redefined warning.
+// OpenMV's own py_ml.c/tflm_backend.cc (`import ml`/`import tf`) --
+// REMOVED. Both were under a restrictive, non-commercial-use-only
+// license (see git history/SESSION_STATE.yaml's clean-room ml-wrapper
+// entry). Superseded by a from-scratch, clean-room `ml` package
+// (libraries/ml/__init__.py, seeded to VFS root) built on this
+// project's own `litert` module -- it shadows `import ml` automatically
+// via MicroPython's own extensible-built-in-vs-filesystem resolution
+// order, so no MICROPY_PY_ML flag is needed here at all any more.
+// Verified both-devices-equivalent before this removal (Tab A7 + Redmi
+// Note 15), per SESSION_STATE.yaml.
 
 // OpenMV's own py_crc.c (vendor/openmv/py_crc.c) + common/omv_crc.c --
-// NOT a core MicroPython flag, same "OpenMV's own board configs define
-// it directly" tier as MICROPY_PY_ML above. import crc: crc16()/
+// NOT a core MicroPython flag; OpenMV's own board configs define it
+// directly, same tier of flag as the since-removed MICROPY_PY_ML was
+// (see git history/SESSION_STATE.yaml). import crc: crc16()/
 // crc32(). Deliberately NOT the same thing as binascii.crc32() (see
 // MICROPY_PY_BINASCII's own comment below, which stays off) even if
 // that flag were enabled: omv_crc32_start/update is a non-reflected,
@@ -254,9 +245,9 @@ unsigned long mp_android_random_seed_init(void);
 // by a real -Werror "redefined" failure during qstr-scan generation
 // (silently dropped that file's own contribution, including its
 // MP_REGISTER_MODULE -- no compile error, `import crc` just failed
-// with ImportError, closest match to tflm_backend.cc's own "silently
-// compiles out to an empty translation unit" case, see CMakeLists.txt's
-// own comment on that file): py_crc.c's own #if MICROPY_PY_CRC guard is
+// with ImportError; the since-removed tflm_backend.cc hit the same bug
+// class first, see git history/SESSION_STATE.yaml): py_crc.c's own
+// #if MICROPY_PY_CRC guard is
 // its first real line, wrapping even its own #include "py/runtime.h",
 // so a define reachable only transitively through that include (i.e.
 // one placed here) is never visible in time -- it must be a command-

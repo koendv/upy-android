@@ -54,12 +54,6 @@ FROM ubuntu:24.04 AS tools
 ENV MICROPYTHON_SHA=52b5fbcb4b7961356c83ba0c533ee42acdfa0169
 ENV OPENMV_SHA=818f111d49effc98c0c6361f8fe85cb68deac9eb
 ENV ULAB_SHA=01ad8a5fff89d7aeb68ef1827d1ba8f83f6462a7
-# TFLM (TensorFlow Lite Micro) -- the real interpreter + reference-
-# kernel backend behind `import ml`/`import tf` (Part 5, see
-# SESSION_STATE.yaml). Exact commit tflm_backend.cc (my-overrides/
-# openmv/, patched) was written/tested against, per openmv/tflm's own
-# CI workflow (.github/workflows/tflm.yml).
-ENV TFLM_SHA=a57349f0bc3bc3ded105238fe2f14c36888d42b0
 
 ARG DEST_DIR=/root
 WORKDIR ${DEST_DIR}
@@ -68,21 +62,9 @@ RUN apt-get update
 
 RUN apt-get install -y apt-utils
 
-# python3-numpy/python3-pil: NOT needed for anything this project
-# actually uses -- required only because TFLM's own Makefile
-# unconditionally includes every examples/*/Makefile.inc fragment at
-# PARSE time (Part 5's own vendor/tflm/ fetch below, `make ...
-# third_party_downloads`), and person_detection's own fragment shells
-# out to generate_cc_arrays.py (numpy + PIL) as a side effect of being
-# parsed at all, regardless of which target was actually requested.
-# Confirmed via a real Docker build failing twice (ModuleNotFoundError:
-# numpy, then PIL) before finding this, not guessed ahead of time --
-# see SESSION_STATE.yaml's Part 5 entry.
-# openssl: TFLM's own download_and_extract.sh (same fetch step) uses
-# `openssl dgst -md5` to verify each downloaded archive.
 RUN apt-get install -y \
       git wget unzip curl ca-certificates openjdk-21-jdk-headless \
-      build-essential python3 python3-numpy python3-pil openssl
+      build-essential
 
 # build runs as non-root user
 ARG USER_UID=1000
@@ -146,9 +128,6 @@ RUN git clone https://github.com/openmv/openmv.git /home/devuser/openmv \
 RUN git clone https://github.com/v923z/micropython-ulab.git /home/devuser/ulab \
     && git -C /home/devuser/ulab checkout $ULAB_SHA
 
-RUN git clone https://github.com/tensorflow/tflite-micro.git /home/devuser/tflite-micro \
-    && git -C /home/devuser/tflite-micro checkout $TFLM_SHA
-
 # upy-android's own sources, embedded in this repo, not cloned (see
 # header comment). This includes my-overrides/openmv/'s 14 files with no
 # fetchable upstream equivalent and my-overrides/ulab/'s one (ulab_
@@ -183,51 +162,6 @@ RUN mkdir -p vendor/ulab \
     && cp /home/devuser/ulab/code/*.c /home/devuser/ulab/code/*.h vendor/ulab/ \
     && find /home/devuser/ulab/code -mindepth 1 -maxdepth 1 -type d -exec cp -r {} vendor/ulab/ \;
 
-# Populate vendor/tflm/ via TFLM's own real project-generation script
-# (create_tflm_tree.py) -- NOT hand-picked files, matches the exact
-# file set tflm_backend.cc needs. No --makefile_options override at
-# all: TARGET defaults to $(HOST_OS) (confirmed by reading the real
-# Makefile -- TARGET := $(HOST_OS), and TARGETS_WITHOUT_MAKEFILES :=
-# $(HOST_OS) means this deliberately skips any bare-metal/Cortex-M-
-# specific target fragment), and OPTIMIZED_KERNEL_DIR stays unset,
-# defaulting to portable reference kernels rather than cmsis_nn/
-# ethos_u -- exactly what this project's own CMake build compiles
-# directly (bypassing TFLM's own Makefile/toolchain machinery
-# entirely), same "vendor + compile under our own build" pattern as
-# ulab/imlib above. third_party_downloads fetches flatbuffers/
-# gemmlowp/ruy/kissfft from their own upstream sources -- needs network
-# access, same tier as the git clones above.
-RUN cd /home/devuser/tflite-micro \
-    && make -f tensorflow/lite/micro/tools/make/Makefile third_party_downloads \
-    && rm -rf /home/devuser/upy-android/native-bringup/vendor/tflm \
-    && python3 tensorflow/lite/micro/tools/project_generation/create_tflm_tree.py \
-           /home/devuser/upy-android/native-bringup/vendor/tflm
-
-# Swap in the ONE debug-log implementation that actually routes
-# through RegisterDebugLogCallback -- tflm_backend.cc's own #include
-# is hardcoded to this exact "cortex_m_generic/" path, and the
-# default/host file list above pulls in the plain tensorflow/lite/
-# micro/debug_log.cc instead (hardcodes vfprintf(stderr), which goes
-# nowhere on Android, and doesn't even define RegisterDebugLogCallback
-# at all -- confirmed by diffing the two files directly, not guessed;
-# see SESSION_STATE.yaml's Part 5 entry). Both files are genuinely
-# portable despite living under a "cortex_m_generic" directory name.
-# array.cc is deleted (array.h stays, header-only) -- it cannot
-# compile under TF_LITE_STATIC_MEMORY (its own deleter calls
-# TfLiteIntArrayFree/TfLiteFloatArrayFree, both declared only when
-# that macro is NOT defined), and nothing in this build's own
-# TF_LITE_STATIC_MEMORY configuration ever instantiates the template
-# functions that would otherwise need it (confirmed via grep against
-# kernel_util.cc's own matching #ifndef TF_LITE_STATIC_MEMORY guard).
-RUN cd /home/devuser/upy-android/native-bringup/vendor/tflm \
-    && rm -f tensorflow/lite/micro/debug_log.cc \
-    && mkdir -p tensorflow/lite/micro/cortex_m_generic \
-    && cp /home/devuser/tflite-micro/tensorflow/lite/micro/cortex_m_generic/debug_log.cc \
-          tensorflow/lite/micro/cortex_m_generic/debug_log.cc \
-    && cp /home/devuser/tflite-micro/tensorflow/lite/micro/cortex_m_generic/debug_log_callback.h \
-          tensorflow/lite/micro/cortex_m_generic/debug_log_callback.h \
-    && rm -f tensorflow/lite/array.cc
-
 # Regenerate the MicroPython embed-port tree fresh from the pinned
 # upstream clone, then reapply our own override/new files on top. Same
 # two-step process the real project's own dev workflow uses.
@@ -244,12 +178,6 @@ RUN rm -rf build-embed micropython_embed \
 # rather than silently depending on a pre-generated snapshot.
 RUN rm -rf ../app/src/main/cpp/micropython_embed \
     && cp -r micropython_embed ../app/src/main/cpp/micropython_embed
-
-# Same sync as above, for vendor/tflm/ -- no merge step needed (unlike
-# micropython_embed/, tflm/ has no my-overrides/ counterpart to fold
-# in; it's 100% pristine + the one debug-log swap already applied above).
-RUN rm -rf ../app/src/main/cpp/tflm \
-    && cp -r vendor/tflm ../app/src/main/cpp/tflm
 
 WORKDIR /home/devuser/upy-android
 

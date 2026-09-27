@@ -143,13 +143,6 @@ SRC_QSTR += vendor/openmv/py_image_stats.c
 # only references &py_clock_type and the exposed `clock` name -- see
 # that file's own MICROPY_PY_TIME_EXTRA_GLOBALS entry).
 SRC_QSTR += vendor/openmv/py_clock.c
-# py_ml.c (import ml / import tf, TFLM backend -- see mpconfigport.h's
-# own MICROPY_PY_ML/MICROPY_PY_ML_TFLM comment and SESSION_STATE.yaml's
-# Part 5 entry) -- same vendored location/reasoning as the other
-# modules/*.c files above. tflm_backend.cc (my-overrides/openmv/,
-# patched) is NOT listed here -- it has zero MP_QSTR_* usage of its own
-# (confirmed via grep), same "no qstr surface" case as litert_jni_bridge.cpp.
-SRC_QSTR += vendor/openmv/py_ml.c
 # py_gif.c (import gif -- IMLIB_ENABLE_IMAGE_FILE_IO, see
 # imlib_config.h's own comment) -- same vendored-location reasoning as
 # the other modules/*.c files above. The qstr-scan reads this PRISTINE

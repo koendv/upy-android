@@ -1,9 +1,12 @@
-# ml/tf (TFLM backend) confidence test -- confirms the real interpreter +
-# MicroMutableOpResolver<113> vendored in Part 5 actually runs inference
-# on THIS device and THIS build, not just that the code compiles. Runs
-# the SAME known-good fixture android.tf/android.rt's own selftests used
-# to (both since deleted -- ml/tf is their replacement), through the new
-# top-level `ml`/`tf` module instead.
+# ml confidence test -- confirms `import ml` (the clean-room, litert-
+# backed replacement for OpenMV's own non-commercially-licensed py_ml.c/
+# tflm_backend.cc, see git history/SESSION_STATE.yaml) actually runs
+# inference on THIS device and THIS build, not just that the code
+# compiles. This exact script, UNMODIFIED, was also the acceptance test
+# proving drop-in compatibility with OpenMV's own module while both
+# still existed side by side (shadowing) -- see SESSION_STATE.yaml for
+# that verification. Runs the SAME known-good fixture android.tf/
+# android.rt's own selftests used to (all three since deleted).
 #
 # Setup: copy add_simple.tflite onto the device's VFS root first, e.g.
 #   adb push examples/add_simple/add_simple.tflite /data/local/tmp/add_simple.tflite
@@ -21,11 +24,12 @@ TOLERANCE = 1e-5
 
 
 def main():
-    print("ml selftest (TFLM backend)")
+    print("ml selftest (litert backend)")
 
     try:
-        # postprocess is MP_ARG_REQUIRED in py_ml.c despite having a
-        # None default -- must be passed explicitly.
+        # postprocess is a required kwarg (matches OpenMV's own py_ml.c
+        # behavior, despite having a None default) -- must be passed
+        # explicitly.
         model = ml.Model(MODEL_PATH, postprocess=None)
     except OSError as e:
         print("FAIL: could not load %s (%s)" % (MODEL_PATH, e))

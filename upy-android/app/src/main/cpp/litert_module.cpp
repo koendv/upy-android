@@ -9,15 +9,19 @@
 // TensorBuffer, Options, Accelerator, each exposed separately, not
 // folded into one Model god-object the way android.tf/android.rt were.
 // android.tf/android.rt (this project's original, NNAPI/LiteRt-C-API-
-// based modules) have since been deleted -- Part 5's ml/tf module
-// (py_ml.c + a vendored TFLM backend, real unmodified-OpenMV-script
-// compatibility) is their actual replacement, both-devices-verified,
-// not this module. litert stays as its own separate, lower-level path
-// against litert-api's own Kotlin surface -- it never grew the ndarray
-// convenience layer android.rt had (see below), and the newer C API
-// this module wraps has zero NNAPI code anywhere (confirmed against
-// LiteRT's own source), so it was never a hardware-acceleration
-// replacement for android.tf either.
+// based modules) have since been deleted -- Part 5's `ml`/`tf` module
+// was their first replacement (initially OpenMV's own py_ml.c + a
+// vendored TFLM backend), both-devices-verified; that backend has SINCE
+// been removed too (restrictively licensed, see git history/
+// SESSION_STATE.yaml's clean-room ml-wrapper entry) and replaced again,
+// by a from-scratch `ml` package (libraries/ml/__init__.py) built on
+// THIS module -- get_input_tensor_type()/get_input_tensor_quantization()
+// etc. exist specifically to support that. litert itself stays its own
+// separate, lower-level path against litert-api's own Kotlin surface --
+// it never grew the ndarray convenience layer android.rt had (see
+// below), and the newer C API this module wraps has zero NNAPI code
+// anywhere (confirmed against LiteRT's own source), so it was never a
+// hardware-acceleration replacement for android.tf either.
 //
 // TensorBuffer exposes all five of the real litert-api's own typed
 // read/write pairs (int8, float, int, bool, long -- matching
