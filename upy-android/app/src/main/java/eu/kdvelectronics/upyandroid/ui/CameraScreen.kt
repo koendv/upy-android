@@ -10,14 +10,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import eu.kdvelectronics.upyandroid.managers.BoardManager
@@ -77,17 +75,20 @@ fun CameraScreen(
             // A SurfaceView's own Surface composites as opaque black
             // until something is actually written to it (:engine's own
             // ANativeWindow_lock/unlockAndPost, only while a script is
-            // running) -- setBackgroundColor matches this idle state to
-            // the rest of the app's own theme background instead of
-            // leaving it black regardless of light/dark mode. Read here
-            // (not captured once in factory) so it also updates if the
-            // system theme changes while this screen is visible.
-            val backgroundColor = MaterialTheme.colorScheme.background.toArgb()
+            // running) -- deliberately NOT given a background color to
+            // match the app theme (tried in 718028d, reverted): a plain
+            // SurfaceView's real Surface is composited BEHIND the normal
+            // view hierarchy by default, so any background painted via
+            // the View system (setBackgroundColor, every recomposition
+            // via AndroidView's own update{}) sits ON TOP of the actual
+            // native-written frame content, hiding it completely -- a
+            // real regression only caught by actually trying to display
+            // live camera frames, not by the earlier screenshot-only
+            // "does the idle color match" check.
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     SurfaceView(context).apply {
-                        setBackgroundColor(backgroundColor)
                         holder.addCallback(object : SurfaceHolder.Callback {
                             override fun surfaceCreated(holder: SurfaceHolder) {
                                 boardManager.setDisplaySurface(holder.surface)
@@ -112,7 +113,6 @@ fun CameraScreen(
                         })
                     }
                 },
-                update = { view -> view.setBackgroundColor(backgroundColor) }
             )
         }
     }
