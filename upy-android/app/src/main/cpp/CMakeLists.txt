@@ -217,6 +217,20 @@ set_source_files_properties(micropython_embed/openmv/tflm_backend.cc
     COMPILE_OPTIONS "-fvisibility=hidden;-fvisibility-inlines-hidden"
 )
 
+# py_crc.c -- MICROPY_PY_CRC must ALSO be a command-line define here,
+# not just set in mpconfigport.h -- same real bug class as
+# MICROPY_PY_ML_TFLM above (see that entry's own comment for the full
+# writeup): py_crc.c's #if MICROPY_PY_CRC guard is its own first real
+# line, before its own #include "py/runtime.h", so mpconfigport.h's
+# define is never visible in time. Unlike tflm_backend.cc, no extra
+# include dirs are needed -- omv_crc.h is already reachable via the
+# same -Imy-overrides/openmv -Ivendor/openmv pair every other vendored
+# openmv/ file gets project-wide.
+set_source_files_properties(micropython_embed/openmv/py_crc.c
+    PROPERTIES
+    COMPILE_DEFINITIONS "MICROPY_PY_CRC=1"
+)
+
 # LiteRT (litert_module.cpp, see SESSION_STATE.yaml's design discussion)
 # -- this project's first PREBUILT BINARY dependency (see NOTICE.md),
 # fetched by native-bringup/fetch-litert.sh (run it before building if

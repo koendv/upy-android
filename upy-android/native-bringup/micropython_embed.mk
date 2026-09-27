@@ -166,6 +166,18 @@ SRC_QSTR += vendor/openmv/py_gif.c
 # picks up my-overrides/openmv/py_mjpeg.c's patched override" reasoning
 # as py_gif.c's own comment just above.
 SRC_QSTR += vendor/openmv/py_mjpeg.c
+# py_crc.c (import crc -- MICROPY_PY_CRC, see mpconfigport.h's own
+# comment) -- crc16()/crc32(), no patch needed at all (pure arithmetic,
+# no framebuffer/hardware dependency unlike gif/mjpeg). omv_crc.c
+# (common/) needs no SRC_QSTR entry, same "C-only, no qstr surface"
+# reasoning as gif.c/mjpeg.c above.
+SRC_QSTR += vendor/openmv/py_crc.c
+# MUST be a command-line define, not mpconfigport.h's own #define --
+# py_crc.c's #if MICROPY_PY_CRC guard is its own first real line,
+# before its own #include "py/runtime.h" (the only path mpconfigport.h
+# would otherwise reach it through) -- same tflm_backend.cc-class bug,
+# see mpconfigport.h's own comment for the full real-bug writeup.
+CFLAGS += -DMICROPY_PY_CRC=1
 # CMSIS_MCU_H: real boards point this at their vendor MCU header (e.g.
 # stm32h7xx.h); nothing we compile needs real CMSIS SFR/intrinsic
 # definitions once __ARM_ARCH is forced below 7/8 (see arm_math.h) --

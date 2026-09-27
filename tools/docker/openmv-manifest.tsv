@@ -36,6 +36,8 @@ lib/imlib/mathop.c	mathop.c
 common/memcpy.c	memcpy.c
 common/memcpy.h	memcpy.h
 common/omv_common.h	omv_common.h
+common/omv_crc.c	omv_crc.c
+common/omv_crc.h	omv_crc.h
 common/omv_profiler.h	omv_profiler.h
 lib/imlib/gif.c	gif.c
 lib/imlib/mjpeg.c	mjpeg.c
@@ -46,6 +48,7 @@ lib/imlib/ppm.c	ppm.c
 modules/py_assert.h	py_assert.h
 modules/py_clock.c	py_clock.c
 modules/py_clock.h	py_clock.h
+modules/py_crc.c	py_crc.c
 modules/py_gif.c	py_gif.c
 modules/py_helper.c	py_helper.c
 modules/py_mjpeg.c	py_mjpeg.c

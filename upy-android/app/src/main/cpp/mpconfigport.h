@@ -238,3 +238,31 @@ unsigned long mp_android_random_seed_init(void);
 // found via a real undefined-symbol link error, not by inspection).
 // A #define here too would just silently redefine the same value and
 // trigger a harmless but confusing -Wmacro-redefined warning.
+
+// OpenMV's own py_crc.c (vendor/openmv/py_crc.c) + common/omv_crc.c --
+// NOT a core MicroPython flag, same "OpenMV's own board configs define
+// it directly" tier as MICROPY_PY_ML above. import crc: crc16()/
+// crc32(). Deliberately NOT the same thing as binascii.crc32() (see
+// MICROPY_PY_BINASCII's own comment below, which stays off) even if
+// that flag were enabled: omv_crc32_start/update is a non-reflected,
+// MSB-first CRC32 variant (confirmed by reading its own table-driven
+// implementation), not the standard reflected zlib/PNG/zip CRC32
+// uzlib_crc32 provides -- different algorithms sharing a name, not
+// redundant. crc16() has no core-MicroPython equivalent at all.
+//
+// MICROPY_PY_CRC is deliberately NOT defined here -- REAL BUG, caught
+// by a real -Werror "redefined" failure during qstr-scan generation
+// (silently dropped that file's own contribution, including its
+// MP_REGISTER_MODULE -- no compile error, `import crc` just failed
+// with ImportError, closest match to tflm_backend.cc's own "silently
+// compiles out to an empty translation unit" case, see CMakeLists.txt's
+// own comment on that file): py_crc.c's own #if MICROPY_PY_CRC guard is
+// its first real line, wrapping even its own #include "py/runtime.h",
+// so a define reachable only transitively through that include (i.e.
+// one placed here) is never visible in time -- it must be a command-
+// line -D instead (see CMakeLists.txt's set_source_files_properties for
+// the real compile, and micropython_embed.mk's own CFLAGS += for the
+// qstr-scan). A #define here too would just redefine the same value
+// with a different literal token form (1 vs (1)) and trigger exactly
+// the -Wmacro-redefined-turned-fatal-by-Werror warning that caused
+// this bug in the first place.
