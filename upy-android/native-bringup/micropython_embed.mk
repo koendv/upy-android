@@ -5,6 +5,18 @@
 # Set the location of the top of the MicroPython repository.
 MICROPYTHON_TOP = /home/koen/src/repos/upy-android/upstream/micropython
 
+# There is only ONE mpconfigport.h in this project: ../app/src/main/cpp/
+# mpconfigport.h, the file the real app is actually compiled with (its
+# own directory is first on CMakeLists.txt's include path). A second,
+# separately-maintained copy used to live here too, feeding only this
+# qstr-scan step -- the two drifted (MICROPY_FLOAT_IMPL FLOAT vs DOUBLE)
+# without anyone noticing, since nothing but a rebuild's genhdr output
+# would have revealed it. embed.mk's own mkrules.mk hard-requires
+# mpconfigport.h to exist as a real prerequisite file (resolved by GNU
+# Make's own dependency tracking, not by any CFLAGS -I search) -- vpath
+# tells Make where to actually find it without a second copy.
+vpath mpconfigport.h ../app/src/main/cpp
+
 # extmod VFS/os/json/random/re/time/binascii -- embed.mk's own SRC_QSTR
 # only scans py/*.c, it has no idea this project needs these extmod
 # modules at all. Split out into its own file (embed-android.mk) --
