@@ -26,6 +26,18 @@ import java.io.OutputStream
 // EngineWorker.interrupt()'s own bypass of its task queue); Ctrl+D
 // (0x04) resets the shell. All three map 1:1 onto AdbExecProvider's own
 // run/interrupt/reset methods, via the SAME shared ScriptExecCore.
+// Deliberately NOT Ctrl+D-closes-the-connection (unlike a real POSIX
+// shell's own EOF-on-Ctrl+D convention) -- there was otherwise no way
+// to end the SSH session from the client's typed input at all, since
+// MINA SSHD only calls destroy() when the underlying channel/transport
+// itself closes. Fixed via a plain typed `exit`/`quit` line instead,
+// only recognized as a standalone first line of a fresh submission
+// (bufferedLines empty) -- neither word is a reserved keyword or even
+// a builtin in this MicroPython build (confirmed: `exit` only exists
+// namespaced as sys.exit/_thread.exit, `quit` isn't a registered
+// identifier at all here), so intercepting them client-side, before
+// anything reaches MicroPython, can never misfire against a real
+// script.
 //
 // No real pty is allocated on this side even when the SSH client
 // requests one (pty-req) -- MINA SSHD just tracks the requested
@@ -93,7 +105,7 @@ class UpyShellCommand(private val context: Context) : Command {
     }
 
     private fun runLoop() {
-        write("upy shell\r\nblank line runs the buffer, ctrl+c interrupts, ctrl+d resets.\r\n>>> ")
+        write("upy shell\r\nblank line runs the buffer, ctrl+c interrupts, ctrl+d resets, exit/quit closes.\r\n>>> ")
         val lineBuf = StringBuilder()
         val bufferedLines = StringBuilder()
         try {
@@ -117,7 +129,25 @@ class UpyShellCommand(private val context: Context) : Command {
                     }
                     '\r'.code, '\n'.code -> {
                         write("\r\n")
-                        if (lineBuf.isEmpty() && bufferedLines.isNotEmpty()) {
+                        val trimmed = lineBuf.toString().trim().lowercase()
+                        if (bufferedLines.isEmpty() && (trimmed == "exit" || trimmed == "quit")) {
+                            // Only intercepted as a standalone first line of a
+                            // fresh submission (bufferedLines empty) -- a real
+                            // script that merely contains "exit"/"quit"
+                            // partway through a longer multi-line buffer is
+                            // never affected, since by then bufferedLines is
+                            // already non-empty and this falls through to the
+                            // plain accumulate-and-continue branch below.
+                            // Neither word is a reserved keyword or even a
+                            // builtin in this MicroPython build (confirmed:
+                            // `exit` only exists namespaced as sys.exit/
+                            // _thread.exit, `quit` isn't a registered
+                            // identifier at all here) -- safe to intercept
+                            // client-side, before anything reaches
+                            // MicroPython.
+                            write("bye\r\n")
+                            running = false
+                        } else if (lineBuf.isEmpty() && bufferedLines.isNotEmpty()) {
                             submitAsync(bufferedLines.toString())
                             bufferedLines.setLength(0)
                         } else {
