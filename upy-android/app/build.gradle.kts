@@ -142,6 +142,19 @@ dependencyLocking {
     lockAllConfigurations()
 }
 
+// com.google.android.gms:play-services-basement (pulled in transitively by
+// LiteRT's ai-delivery -> Play-Store model download path) declares a
+// STRICT constraint pinning androidx.fragment to 1.1.0 -- an explicit
+// dependency alone can't outrank a "strictly" constraint, only a force
+// can. Without this, lintVitalRelease fails release builds only (debug
+// doesn't run lintVital) with InvalidFragmentVersionForActivityResult,
+// since MainActivity's registerForActivityResult() needs Fragment >=1.3.0.
+configurations.all {
+    resolutionStrategy {
+        force("androidx.fragment:fragment:1.9.1")
+    }
+}
+
 dependencies {
     implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.ui:ui")
