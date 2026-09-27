@@ -2,6 +2,7 @@ package eu.kdvelectronics.upyandroid.ui
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -11,8 +12,10 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -93,10 +96,36 @@ fun Symbol(
         // Text (material3), not BasicText: resolves Color.Unspecified to
         // LocalContentColor.current automatically, same convention
         // androidx.compose.material3.Icon's own tint default uses.
+        //
+        // lineHeight/lineHeightStyle/includeFontPadding: without these,
+        // Text inherits LocalTextStyle's own ABSOLUTE lineHeight (material3
+        // bodyLarge's 24.sp), not one derived from fixedFontSize -- at
+        // any system font scale other than 1.0 (real device state found
+        // debugging this: 1.1), that 24.sp line box ends up taller than
+        // this glyph's own actual rendered size, and Compose's default
+        // (non-centered) distribution of that extra space is weighted
+        // toward ascent -- pushing the glyph itself toward the bottom of
+        // the still-Box-centered line box. Result: curved glyph bottoms
+        // (circles, rounded corners) got their last 1-2px sheared off
+        // while straight-edged glyphs (chevrons, squares) never showed
+        // it. Pinning lineHeight to fixedFontSize + Center/None trim +
+        // includeFontPadding=false makes the line box match the font's
+        // own em-square exactly, so nothing overflows the Box and
+        // nothing clips, at any font scale.
         Text(
             text = String(Character.toChars(codepoint)),
             fontFamily = symbolFontFamily,
             fontSize = fixedFontSize,
+            lineHeight = fixedFontSize,
+            style = LocalTextStyle.current.copy(
+                lineHeightStyle = LineHeightStyle(
+                    alignment = LineHeightStyle.Alignment.Center,
+                    trim = LineHeightStyle.Trim.None,
+                ),
+                platformStyle = PlatformTextStyle(includeFontPadding = false),
+            ),
+            maxLines = 1,
+            softWrap = false,
             color = tint,
         )
     }
