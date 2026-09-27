@@ -1,6 +1,6 @@
 # upy-android
 
-MicroPython on Android. Single APK, two processes.
+MicroPython on Android, with a subset of [OpenMV](https://github.com/openmv/openmv)'s own modules. Single APK, two processes.
 
 ## What it is
 
@@ -21,7 +21,8 @@ No USB/hardware board required.
 - Camera and display modules (`csi`, `display`) backed by Camera2/NDK and `ANativeWindow`; camera screen in-app
 - `android` module for phone API
 - VFS rooted at app-private storage
-- Bundled modules: `ulab`, `image` (OpenMV imlib subset)
+- OpenMV script compatibility (`csi`, `image`, `ml`/`tf`, `gif`, `mjpeg`, `ulab`, ...) --
+  real OpenMV scripts run largely unmodified, growing as real scripts need more
 - 32 MB micropython heap, settable.
 
 ## Design
@@ -32,7 +33,7 @@ No USB/hardware board required.
 - AIDL: `exec`/`interrupt`/`reset`/`setOutputListener`/`setDisplaySurface`
 - Idle/lazy Service bind; explicit `reset()` does in-process `mp_deinit()`+`mp_embed_init()`, not unbind/rebind
 - Crash isolation verified: `kill -9` on `:engine` leaves UI intact
-- arm64-v8a only. minSdk 26, compile/targetSdk 37
+- arm64-v8a only. minSdk 27, compile/targetSdk 37
 
 ## Build Notes
 
