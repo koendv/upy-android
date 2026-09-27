@@ -14,12 +14,25 @@ import java.io.File
 // cannot bind ports below 1024 (same convention Termux's own sshd
 // uses), and this project has no need to imitate a "real" system SSH
 // port.
-class SshServerManager(private val context: Context, private val settingsManager: SettingsManager) {
-    companion object {
-        private const val TAG = "SshServerManager"
-        const val PORT = 8022
-        private const val HOST_KEY_FILE_NAME = ".ssh_host_key"
-    }
+//
+// A process-wide singleton (object, not a per-Activity class instance),
+// same pattern as ScriptExecCore -- REAL CRASH FOUND AND FIXED, not a
+// landmine left behind: MainActivity has no android:configChanges, so
+// Android's default behavior applies -- any config change it doesn't
+// declare handling itself (a system light/dark theme switch included,
+// a uiMode change) destroys and recreates the whole Activity. The old
+// per-Activity SshServerManager instance's own SshServer stayed bound
+// to port 8022 (this class's own comments already establish it must
+// survive Activity teardown), so the NEW Activity's onCreate() building
+// a SECOND SshServerManager and calling start() again hit a real
+// BindException: Address already in use, crashing the newly-recreated
+// Activity outright (confirmed via a real on-device logcat capture).
+// A singleton means onCreate() re-running just calls applySettings()
+// again on the SAME already-running instance, which correctly no-ops.
+object SshServerManager {
+    private const val TAG = "SshServerManager"
+    const val PORT = 8022
+    private const val HOST_KEY_FILE_NAME = ".ssh_host_key"
 
     @Volatile
     private var server: SshServer? = null
@@ -32,17 +45,17 @@ class SshServerManager(private val context: Context, private val settingsManager
     // connection attempt with no restart needed -- only ssh_enabled
     // flipping needs this start/stop check.
     @Synchronized
-    fun applySettings() {
+    fun applySettings(context: Context, settingsManager: SettingsManager) {
         val shouldRun = settingsManager.sshEnabled
         val running = server != null
         if (shouldRun && !running) {
-            start()
+            start(context, settingsManager)
         } else if (!shouldRun && running) {
             stop()
         }
     }
 
-    private fun start() {
+    private fun start(context: Context, settingsManager: SettingsManager) {
         Log.i(TAG, "starting SSH server on port $PORT")
         // MUST happen before the very first SshServer.setUpDefaultServer()
         // call, and MUST be set again on every start() (a real, on-device

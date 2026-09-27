@@ -40,11 +40,21 @@ import java.io.FileNotFoundException
 //   on the very next request, no restart needed).
 // Same-LAN-only v1 scope (plain HTTP, no relay/tunnel/NAT traversal) --
 // see the plan's own Part 7 scope note.
-class HttpServerManager(private val context: Context, private val settingsManager: SettingsManager) {
-    companion object {
-        private const val TAG = "HttpServerManager"
-        const val PORT = 8080
-    }
+//
+// A process-wide singleton (object, not a per-Activity class instance),
+// same pattern as ScriptExecCore/SshServerManager -- same real crash
+// class SshServerManager's own header comment documents in full: no
+// android:configChanges on MainActivity means a system config change
+// (a light/dark theme switch included) destroys and recreates the
+// whole Activity, and this server is deliberately never stopped in
+// onDestroy() (must survive Activity teardown) -- a per-Activity
+// instance meant the OLD server stayed bound to port 8080 while the
+// newly-recreated Activity's onCreate() tried to start a SECOND one on
+// the same port. A singleton means that re-run just calls
+// applySettings() again on the SAME already-running instance.
+object HttpServerManager {
+    private const val TAG = "HttpServerManager"
+    const val PORT = 8080
 
     @Volatile
     private var server: EmbeddedServer<*, *>? = null
@@ -56,17 +66,17 @@ class HttpServerManager(private val context: Context, private val settingsManage
     // http_private_files_enabled are read live per-request instead
     // (see the route handlers below), so they never need a restart.
     @Synchronized
-    fun applySettings() {
+    fun applySettings(context: Context, settingsManager: SettingsManager) {
         val shouldRun = settingsManager.httpServerEnabled
         val running = server != null
         if (shouldRun && !running) {
-            start()
+            start(context, settingsManager)
         } else if (!shouldRun && running) {
             stop()
         }
     }
 
-    private fun start() {
+    private fun start(context: Context, settingsManager: SettingsManager) {
         Log.i(TAG, "starting HTTP server on port $PORT")
         server = embeddedServer(CIO, port = PORT) {
             install(StatusPages) {

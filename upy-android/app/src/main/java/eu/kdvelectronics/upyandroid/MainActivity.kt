@@ -86,8 +86,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var terminalManager: TerminalManager
     private lateinit var filesManager: FilesManager
     private lateinit var settingsManager: SettingsManager
-    private lateinit var httpServerManager: HttpServerManager
-    private lateinit var sshServerManager: SshServerManager
     private lateinit var viewModel: MainViewModel
 
     // Must be registered unconditionally before STARTED (Android's own
@@ -122,16 +120,18 @@ class MainActivity : ComponentActivity() {
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)
         // Lives in this (default/UI) process, not :engine -- see
-        // HttpServerManager.kt's own header comment. Deliberately never
-        // stopped in onDestroy(): like AdbExecProvider's own BoardManager,
-        // it should keep serving for as long as this process is alive,
-        // not just while MainActivity itself is on screen.
-        httpServerManager = HttpServerManager(applicationContext, settingsManager)
-        httpServerManager.applySettings()
-        // Same lifecycle reasoning as httpServerManager above -- also
-        // never stopped in onDestroy().
-        sshServerManager = SshServerManager(applicationContext, settingsManager)
-        sshServerManager.applySettings()
+        // HttpServerManager.kt's own header comment. A process-wide
+        // singleton (not a per-Activity instance): deliberately never
+        // stopped in onDestroy(), like AdbExecProvider's own
+        // BoardManager, so it should keep serving for as long as this
+        // process is alive, not just while MainActivity itself is on
+        // screen -- including across an Activity recreation triggered
+        // by a config change (e.g. a system theme switch), which a
+        // per-Activity instance got wrong (see its own header comment).
+        HttpServerManager.applySettings(applicationContext, settingsManager)
+        // Same lifecycle reasoning as HttpServerManager above -- also
+        // never stopped in onDestroy(), also a process-wide singleton.
+        SshServerManager.applySettings(applicationContext, settingsManager)
         boardManager.connect()
         maybeRequestCameraPermission()
 
@@ -201,8 +201,8 @@ class MainActivity : ComponentActivity() {
                                 settingsManager = settingsManager,
                                 onSettingsChanged = {
                                     boardManager.pushSettings()
-                                    httpServerManager.applySettings()
-                                    sshServerManager.applySettings()
+                                    HttpServerManager.applySettings(applicationContext, settingsManager)
+                                    SshServerManager.applySettings(applicationContext, settingsManager)
                                 },
                                 onOpenAbout = { navController.navigate("about") },
                             )
