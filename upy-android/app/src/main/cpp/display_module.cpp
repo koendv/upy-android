@@ -55,15 +55,28 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
     };
     (void) ARG_x;
     (void) ARG_y;
-    (void) ARG_hint;
 
     auto *self = static_cast<display_obj_t *>(MP_OBJ_TO_PTR(pos_args[0]));
     image_t *src = (image_t *) py_image_cobj(pos_args[1]);
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 2, pos_args + 2, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-    // x=/y=/hint= accepted but not yet interpreted.
+    // x=/y= accepted but not yet interpreted -- position offsets, no
+    // stated need yet, and would need to interact with the letterbox
+    // centering below. hint= interprets exactly HMIRROR/VFLIP/TRANSPOSE
+    // (real OpenMV's own rotation primitives -- see imlib.h, there is
+    // no dedicated ROTATE_90 bit upstream either; image.ROTATE_90/180/
+    // 270 are themselves just these three bits combined, confirmed by
+    // reading py_image.c directly). The rest of the real hint bit space
+    // (AREA/BILINEAR/BICUBIC interpolation quality, SCALE_ASPECT_*
+    // modes, the two channel-order flags, BLACK_BACKGROUND) is NOT
+    // implemented -- this module always does one fixed integer-upscale
+    // strategy regardless, same scope decision as x=/y= above.
     // see session-state: display_module.cpp#module_design
+    int32_t hint = args[ARG_hint].u_int;
+    bool transpose = (hint & IMAGE_HINT_TRANSPOSE) != 0;
+    bool hint_hmirror = (hint & IMAGE_HINT_HMIRROR) != 0;
+    bool hint_vflip = (hint & IMAGE_HINT_VFLIP) != 0;
 
     pthread_mutex_lock(&g_window_mutex);
     if (!g_window) {
@@ -80,9 +93,15 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
         return mp_const_none;
     }
 
-    int factor = upscale_factor(src->w, src->h, buffer.width, buffer.height);
-    int32_t scaled_w = src->w * factor;
-    int32_t scaled_h = src->h * factor;
+    // TRANSPOSE swaps which axis is "wide" -- the drawn footprint's
+    // width/height swap with it, same as a real 90-degree rotation
+    // does on any display.
+    int32_t logical_w = transpose ? src->h : src->w;
+    int32_t logical_h = transpose ? src->w : src->h;
+
+    int factor = upscale_factor(logical_w, logical_h, buffer.width, buffer.height);
+    int32_t scaled_w = logical_w * factor;
+    int32_t scaled_h = logical_h * factor;
     int32_t off_x = (buffer.width - scaled_w) / 2;
     int32_t off_y = (buffer.height - scaled_h) / 2;
 
@@ -90,10 +109,42 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
     // Opaque black. Fills the letterbox/pillarbox margin in one pass.
     memset(pixels, 0, (size_t) buffer.stride * buffer.height * 4);
 
-    for (int32_t sy = 0; sy < src->h; sy++) {
-        int32_t read_y = self->vflip ? (src->h - 1 - sy) : sy;
-        for (int32_t sx = 0; sx < src->w; sx++) {
-            int32_t read_x = self->hmirror ? (src->w - 1 - sx) : sx;
+    // hmirror/vflip/transpose are each involutions (self-cancelling),
+    // so ANY combination -- hardware-level (self->vflip/hmirror) AND
+    // hint-level (hint_vflip/hint_hmirror) composed together -- reduces
+    // to exactly two independent per-axis flip decisions plus one
+    // axis-swap decision, not a per-named-rotation branch. transpose
+    // decides whether read_x is driven by the row loop var or the
+    // column one; flip_x/flip_y decide whether EACH of those, once
+    // chosen, also runs backwards. Computed once, outside both loops
+    // -- neither depends on ly/lx.
+    bool flip_x = transpose ? hint_vflip : hint_hmirror;
+    bool flip_y = transpose ? hint_hmirror : hint_vflip;
+
+    // Single pass over the (possibly rotated) logical destination
+    // space -- ly/lx are destination-space loop variables (like the
+    // pre-existing sy/sx), never touched by any mirror/rotate; only
+    // read_x/read_y (which SOURCE pixel gets fetched) changes.
+    // self->vflip/self->hmirror (fixed hardware-orientation correction
+    // from the constructor, e.g. lcd_shield.py's own vflip=True,
+    // hmirror=True) apply first, via the hy/hx substitution below,
+    // same "substitute before reading, never touch what's written"
+    // technique the pre-existing vflip/hmirror-only code already used;
+    // hint='s HMIRROR/VFLIP/TRANSPOSE apply on top of that
+    // substitution, via flip_x/flip_y above.
+    for (int32_t ly = 0; ly < logical_h; ly++) {
+        int32_t hy = self->vflip ? (logical_h - 1 - ly) : ly;
+        for (int32_t lx = 0; lx < logical_w; lx++) {
+            int32_t hx = self->hmirror ? (logical_w - 1 - lx) : lx;
+
+            int32_t read_x, read_y;
+            if (!transpose) {
+                read_x = flip_x ? (src->w - 1 - hx) : hx;
+                read_y = flip_y ? (src->h - 1 - hy) : hy;
+            } else {
+                read_x = flip_x ? (src->w - 1 - hy) : hy;
+                read_y = flip_y ? (src->h - 1 - hx) : hx;
+            }
 
             uint8_t r, g, b;
             if (src->pixfmt == PIXFORMAT_RGB565) {
@@ -106,8 +157,8 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
             }
             uint32_t rgba = 0xFF000000u | ((uint32_t) b << 16) | ((uint32_t) g << 8) | r;
 
-            int32_t dst_y0 = off_y + sy * factor;
-            int32_t dst_x0 = off_x + sx * factor;
+            int32_t dst_y0 = off_y + ly * factor;
+            int32_t dst_x0 = off_x + lx * factor;
             for (int32_t dy = 0; dy < factor; dy++) {
                 uint32_t *row = pixels + (size_t) (dst_y0 + dy) * buffer.stride + dst_x0;
                 for (int32_t dx = 0; dx < factor; dx++) {
