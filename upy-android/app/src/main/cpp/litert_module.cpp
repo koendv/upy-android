@@ -62,7 +62,7 @@
 // below DO now recover shape/dtype/scale/zero_point -- but NOT via the
 // Kotlin-handle-cast path ruled out above. They go through LiteRT's
 // own separate, lower-level C API (litert/c/litert_model.h:
-// LiteRtCreateModelFromFile + LiteRtGetSignatureInputTensor/
+// LiteRtCreateModelFromFile + LiteRtGetSignatureInputTensorByIndex/
 // LiteRtGetQuantizationTypeId/LiteRtGetPerTensorQuantization/etc.),
 // which re-parses the same .tflite FILE directly -- a plain flatbuffer
 // read (no interpreter, no arena, no delegates), not a second
@@ -445,15 +445,20 @@ static MP_DEFINE_CONST_FUN_OBJ_3(litert_compiled_model_run_obj, litert_compiled_
 // why this goes through LiteRT's plain C API instead of Kotlin/JNI.
 
 // Opens self->path's default (index 0) signature and looks up one
-// input/output tensor by name. On success, *out_environment/*out_model
-// own the resources backing *out_tensor -- caller must
-// LiteRtDestroyModel + LiteRtDestroyEnvironment when done, BEFORE any
-// raise_os_error call (MicroPython's nlr_raise longjmps past C++
-// destructors, so cleanup can never be left to RAII in this codebase).
-// On failure, cleans up whatever it already opened itself and raises
-// directly -- never returns without either a valid tensor or an
-// exception already in flight.
-void find_tensor_or_raise(const char *path, bool is_output, const char *name,
+// input/output tensor BY INDEX -- matches how scripts already address
+// model inputs/outputs everywhere else in this module (create_input_
+// buffers()/create_output_buffers() return a plain tuple, indexed 0..N,
+// no name lookup anywhere), so this stays consistent rather than
+// introducing a second, name-based addressing scheme nothing else here
+// uses. On success, *out_environment/*out_model own the resources
+// backing *out_tensor -- caller must LiteRtDestroyModel +
+// LiteRtDestroyEnvironment when done, BEFORE any raise_os_error call
+// (MicroPython's nlr_raise longjmps past C++ destructors, so cleanup can
+// never be left to RAII in this codebase). On failure, cleans up
+// whatever it already opened itself and raises directly -- never
+// returns without either a valid tensor or an exception already in
+// flight.
+void find_tensor_or_raise(const char *path, bool is_output, mp_int_t index,
                            LiteRtEnvironment *out_environment, LiteRtModel *out_model,
                            LiteRtTensor *out_tensor) {
     LiteRtEnvironment environment = nullptr;
@@ -474,14 +479,20 @@ void find_tensor_or_raise(const char *path, bool is_output, const char *name,
         raise_os_error(MP_EIO, "litert: model has no signatures");
     }
 
+    if (index < 0) {
+        LiteRtDestroyModel(model);
+        LiteRtDestroyEnvironment(environment);
+        raise_os_error(MP_EINVAL, "litert: tensor index must not be negative");
+    }
+
     LiteRtTensor tensor = nullptr;
     LiteRtStatus status = is_output
-        ? LiteRtGetSignatureOutputTensor(signature, name, &tensor)
-        : LiteRtGetSignatureInputTensor(signature, name, &tensor);
+        ? LiteRtGetSignatureOutputTensorByIndex(signature, (LiteRtParamIndex) index, &tensor)
+        : LiteRtGetSignatureInputTensorByIndex(signature, (LiteRtParamIndex) index, &tensor);
     if (status != kLiteRtStatusOk) {
         LiteRtDestroyModel(model);
         LiteRtDestroyEnvironment(environment);
-        raise_os_error(MP_EINVAL, is_output ? "litert: no such output tensor" : "litert: no such input tensor");
+        raise_os_error(MP_EINVAL, is_output ? "litert: no such output tensor index" : "litert: no such input tensor index");
     }
 
     *out_environment = environment;
@@ -633,14 +644,14 @@ mp_obj_t quantization_to_mp_obj(LiteRtEnvironment environment, LiteRtModel model
     return mp_const_none;  // unreachable -- raise_os_error() never returns
 }
 
-mp_obj_t litert_compiled_model_get_tensor_type(litert_compiled_model_obj_t *self, mp_obj_t name_in, bool is_output) {
+mp_obj_t litert_compiled_model_get_tensor_type(litert_compiled_model_obj_t *self, mp_obj_t index_in, bool is_output) {
     raise_if_model_closed(self);
-    const char *name = mp_obj_str_get_str(name_in);
+    mp_int_t index = mp_obj_get_int(index_in);
 
     LiteRtEnvironment environment;
     LiteRtModel model;
     LiteRtTensor tensor;
-    find_tensor_or_raise(self->path, is_output, name, &environment, &model, &tensor);
+    find_tensor_or_raise(self->path, is_output, index, &environment, &model, &tensor);
 
     mp_obj_t result = tensor_type_to_mp_obj(environment, model, tensor);
     LiteRtDestroyModel(model);
@@ -648,24 +659,24 @@ mp_obj_t litert_compiled_model_get_tensor_type(litert_compiled_model_obj_t *self
     return result;
 }
 
-mp_obj_t litert_compiled_model_get_input_tensor_type(mp_obj_t self_in, mp_obj_t name_in) {
-    return litert_compiled_model_get_tensor_type((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), name_in, false);
+mp_obj_t litert_compiled_model_get_input_tensor_type(mp_obj_t self_in, mp_obj_t index_in) {
+    return litert_compiled_model_get_tensor_type((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), index_in, false);
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_get_input_tensor_type_obj, litert_compiled_model_get_input_tensor_type);
 
-mp_obj_t litert_compiled_model_get_output_tensor_type(mp_obj_t self_in, mp_obj_t name_in) {
-    return litert_compiled_model_get_tensor_type((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), name_in, true);
+mp_obj_t litert_compiled_model_get_output_tensor_type(mp_obj_t self_in, mp_obj_t index_in) {
+    return litert_compiled_model_get_tensor_type((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), index_in, true);
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_get_output_tensor_type_obj, litert_compiled_model_get_output_tensor_type);
 
-mp_obj_t litert_compiled_model_get_tensor_quantization(litert_compiled_model_obj_t *self, mp_obj_t name_in, bool is_output) {
+mp_obj_t litert_compiled_model_get_tensor_quantization(litert_compiled_model_obj_t *self, mp_obj_t index_in, bool is_output) {
     raise_if_model_closed(self);
-    const char *name = mp_obj_str_get_str(name_in);
+    mp_int_t index = mp_obj_get_int(index_in);
 
     LiteRtEnvironment environment;
     LiteRtModel model;
     LiteRtTensor tensor;
-    find_tensor_or_raise(self->path, is_output, name, &environment, &model, &tensor);
+    find_tensor_or_raise(self->path, is_output, index, &environment, &model, &tensor);
 
     mp_obj_t result = quantization_to_mp_obj(environment, model, tensor);
     LiteRtDestroyModel(model);
@@ -673,13 +684,13 @@ mp_obj_t litert_compiled_model_get_tensor_quantization(litert_compiled_model_obj
     return result;
 }
 
-mp_obj_t litert_compiled_model_get_input_tensor_quantization(mp_obj_t self_in, mp_obj_t name_in) {
-    return litert_compiled_model_get_tensor_quantization((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), name_in, false);
+mp_obj_t litert_compiled_model_get_input_tensor_quantization(mp_obj_t self_in, mp_obj_t index_in) {
+    return litert_compiled_model_get_tensor_quantization((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), index_in, false);
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_get_input_tensor_quantization_obj, litert_compiled_model_get_input_tensor_quantization);
 
-mp_obj_t litert_compiled_model_get_output_tensor_quantization(mp_obj_t self_in, mp_obj_t name_in) {
-    return litert_compiled_model_get_tensor_quantization((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), name_in, true);
+mp_obj_t litert_compiled_model_get_output_tensor_quantization(mp_obj_t self_in, mp_obj_t index_in) {
+    return litert_compiled_model_get_tensor_quantization((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), index_in, true);
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_get_output_tensor_quantization_obj, litert_compiled_model_get_output_tensor_quantization);
 
