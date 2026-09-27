@@ -56,6 +56,25 @@
 // (see this file's own top comment) -- scripts wanting one should use
 // `ml`/`tf` (Part 5's OpenMV-compatible module) instead of expecting
 // litert to grow one.
+//
+// UPDATE: get_input_tensor_type()/get_output_tensor_type()/
+// get_input_tensor_quantization()/get_output_tensor_quantization()
+// below DO now recover shape/dtype/scale/zero_point -- but NOT via the
+// Kotlin-handle-cast path ruled out above. They go through LiteRT's
+// own separate, lower-level C API (litert/c/litert_model.h:
+// LiteRtCreateModelFromFile + LiteRtGetSignatureInputTensor/
+// LiteRtGetQuantizationTypeId/LiteRtGetPerTensorQuantization/etc.),
+// which re-parses the same .tflite FILE directly -- a plain flatbuffer
+// read (no interpreter, no arena, no delegates), not a second
+// CompiledModel and not a cast of any Kotlin object's handle. Real
+// cost: the file's schema is parsed twice (once here, once inside
+// whatever CompiledModel.create() already did) -- negligible next to
+// actual inference cost, and only paid once per get_*() call, not per
+// frame. This still doesn't unblock the ndarray convenience layer on
+// its own (that would additionally need routing quantized bytes through
+// this module's own read/write_int8, not attempted here) -- this is
+// purely the metadata half of that old blocker, resolved because it
+// turned out answerable without touching Kotlin/JNI at all.
 // see session-state: litert_module.cpp#module_design
 //
 // This file is qstr-scanned (SRC_QSTR in micropython_embed.mk).
@@ -75,6 +94,20 @@ extern "C" {
 
 #include "litert_jni_bridge.h"
 #include "litert_module.h"
+
+// Plain C API, NOT JNI -- these headers declare functions exported
+// directly by the already-linked libLiteRt.so (see CMakeLists.txt's own
+// `litert` IMPORTED target), reached without going through Kotlin/JNI at
+// all. Used only by get_input_tensor_type()/get_output_tensor_type()/
+// get_input_tensor_quantization()/get_output_tensor_quantization() below
+// -- everything else in this file talks to litert-api's Kotlin surface
+// via litert_jni_bridge.cpp instead, per this file's own #include <jni.h>
+// ban above; that ban is about JNI specifically, not about LiteRT's own
+// headers in general.
+#include "litert/c/litert_common.h"
+#include "litert/c/litert_environment.h"
+#include "litert/c/litert_model.h"
+#include "litert/c/litert_model_types.h"
 
 // Forward declarations needed inside the anonymous namespace below --
 // these types are only DEFINED (extern MP_DEFINE_CONST_OBJ_TYPE) after
@@ -167,6 +200,13 @@ struct litert_environment_obj_t {
 struct litert_compiled_model_obj_t {
     mp_obj_base_t base;
     LitertHandleNode *node;
+    // strdup'd copy of the (already VFS-leading-slash-stripped) path this
+    // model was constructed from -- only used by get_input_tensor_type()/
+    // get_output_tensor_type()/get_input_tensor_quantization()/
+    // get_output_tensor_quantization() below, which reopen the same file
+    // directly via the plain C API (LiteRtCreateModelFromFile) rather
+    // than asking Kotlin's already-loaded CompiledModel for it.
+    char *path;
 };
 
 struct litert_tensor_buffer_obj_t {
@@ -299,6 +339,7 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
 
     auto *self = mp_obj_malloc_with_finaliser(litert_compiled_model_obj_t, type);
     self->node = registry_add(&g_litert_models, raw_handle, global_ref);
+    self->path = strdup(path);
     return MP_OBJ_FROM_PTR(self);
 }
 
@@ -397,10 +438,257 @@ mp_obj_t litert_compiled_model_run(mp_obj_t self_in, mp_obj_t inputs_in, mp_obj_
 }
 static MP_DEFINE_CONST_FUN_OBJ_3(litert_compiled_model_run_obj, litert_compiled_model_run);
 
+// ---------------- CompiledModel tensor introspection ----------------
+// get_input_tensor_type()/get_output_tensor_type()/
+// get_input_tensor_quantization()/get_output_tensor_quantization(): see
+// this file's own top comment (the ndarray-convenience-layer UPDATE) for
+// why this goes through LiteRT's plain C API instead of Kotlin/JNI.
+
+// Opens self->path's default (index 0) signature and looks up one
+// input/output tensor by name. On success, *out_environment/*out_model
+// own the resources backing *out_tensor -- caller must
+// LiteRtDestroyModel + LiteRtDestroyEnvironment when done, BEFORE any
+// raise_os_error call (MicroPython's nlr_raise longjmps past C++
+// destructors, so cleanup can never be left to RAII in this codebase).
+// On failure, cleans up whatever it already opened itself and raises
+// directly -- never returns without either a valid tensor or an
+// exception already in flight.
+void find_tensor_or_raise(const char *path, bool is_output, const char *name,
+                           LiteRtEnvironment *out_environment, LiteRtModel *out_model,
+                           LiteRtTensor *out_tensor) {
+    LiteRtEnvironment environment = nullptr;
+    if (LiteRtCreateEnvironment(0, nullptr, &environment) != kLiteRtStatusOk) {
+        raise_os_error(MP_EIO, "litert: failed to create environment for tensor introspection");
+    }
+
+    LiteRtModel model = nullptr;
+    if (LiteRtCreateModelFromFile(environment, path, &model) != kLiteRtStatusOk) {
+        LiteRtDestroyEnvironment(environment);
+        raise_os_error(MP_EIO, "litert: failed to open model file for tensor introspection");
+    }
+
+    LiteRtSignature signature = nullptr;
+    if (LiteRtGetModelSignature(model, 0, &signature) != kLiteRtStatusOk) {
+        LiteRtDestroyModel(model);
+        LiteRtDestroyEnvironment(environment);
+        raise_os_error(MP_EIO, "litert: model has no signatures");
+    }
+
+    LiteRtTensor tensor = nullptr;
+    LiteRtStatus status = is_output
+        ? LiteRtGetSignatureOutputTensor(signature, name, &tensor)
+        : LiteRtGetSignatureInputTensor(signature, name, &tensor);
+    if (status != kLiteRtStatusOk) {
+        LiteRtDestroyModel(model);
+        LiteRtDestroyEnvironment(environment);
+        raise_os_error(MP_EINVAL, is_output ? "litert: no such output tensor" : "litert: no such input tensor");
+    }
+
+    *out_environment = environment;
+    *out_model = model;
+    *out_tensor = tensor;
+}
+
+const char *dtype_name_for_element_type(LiteRtElementType element_type) {
+    switch (element_type) {
+        case kLiteRtElementTypeBool: return "bool";
+        case kLiteRtElementTypeInt8: return "int8";
+        case kLiteRtElementTypeInt16: return "int16";
+        case kLiteRtElementTypeInt32: return "int32";
+        case kLiteRtElementTypeInt64: return "int64";
+        case kLiteRtElementTypeUInt8: return "uint8";
+        case kLiteRtElementTypeUInt16: return "uint16";
+        case kLiteRtElementTypeUInt32: return "uint32";
+        case kLiteRtElementTypeUInt64: return "uint64";
+        case kLiteRtElementTypeFloat16: return "float16";
+        case kLiteRtElementTypeFloat32: return "float32";
+        case kLiteRtElementTypeFloat64: return "float64";
+        default: return "unknown";
+    }
+}
+
+// Returns (shape_tuple_or_None, dtype_str). shape is None only for the
+// rare unranked-tensor case (real .tflite models are ranked in practice).
+// Cleans up model/environment itself before any raise, same discipline
+// as find_tensor_or_raise() above.
+mp_obj_t tensor_type_to_mp_obj(LiteRtEnvironment environment, LiteRtModel model, LiteRtTensor tensor) {
+    LiteRtTensorTypeId type_id;
+    if (LiteRtGetTensorTypeId(tensor, &type_id) != kLiteRtStatusOk) {
+        LiteRtDestroyModel(model);
+        LiteRtDestroyEnvironment(environment);
+        raise_os_error(MP_EIO, "litert: failed to get tensor type id");
+    }
+
+    if (type_id == kLiteRtUnrankedTensorType) {
+        LiteRtUnrankedTensorType unranked;
+        if (LiteRtGetUnrankedTensorType(tensor, &unranked) != kLiteRtStatusOk) {
+            LiteRtDestroyModel(model);
+            LiteRtDestroyEnvironment(environment);
+            raise_os_error(MP_EIO, "litert: failed to get unranked tensor type");
+        }
+        const char *dtype = dtype_name_for_element_type(unranked.element_type);
+        mp_obj_t items[2] = {mp_const_none, mp_obj_new_str(dtype, strlen(dtype))};
+        return mp_obj_new_tuple(2, items);
+    }
+
+    LiteRtRankedTensorType ranked;
+    if (LiteRtGetRankedTensorType(tensor, &ranked) != kLiteRtStatusOk) {
+        LiteRtDestroyModel(model);
+        LiteRtDestroyEnvironment(environment);
+        raise_os_error(MP_EIO, "litert: failed to get ranked tensor type");
+    }
+    unsigned int rank = ranked.layout.rank;
+    auto *dims = (mp_obj_t *) malloc(sizeof(mp_obj_t) * rank);
+    for (unsigned int i = 0; i < rank; i++) {
+        dims[i] = mp_obj_new_int(ranked.layout.dimensions[i]);
+    }
+    mp_obj_t shape = mp_obj_new_tuple(rank, dims);
+    free(dims);
+    const char *dtype = dtype_name_for_element_type(ranked.element_type);
+    mp_obj_t items[2] = {shape, mp_obj_new_str(dtype, strlen(dtype))};
+    return mp_obj_new_tuple(2, items);
+}
+
+// Returns a tuple whose first element is always a scheme-tag string,
+// followed by scheme-specific fields (no shared shape across schemes --
+// callers destructure the tag first):
+//   ("none",)
+//   ("per_tensor", scale: float, zero_point: int)
+//   ("per_channel", quantized_dimension: int, scales: tuple[float, ...], zero_points: tuple[int, ...])
+//   ("block_wise", block_size: int) -- LiteRT itself has no models
+//   producing this yet (the schema is marked "not implemented" upstream);
+//   included so callers can already handle it instead of being surprised
+//   later.
+// Cleans up model/environment itself before any raise, same discipline
+// as find_tensor_or_raise()/tensor_type_to_mp_obj() above.
+mp_obj_t quantization_to_mp_obj(LiteRtEnvironment environment, LiteRtModel model, LiteRtTensor tensor) {
+    LiteRtQuantizationTypeId type_id;
+    if (LiteRtGetQuantizationTypeId(tensor, &type_id) != kLiteRtStatusOk) {
+        LiteRtDestroyModel(model);
+        LiteRtDestroyEnvironment(environment);
+        raise_os_error(MP_EIO, "litert: failed to get quantization type id");
+    }
+
+    switch (type_id) {
+        case kLiteRtQuantizationNone: {
+            mp_obj_t items[1] = {mp_obj_new_str("none", 4)};
+            return mp_obj_new_tuple(1, items);
+        }
+        case kLiteRtQuantizationPerTensor: {
+            LiteRtQuantizationPerTensor per_tensor;
+            if (LiteRtGetPerTensorQuantization(tensor, &per_tensor) != kLiteRtStatusOk) {
+                LiteRtDestroyModel(model);
+                LiteRtDestroyEnvironment(environment);
+                raise_os_error(MP_EIO, "litert: failed to get per-tensor quantization");
+            }
+            mp_obj_t items[3] = {
+                mp_obj_new_str("per_tensor", 10),
+                mp_obj_new_float(per_tensor.scale),
+                mp_obj_new_int_from_ll(per_tensor.zero_point),
+            };
+            return mp_obj_new_tuple(3, items);
+        }
+        case kLiteRtQuantizationPerChannel: {
+            LiteRtQuantizationPerChannel per_channel;
+            if (LiteRtGetPerChannelQuantization(tensor, &per_channel) != kLiteRtStatusOk) {
+                LiteRtDestroyModel(model);
+                LiteRtDestroyEnvironment(environment);
+                raise_os_error(MP_EIO, "litert: failed to get per-channel quantization");
+            }
+            auto *scale_items = (mp_obj_t *) malloc(sizeof(mp_obj_t) * per_channel.num_channels);
+            auto *zp_items = (mp_obj_t *) malloc(sizeof(mp_obj_t) * per_channel.num_channels);
+            for (uint64_t i = 0; i < per_channel.num_channels; i++) {
+                scale_items[i] = mp_obj_new_float(per_channel.scales[i]);
+                zp_items[i] = mp_obj_new_int_from_ll(per_channel.zero_points[i]);
+            }
+            mp_obj_t scales = mp_obj_new_tuple(per_channel.num_channels, scale_items);
+            mp_obj_t zero_points = mp_obj_new_tuple(per_channel.num_channels, zp_items);
+            free(scale_items);
+            free(zp_items);
+            mp_obj_t items[4] = {
+                mp_obj_new_str("per_channel", 11),
+                mp_obj_new_int(per_channel.quantized_dimension),
+                scales,
+                zero_points,
+            };
+            return mp_obj_new_tuple(4, items);
+        }
+        case kLiteRtQuantizationBlockWise: {
+            LiteRtQuantizationBlockWise block_wise;
+            if (LiteRtGetBlockWiseQuantization(tensor, &block_wise) != kLiteRtStatusOk) {
+                LiteRtDestroyModel(model);
+                LiteRtDestroyEnvironment(environment);
+                raise_os_error(MP_EIO, "litert: failed to get block-wise quantization");
+            }
+            mp_obj_t items[2] = {
+                mp_obj_new_str("block_wise", 10),
+                mp_obj_new_int(block_wise.block_size),
+            };
+            return mp_obj_new_tuple(2, items);
+        }
+    }
+    LiteRtDestroyModel(model);
+    LiteRtDestroyEnvironment(environment);
+    raise_os_error(MP_EIO, "litert: unsupported quantization type id");
+    return mp_const_none;  // unreachable -- raise_os_error() never returns
+}
+
+mp_obj_t litert_compiled_model_get_tensor_type(litert_compiled_model_obj_t *self, mp_obj_t name_in, bool is_output) {
+    raise_if_model_closed(self);
+    const char *name = mp_obj_str_get_str(name_in);
+
+    LiteRtEnvironment environment;
+    LiteRtModel model;
+    LiteRtTensor tensor;
+    find_tensor_or_raise(self->path, is_output, name, &environment, &model, &tensor);
+
+    mp_obj_t result = tensor_type_to_mp_obj(environment, model, tensor);
+    LiteRtDestroyModel(model);
+    LiteRtDestroyEnvironment(environment);
+    return result;
+}
+
+mp_obj_t litert_compiled_model_get_input_tensor_type(mp_obj_t self_in, mp_obj_t name_in) {
+    return litert_compiled_model_get_tensor_type((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), name_in, false);
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_get_input_tensor_type_obj, litert_compiled_model_get_input_tensor_type);
+
+mp_obj_t litert_compiled_model_get_output_tensor_type(mp_obj_t self_in, mp_obj_t name_in) {
+    return litert_compiled_model_get_tensor_type((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), name_in, true);
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_get_output_tensor_type_obj, litert_compiled_model_get_output_tensor_type);
+
+mp_obj_t litert_compiled_model_get_tensor_quantization(litert_compiled_model_obj_t *self, mp_obj_t name_in, bool is_output) {
+    raise_if_model_closed(self);
+    const char *name = mp_obj_str_get_str(name_in);
+
+    LiteRtEnvironment environment;
+    LiteRtModel model;
+    LiteRtTensor tensor;
+    find_tensor_or_raise(self->path, is_output, name, &environment, &model, &tensor);
+
+    mp_obj_t result = quantization_to_mp_obj(environment, model, tensor);
+    LiteRtDestroyModel(model);
+    LiteRtDestroyEnvironment(environment);
+    return result;
+}
+
+mp_obj_t litert_compiled_model_get_input_tensor_quantization(mp_obj_t self_in, mp_obj_t name_in) {
+    return litert_compiled_model_get_tensor_quantization((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), name_in, false);
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_get_input_tensor_quantization_obj, litert_compiled_model_get_input_tensor_quantization);
+
+mp_obj_t litert_compiled_model_get_output_tensor_quantization(mp_obj_t self_in, mp_obj_t name_in) {
+    return litert_compiled_model_get_tensor_quantization((litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in), name_in, true);
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_get_output_tensor_quantization_obj, litert_compiled_model_get_output_tensor_quantization);
+
 void litert_compiled_model_close_impl(litert_compiled_model_obj_t *self) {
     if (!self->node) {
         return;
     }
+    free(self->path);
+    self->path = nullptr;
     char *err = nullptr;
     LitertHandleNode *node = self->node;
     self->node = nullptr;
@@ -427,6 +715,10 @@ const mp_rom_map_elem_t litert_compiled_model_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_create_input_buffers), MP_ROM_PTR(&litert_compiled_model_create_input_buffers_obj)},
     {MP_ROM_QSTR(MP_QSTR_create_output_buffers), MP_ROM_PTR(&litert_compiled_model_create_output_buffers_obj)},
     {MP_ROM_QSTR(MP_QSTR_run), MP_ROM_PTR(&litert_compiled_model_run_obj)},
+    {MP_ROM_QSTR(MP_QSTR_get_input_tensor_type), MP_ROM_PTR(&litert_compiled_model_get_input_tensor_type_obj)},
+    {MP_ROM_QSTR(MP_QSTR_get_output_tensor_type), MP_ROM_PTR(&litert_compiled_model_get_output_tensor_type_obj)},
+    {MP_ROM_QSTR(MP_QSTR_get_input_tensor_quantization), MP_ROM_PTR(&litert_compiled_model_get_input_tensor_quantization_obj)},
+    {MP_ROM_QSTR(MP_QSTR_get_output_tensor_quantization), MP_ROM_PTR(&litert_compiled_model_get_output_tensor_quantization_obj)},
     {MP_ROM_QSTR(MP_QSTR_close), MP_ROM_PTR(&litert_compiled_model_close_obj)},
     {MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&litert_compiled_model_del_obj)},
 };

@@ -251,29 +251,25 @@ SRC_QSTR += ../app/src/main/cpp/imu_module.cpp
 SRC_QSTR += ../app/src/main/cpp/android_module.cpp
 
 # litert_module.cpp -- OUR OWN native module (android.litert, see that
-# file's own header comment). Does NOT itself #include LiteRT's C API
-# (app/src/main/cpp/litert/include/) -- it talks to litert-api's Kotlin
-# surface entirely through litert_jni_bridge.h (stddef.h/stdint.h only),
-# never the native C headers directly (that direct-C-API approach was
-# tf_module.cpp's/rt_module.cpp's, both since deleted -- see git history/
-# SESSION_STATE.yaml). No new qstr-stub headers needed here either, only
-# py/runtime.h/py/obj.h/py/mperrno.h and its own litert_jni_bridge.h/
-# litert_module.h, both plain portable headers. litert_jni_bridge.cpp
-# deliberately NOT listed here -- it #includes <jni.h>, no qstr-stub
-# exists for JNI headers, same reasoning as engine_jni.cpp's own
-# exclusion from this list (and this file has no MP_QSTR_* usage of its
-# own to scan for).
+# file's own header comment). Talks to litert-api's Kotlin surface
+# through litert_jni_bridge.h (stddef.h/stdint.h only) for
+# Environment/CompiledModel/TensorBuffer/run() -- that part never
+# touches LiteRT's native C headers directly (that direct-C-API approach
+# was tf_module.cpp's/rt_module.cpp's, both since deleted -- see git
+# history/SESSION_STATE.yaml).
 #
-# The CMake build's own target_include_directories still adds
-# litert/include (app/src/main/cpp/CMakeLists.txt) and still links
-# libLiteRt.so -- NOT dead despite no .cpp including its C headers
-# anymore: it's how libLiteRt.so itself gets packaged into the APK's
-# jniLibs at all, which litert-api's own Kotlin/JNI implementation
-# (LiteRtShim.kt) needs present at runtime even though this project's
-# own C++ never calls into it directly (see build.gradle.kts's own
-# litert-api dependency comment for the full packaging story). This
-# qstr-scan Makefile has no such runtime-packaging concern, so it has no
-# equivalent -I of its own.
+# UPDATE: get_input_tensor_type()/get_output_tensor_type()/
+# get_input_tensor_quantization()/get_output_tensor_quantization() DO
+# now #include LiteRT's own C API directly (litert/c/litert_common.h,
+# litert_environment.h, litert_model.h, litert_model_types.h) --
+# reopening the .tflite FILE via LiteRtCreateModelFromFile for cheap,
+# flatbuffer-only metadata (no interpreter/arena), bypassing Kotlin/JNI
+# entirely for just this. Unlike camera_module.cpp's own -Iqstr-stub
+# workaround above, these are plain, portable C99 headers with no
+# NDK/Android-only #includes of their own -- confirmed safe to add to
+# this shared, HOST-gcc-preprocessed CFLAGS list directly, no stub
+# headers needed.
+CFLAGS += -I../app/src/main/cpp/litert/include
 SRC_QSTR += ../app/src/main/cpp/litert_module.cpp
 
 # settings_module.cpp -- OUR OWN native module (android.settings, see
