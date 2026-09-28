@@ -29,7 +29,6 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import eu.kdvelectronics.upyandroid.fileprovider.shareFile
 import eu.kdvelectronics.upyandroid.http.HttpServerManager
-import eu.kdvelectronics.upyandroid.managers.BoardManager
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
@@ -73,9 +72,10 @@ private fun NavHostController.navigateToTab(route: String) {
     }
 }
 
-// Binds to EngineService (a separate :engine process) via BoardManager
-// and talks to it only through TerminalManager, never touching
-// Engine/JNI directly. Three screens (terminal, explorer, editor) via
+// Binds to EngineService (a separate :engine process) via
+// ScriptExecCore's shared BoardManager connection and talks to it only
+// through TerminalManager, never touching Engine/JNI directly. Three
+// screens (terminal, explorer, editor) via
 // Navigation Compose. Explorer and editor never touch the engine
 // process directly either: FilesManager does plain local java.io.File
 // I/O rooted at the same filesDir the :engine process mounts as VFS
@@ -93,7 +93,6 @@ private const val CURRENT_ML_LIBRARY_VERSION = 1
 
 @OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class, ExperimentalLayoutApi::class)
 class MainActivity : ComponentActivity() {
-    private lateinit var boardManager: BoardManager
     private lateinit var terminalManager: TerminalManager
     private lateinit var filesManager: FilesManager
     private lateinit var settingsManager: SettingsManager
@@ -113,21 +112,19 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         viewModel = MainViewModel()
-        boardManager = BoardManager(this) { status ->
-            viewModel.status.value = status
-        }
-        // Registered once, globally, rather than per-screen: every
-        // exec() (terminal input, or explorer/editor "Run") shows up in
-        // the terminal's own output, so a single listener forwarding
-        // straight to TerminalLog covers every caller. Re-applied to
-        // the engine automatically on every BoardManager (re)connect.
-        boardManager.setOutputListener { chunk -> TerminalLog.append(chunk) }
+        // Output-listener forwarding into TerminalLog is registered
+        // once, inside ScriptExecCore itself (not here), so it covers
+        // every caller -- terminal input, explorer/editor "Run",
+        // adb-exec, and SSH -- through the one shared connection. See
+        // ScriptExecCore.kt#ScriptExecCore.
+        //
         // android.fileprovider.share() requests, routed here (the
         // main/UI process) from :engine -- see the plan's own Part 7
         // cross-process constraint. this is a real Activity Context,
         // required by FileProviderShim.shareFile()'s startActivity().
-        boardManager.setShareRequestListener { path, mimeType -> shareFile(this, path, mimeType) }
-        terminalManager = TerminalManager(boardManager)
+        // Cleared in onDestroy() -- see its own comment.
+        ScriptExecCore.setShareRequestListener { path, mimeType -> shareFile(this, path, mimeType) }
+        terminalManager = TerminalManager(applicationContext)
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)
         seedDemoScriptsIfNeeded()
@@ -145,12 +142,12 @@ class MainActivity : ComponentActivity() {
         // Same lifecycle reasoning as HttpServerManager above -- also
         // never stopped in onDestroy(), also a process-wide singleton.
         SshServerManager.applySettings(applicationContext, settingsManager)
-        boardManager.connect()
+        ScriptExecCore.connect(applicationContext)
         maybeRequestCameraPermission()
 
         setContent {
             UpyTheme {
-                val status by viewModel.status.collectAsState()
+                val status by ScriptExecCore.status.collectAsState()
                 val vm = remember { viewModel }
                 val navController = rememberNavController()
                 val coroutineScope = rememberCoroutineScope()
@@ -206,14 +203,14 @@ class MainActivity : ComponentActivity() {
                                 viewModel = vm,
                                 terminalManager = terminalManager,
                                 status = status,
-                                onReconnect = { boardManager.connect() },
+                                onReconnect = { ScriptExecCore.connect(applicationContext) },
                             )
                         }
                         composable(TopLevelDestination.SETTINGS.route) {
                             SettingsScreen(
                                 settingsManager = settingsManager,
                                 onSettingsChanged = {
-                                    boardManager.pushSettings()
+                                    ScriptExecCore.pushSettings()
                                     HttpServerManager.applySettings(applicationContext, settingsManager)
                                     SshServerManager.applySettings(applicationContext, settingsManager)
                                 },
@@ -221,7 +218,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable(TopLevelDestination.CAMERA.route) {
-                            CameraScreen(boardManager = boardManager)
+                            CameraScreen()
                         }
                         composable(TopLevelDestination.EXPLORER.route) {
                             ExplorerScreen(
@@ -254,7 +251,17 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        boardManager.disconnect()
+        // :engine intentionally outlives MainActivity now -- adb-exec
+        // and SSH keep working after this Activity is destroyed
+        // (including a config-change recreation, not just the user
+        // leaving), and process death is what actually tears the
+        // connection down, not onDestroy(). See
+        // ScriptExecCore.kt#ScriptExecCore. Only the Activity-scoped
+        // share-request lambda (closes over this Activity) gets
+        // cleared here, so a destroyed/recreated Activity never leaves
+        // a stale Activity reference wired into the process-lifetime
+        // ScriptExecCore singleton.
+        ScriptExecCore.setShareRequestListener(null)
     }
 
     // Android cannot distinguish "never asked" from "permanently

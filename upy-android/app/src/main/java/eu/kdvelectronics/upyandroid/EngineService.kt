@@ -15,7 +15,10 @@ import eu.kdvelectronics.upyandroid.managers.SettingsManager
 // state is expected to reset then. This is the idle/lazy tier of the
 // two-tier reset design; this class does not need to implement reset
 // itself.
-// Exception: AdbExecProvider never unbinds. Not a leak.
+// Exception: ScriptExecCore's one shared connection (Terminal,
+// Explorer/Editor Run, adb-exec, SSH) never unbinds, for the process's
+// entire lifetime, not just after adb-exec or SSH has been used. Not a
+// leak. See ScriptExecCore.kt#ScriptExecCore.
 // see session-state: EngineService.kt#EngineService
 // see session-state: IEngine.aidl#reset
 class EngineService : Service() {

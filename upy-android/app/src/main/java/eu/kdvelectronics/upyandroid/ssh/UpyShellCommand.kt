@@ -2,7 +2,6 @@ package eu.kdvelectronics.upyandroid.ssh
 
 import android.content.Context
 import eu.kdvelectronics.upyandroid.ScriptExecCore
-import eu.kdvelectronics.upyandroid.TerminalLog
 import org.apache.sshd.server.Environment
 import org.apache.sshd.server.ExitCallback
 import org.apache.sshd.server.channel.ChannelSession
@@ -202,15 +201,12 @@ class UpyShellCommand(private val context: Context) : Command {
         submitting = true
         Thread({
             try {
-                when (val result = ScriptExecCore.run(context, code)) {
-                    is ScriptExecCore.RunResult.Ok -> {
-                        // Retroactive requirement (Part 8): SSH's
-                        // commands and output must show up in the
-                        // on-screen terminal too -- see TerminalLog.kt's
-                        // own header comment.
-                        TerminalLog.append("\n>>> (ssh)\n$code\n${result.output}\n")
-                        write(result.output.replace("\n", "\r\n"))
-                    }
+                // Header written by run() itself, once the busy check
+                // succeeds -- see ScriptExecCore.kt#ScriptExecCore. Live
+                // output already reaches TerminalLog via the shared
+                // connection's output listener as the script runs.
+                when (val result = ScriptExecCore.run(context, code, label = "ssh")) {
+                    is ScriptExecCore.RunResult.Ok -> write(result.output.replace("\n", "\r\n"))
                     ScriptExecCore.RunResult.Busy -> write("[busy]")
                     ScriptExecCore.RunResult.Disconnected -> write("[disconnected]")
                 }

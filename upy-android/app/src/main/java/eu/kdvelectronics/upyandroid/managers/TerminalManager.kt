@@ -1,8 +1,11 @@
 package eu.kdvelectronics.upyandroid.managers
 
+import android.content.Context
+import eu.kdvelectronics.upyandroid.ScriptExecCore
+
 /**
- * Thin wrapper over [BoardManager] -- the UI-facing contract, kept
- * separate from BoardManager itself so the transport and the REPL-level
+ * Thin wrapper over [ScriptExecCore]'s shared connection. The UI-facing
+ * contract, kept separate so the transport and the REPL-level
  * operations stay distinct concerns, matching micro-repl's original
  * shape. Much smaller than the original `TerminalManager`: no raw-REPL
  * silent-mode dance (there's no serial link to simulate call/return
@@ -11,13 +14,22 @@ package eu.kdvelectronics.upyandroid.managers
  * `exec()` takes real source text and MicroPython's compiler handles
  * real newlines fine -- already exercised in native bring-up).
  *
- * All methods block until the engine responds -- call from a background
- * thread/coroutine, never the UI thread.
+ * eval()/reset() block until the engine responds. Call from a
+ * background thread/coroutine, never the UI thread. terminateExecution()
+ * is the exception: non-blocking, safe from the UI thread, see its own
+ * comment.
  */
-class TerminalManager(private val boardManager: BoardManager) {
-    fun eval(code: String): String = boardManager.exec(code.trim())
+class TerminalManager(private val context: Context) {
+    // Routed through ScriptExecCore.runQueued() so a script running from
+    // here participates in the same shared in-flight signal a concurrent
+    // adb-exec/SSH call checks -- see ScriptExecCore.kt#ScriptExecCore.
+    fun eval(code: String): String = ScriptExecCore.runQueued(context, code.trim())
 
-    fun terminateExecution() = boardManager.interrupt()
+    // interruptNow(), not interrupt(context): called directly from a
+    // Compose onClick (TerminalScreen's Interrupt button), never wrapped
+    // in a coroutine. interrupt(context) blocks via ensureConnected() and
+    // would risk a main-thread deadlock here.
+    fun terminateExecution() = ScriptExecCore.interruptNow()
 
-    fun reset() = boardManager.reset()
+    fun reset() = ScriptExecCore.reset(context)
 }

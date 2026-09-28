@@ -17,7 +17,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import eu.kdvelectronics.upyandroid.managers.BoardManager
+import eu.kdvelectronics.upyandroid.ScriptExecCore
 
 // Passive viewport, not a "run" screen. Vision scripts are written and
 // launched through the existing Terminal/Explorer/Editor "Run" flow
@@ -34,9 +34,7 @@ import eu.kdvelectronics.upyandroid.managers.BoardManager
 // interrupted by navigating off this screen.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CameraScreen(
-    boardManager: BoardManager,
-) {
+fun CameraScreen() {
     val activity = LocalContext.current as Activity
 
     // Locks to one orientation while this screen is visible, restores
@@ -61,7 +59,7 @@ fun CameraScreen(
                     TooltipIconButton(
                         icon = SymbolIcon.STOP,
                         label = "Interrupt",
-                        onClick = { boardManager.interrupt() },
+                        onClick = { ScriptExecCore.interruptNow() },
                     )
                 }
             )
@@ -92,7 +90,7 @@ fun CameraScreen(
                     SurfaceView(context).apply {
                         holder.addCallback(object : SurfaceHolder.Callback {
                             override fun surfaceCreated(holder: SurfaceHolder) {
-                                boardManager.setDisplaySurface(holder.surface)
+                                ScriptExecCore.setDisplaySurface(holder.surface)
                             }
 
                             override fun surfaceChanged(
@@ -109,7 +107,7 @@ fun CameraScreen(
                             }
 
                             override fun surfaceDestroyed(holder: SurfaceHolder) {
-                                boardManager.setDisplaySurface(null)
+                                ScriptExecCore.setDisplaySurface(null)
                             }
                         })
                     }

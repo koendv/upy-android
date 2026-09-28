@@ -20,15 +20,19 @@ import eu.kdvelectronics.upyandroid.model.ConnectionStatus
  * `:engine` process) over AIDL and exposes exec()/interrupt()/reset().
  * Backed by Binder, with typed call/return, not a raw-REPL byte protocol.
  *
- * Reconnection is not automatic. MIUI blocks auto-restart of a killed
- * bound service, so a crashed engine must be recovered by explicitly
- * calling [connect] again. Callers (the UI) decide when; this class does
- * not retry on its own.
+ * Reconnection is not assumed automatic, and this class never retries on
+ * its own -- callers (the UI, ScriptExecCore's ensureConnected()) decide
+ * when to call [connect] again. Whether the OS actually restores the
+ * binding on its own after a crashed :engine process is device-
+ * dependent: MIUI is documented to block auto-restart of a killed bound
+ * service, requiring an explicit reconnect; a stock-ish Samsung tablet
+ * (SM-T500, Android, confirmed directly by killing :engine) instead
+ * auto-restarted the service and re-delivered onServiceConnected with no
+ * explicit [connect] call at all. Don't assume either behavior; always
+ * go through the explicit reconnect path.
  */
 class BoardManager(
     private val context: Context,
-    // see session-state: BoardManager.kt#registerOutputListener
-    private val registerOutputListener: Boolean = true,
     private val onStatusChanges: ((status: ConnectionStatus) -> Unit)? = null,
 ) {
     companion object {
@@ -51,12 +55,11 @@ class BoardManager(
         }
     }
 
-    // Same single-slot-collision reasoning as chunkListener/
-    // registerOutputListener above applies here too (EngineService holds
-    // exactly one share-listener registration, last one wins), so this
-    // reuses the same registerOutputListener flag rather than adding a
-    // second one -- both flags mean the same thing in practice: "is this
-    // the primary, UI-owned BoardManager instance".
+    // Same single-slot reasoning as chunkListener above: EngineService
+    // holds exactly one share-listener registration, last one wins.
+    // Only one BoardManager instance exists for the whole process (see
+    // ScriptExecCore.kt#ScriptExecCore), so there is nothing left to
+    // collide with.
     @Volatile
     private var shareRequestListener: ((path: String, mimeType: String) -> Unit)? = null
 
@@ -69,14 +72,11 @@ class BoardManager(
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, binder: IBinder) {
             engine = IEngine.Stub.asInterface(binder)
-            // Before Connected, unconditionally (regardless of
-            // registerOutputListener) -- see IEngine.aidl#setSettings
-            // for why this ordering matters.
+            // Before Connected, unconditionally. See
+            // IEngine.aidl#setSettings for why this ordering matters.
             pushSettings()
-            if (registerOutputListener) {
-                engine?.setOutputListener(outputListenerStub)
-                engine?.setShareListener(shareListenerStub)
-            }
+            engine?.setOutputListener(outputListenerStub)
+            engine?.setShareListener(shareListenerStub)
             onStatusChanges?.invoke(ConnectionStatus.Connected)
         }
 
@@ -104,11 +104,6 @@ class BoardManager(
         if (!bound) {
             onStatusChanges?.invoke(ConnectionStatus.Disconnected("could not bind engine service"))
         }
-    }
-
-    fun disconnect() {
-        engine = null
-        context.unbindService(connection)
     }
 
     /**

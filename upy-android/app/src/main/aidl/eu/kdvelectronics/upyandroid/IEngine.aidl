@@ -42,8 +42,19 @@ interface IEngine {
     // SurfaceView is torn down; a running script's write() calls
     // silently no-op until a fresh Surface is handed over, and the
     // script itself is never interrupted by this.
+    //
+    // oneway: the caller (a main-thread SurfaceHolder.Callback) must
+    // never block on this. display_module.cpp's g_window_mutex is also
+    // held by write() for the full ANativeWindow_lock()/copy/
+    // unlockAndPost() sequence on the worker thread, and
+    // ANativeWindow_lock() can legitimately stall waiting for a free
+    // graphics buffer -- a synchronous call here hit exactly that
+    // window and produced a real ANR ("Input dispatching timed out,
+    // waited 10001ms") on-device. oneway calls to the same interface
+    // stay ordered, so a surface-then-null sequence still applies
+    // correctly; nothing here ever depended on synchronous completion.
     // see session-state: IEngine.aidl#setDisplaySurface
-    void setDisplaySurface(in Surface surface);
+    oneway void setDisplaySurface(in Surface surface);
 
     // Pushes the current, non-secret settings snapshot (see
     // SettingsManager.kt) into :engine, never ssh_password/

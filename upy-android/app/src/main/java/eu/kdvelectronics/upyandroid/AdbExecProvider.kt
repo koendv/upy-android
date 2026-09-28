@@ -55,17 +55,15 @@ class AdbExecProvider : ContentProvider() {
         } catch (e: IllegalArgumentException) {
             return Bundle().apply { putString("error", "bad_base64") }
         }
-        return when (val result = ScriptExecCore.run(appContext, decoded)) {
+        // Header written by run() itself, once the busy check succeeds
+        // -- see ScriptExecCore.kt#ScriptExecCore. Live output already
+        // reaches TerminalLog via the shared connection's output
+        // listener as the script runs; this return value only needs to
+        // go back to the adb caller.
+        return when (val result = ScriptExecCore.run(appContext, decoded, label = "adb-exec")) {
             is ScriptExecCore.RunResult.Busy -> Bundle().apply { putString("error", "busy") }
             is ScriptExecCore.RunResult.Disconnected -> Bundle().apply { putString("error", "disconnected") }
-            is ScriptExecCore.RunResult.Ok -> {
-                // Retroactive requirement (Part 8): adb-exec's commands
-                // and output must show up in the on-screen terminal too,
-                // not just be returned to the caller -- see
-                // TerminalLog.kt's own header comment.
-                TerminalLog.append("\n>>> (adb-exec)\n$decoded\n${result.output}\n")
-                Bundle().apply { putString("output", result.output) }
-            }
+            is ScriptExecCore.RunResult.Ok -> Bundle().apply { putString("output", result.output) }
         }
     }
 
