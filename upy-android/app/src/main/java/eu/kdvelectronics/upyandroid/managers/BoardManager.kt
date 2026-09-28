@@ -42,6 +42,11 @@ class BoardManager(
     @Volatile
     private var engine: IEngine? = null
 
+    // Whether bindService() below currently has an outstanding bind.
+    // Needed for connect()'s own stuck-connection recovery -- see there.
+    @Volatile
+    private var bound = false
+
     // Kept separate from the AIDL Stub below so callers can register or
     // replace it independent of the bind lifecycle. Re-applied to the
     // engine on every reconnect, since a crashed :engine process starts
@@ -91,17 +96,41 @@ class BoardManager(
 
     fun connect() {
         onStatusChanges?.invoke(ConnectionStatus.Connecting)
+        // Stuck-connection recovery, a real bug hit and confirmed
+        // on-device: if bound is already true but engine is still null,
+        // this app's own onServiceConnected was never observed for the
+        // current binding (e.g. a missed/raced auto-reconnect after
+        // :engine died while this process was backgrounded), yet
+        // Android's own ActivityManager still considers the
+        // ServiceConnection bound (confirmed via dumpsys activity
+        // services: hasBound=true, multiple stacked ConnectionRecords
+        // on the same BinderProxy). bindService() on a connection
+        // Android already considers bound does NOT re-deliver
+        // onServiceConnected -- confirmed by a run() call that waited
+        // the full 10s ensureConnected() timeout and still got
+        // Disconnected. unbindService() first forces Android to drop
+        // the stale connection, so the bindService() below is
+        // guaranteed a fresh connection cycle. Safe to skip when
+        // engine != null: that means a previous connect() already
+        // succeeded and this call is redundant (e.g. Activity
+        // recreation calling ScriptExecCore.connect() again), so
+        // there's nothing stuck to recover from.
+        if (bound && engine == null) {
+            context.unbindService(connection)
+            bound = false
+        }
         // BIND_ABOVE_CLIENT keeps :engine's process importance tied to
         // at least this client process's own, instead of the OS's
         // default demotion while bound. Needed for reliable sensor
         // delivery.
         // see session-state: BoardManager.kt#connect
-        val bound = context.bindService(
+        val ok = context.bindService(
             Intent(context, EngineService::class.java),
             connection,
             Context.BIND_AUTO_CREATE or Context.BIND_ABOVE_CLIENT
         )
-        if (!bound) {
+        bound = ok
+        if (!ok) {
             onStatusChanges?.invoke(ConnectionStatus.Disconnected("could not bind engine service"))
         }
     }
