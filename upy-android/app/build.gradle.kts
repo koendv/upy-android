@@ -116,7 +116,10 @@ val copyNotice = tasks.register<Copy>("copyNotice") {
 // examples/ tree, same "one real copy, not hand-duplicated" reasoning
 // as copyNotice above.
 val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
-    from(rootProject.file("examples/lcd_shield/lcd_shield.py"))
+    from(
+        rootProject.file("examples/lcd_shield/lcd_shield.py"),
+        rootProject.file("examples/find_line_segments/find_line_segments.py"),
+    )
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }
 
