@@ -79,12 +79,11 @@ fun ExplorerScreen(
 
     LaunchedEffect(path) { refresh() }
 
-    // Peer nav-suite tab now (Part 10) -- no onBack to fall through to
-    // at the VFS root any more; up() is a no-op there (tab switching is
-    // the only way to leave this screen). BackHandler is only enabled
-    // below the root, so a system back press at the root falls through
-    // to the platform's own default behavior instead of being swallowed
-    // silently.
+    // Peer nav-suite tab: no onBack to fall through to at the VFS root
+    // any more. up() is a no-op there (tab switching is the only way to
+    // leave this screen). BackHandler is only enabled below the root,
+    // so a system back press at the root falls through to the
+    // platform's own default behavior instead of being swallowed silently.
     fun up() {
         if (path.isNotEmpty()) {
             path = path.substringBeforeLast('/', "")

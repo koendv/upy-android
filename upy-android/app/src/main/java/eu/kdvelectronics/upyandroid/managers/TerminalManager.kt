@@ -12,7 +12,7 @@ import eu.kdvelectronics.upyandroid.ScriptExecCore
  * over), no `executeScript`/`executeLocalScript` (Scripts feature
  * dropped for v1), no `\r`-joining for multi-line code (the AIDL
  * `exec()` takes real source text and MicroPython's compiler handles
- * real newlines fine -- already exercised in native bring-up).
+ * real newlines fine, already exercised in native bring-up).
  *
  * eval()/reset() block until the engine responds. Call from a
  * background thread/coroutine, never the UI thread. terminateExecution()

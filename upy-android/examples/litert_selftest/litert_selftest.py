@@ -1,15 +1,13 @@
-# litert confidence test (top-level `litert`, see Part 4 of the
-# dev-workflow-speedups plan -- was android.litert). litert deliberately
-# stays a faithful, literal mirror of litert-api's own Kotlin
-# TensorBuffer surface -- write_int8/read_int8 (raw bytes) plus
-# write_float/read_float/write_int/read_int/write_bool/read_bool/
-# write_long/read_long (typed arrays, one real Kotlin method each) --
-# with no ndarray/auto-quantize convenience layer of its own (that was
-# tried and dropped; see litert_module.cpp's own header comment).
-# `ml`/`tf` (Part 5) covers that use case now -- android.rt, which used
+# litert confidence test (top-level `litert`, was android.litert).
+# litert deliberately stays a faithful, literal mirror of litert-api's
+# own Kotlin TensorBuffer surface: write_int8/read_int8 (raw bytes)
+# plus write_float/read_float/write_int/read_int/write_bool/read_bool/
+# write_long/read_long (typed arrays, one real Kotlin method each),
+# with no ndarray/auto-quantize convenience layer of its own (tried and
+# dropped). `ml`/`tf` covers that use case now. android.rt, which used
 # to, has been deleted.
 #
-# Setup: same two fixtures ml_selftest.py also uses --
+# Setup: same two fixtures ml_selftest.py also uses.
 #   adb push examples/quant/single_add_default_a8w8_recipe_quantized.tflite /data/local/tmp/single_add_quant.tflite
 #   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
 #       'cat /data/local/tmp/single_add_quant.tflite > files/single_add_quant.tflite'
@@ -68,7 +66,7 @@ def run_case_int8(label, in1, in2, expected):
 
 def run_case_float():
     # add_simple.tflite: real typed write_float()/read_float(), not
-    # write_int8()/read_int8() -- exercises the new typed pair directly,
+    # write_int8()/read_int8(). Exercises the new typed pair directly,
     # matching litert-api's own TensorBuffer.writeFloat()/readFloat().
     env = litert.Environment()
     options = litert.Options(litert.Accelerator.CPU)

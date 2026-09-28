@@ -4,15 +4,15 @@ import eu.kdvelectronics.upyandroid.model.MicroFile
 import java.io.File
 
 /**
- * Local file operations rooted at [root] -- the SAME directory
+ * Local file operations rooted at [root], the same directory
  * EngineService passes to nativeInit/nativeReset as the VFS root, so
  * whatever this browses/edits is exactly what MicroPython scripts see
  * via open()/os.listdir(). Plain java.io.File calls, not a remote-board
  * REPL round-trip like micro-repl's own FilesManager (MIT, see
- * NOTICE.html) -- this app has no remote board, the "board" IS this local
+ * NOTICE.html). This app has no remote board, the "board" is this local
  * sandboxed directory, so there's no transport to simulate.
  *
- * All methods do blocking I/O -- call from a background thread/coroutine
+ * All methods do blocking I/O. Call from a background thread/coroutine
  * (Dispatchers.IO), matching TerminalManager's own contract, never the
  * UI thread.
  */

@@ -1,15 +1,16 @@
-// upy-android OpenMV support layer -- stub replacement for OpenMV's
-// common/omv_cycles.h (real one needs CMSIS_MCU_H, a device-specific SDK
-// header we don't have). Only real caller found in our copied set is
-// imlib.h's imlib_poll_events()/imlib_poll_events_noexc() macros, which
-// periodically yield to MicroPython's event loop during long-running
-// algorithms so Interrupt stays responsive -- same purpose as this
-// project's own mp_hal_delay_ms() chunking (see mphalport.c).
+// upy-android OpenMV support layer. Stub replacement for OpenMV's
+// common/omv_cycles.h (the real one needs CMSIS_MCU_H, a device-
+// specific SDK header not available here). Only real caller found in
+// this port's copied set is imlib.h's imlib_poll_events()/
+// imlib_poll_events_noexc() macros, which periodically yield to
+// MicroPython's event loop during long-running algorithms so Interrupt
+// stays responsive. Same purpose as this project's own
+// mp_hal_delay_ms() chunking (see mphalport.c).
 //
 // "Cycles" here are just milliseconds (OMV_CPU_FREQ_HZ=1000, i.e. 1
-// cycle == 1ms) via CLOCK_MONOTONIC, not real CPU cycles -- imlib.h's
-// polling interval (20 "cycles") only cares about elapsed wall time, not
-// an actual instruction-cycle count.
+// cycle == 1ms) via CLOCK_MONOTONIC, not real CPU cycles. imlib.h's
+// polling interval (20 "cycles") only cares about elapsed wall time,
+// not an actual instruction-cycle count.
 #ifndef UPY_ANDROID_STUB_OMV_CYCLES_H
 #define UPY_ANDROID_STUB_OMV_CYCLES_H
 

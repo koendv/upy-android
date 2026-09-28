@@ -1,6 +1,6 @@
 // JNI-facing implementation for android.fileprovider
 // (fileprovider_module.cpp). One JNI call, straight into
-// EngineService.requestShare() -- see fileprovider_jni_bridge.h's own
+// EngineService.requestShare(). See fileprovider_jni_bridge.h's own
 // header comment for why fileprovider_module.cpp never sees a real
 // jobject/JNIEnv*.
 
@@ -19,7 +19,7 @@ jclass g_engine_service_class = nullptr;
 jmethodID g_mid_request_share = nullptr;
 
 // Same per-call JNIEnv* lookup as mediastore_jni_bridge.cpp's own
-// current_env() -- the worker thread is JVM-attached for :engine's
+// current_env(). The worker thread is JVM-attached for :engine's
 // entire lifetime, so GetEnv() alone is enough, no Attach/Detach.
 JNIEnv *current_env() {
     JNIEnv *env = nullptr;
@@ -58,8 +58,7 @@ extern "C" void fileprovider_bridge_init_impl(void *jni_env) {
     env->DeleteLocalRef(local_class);
 
     // requestShare is a companion-object @JvmStatic member, which
-    // compiles to a genuine static method directly on EngineService --
-    // see EngineService.kt's own Companion comment.
+    // compiles to a genuine static method directly on EngineService.
     g_mid_request_share = env->GetStaticMethodID(g_engine_service_class, "requestShare",
         "(Ljava/lang/String;Ljava/lang/String;)V");
 }

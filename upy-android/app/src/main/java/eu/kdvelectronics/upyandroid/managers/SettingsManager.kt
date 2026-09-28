@@ -19,14 +19,14 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_ASKED_CAMERA_PERMISSION, false)
         set(value) = prefs.edit().putBoolean(KEY_ASKED_CAMERA_PERMISSION, value).apply()
 
-    // Gates AdbExecProvider's call() -- see AdbExecProvider.kt. Default
+    // Gates AdbExecProvider's call(), see AdbExecProvider.kt. Default
     // false: a fresh install must not expose an adb-driven exec channel
     // until the user deliberately opts in via the UI toggle.
     var adbExecEnabled: Boolean
         get() = prefs.getBoolean(KEY_ADB_EXEC_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_ADB_EXEC_ENABLED, value).apply()
 
-    // MicroPython's heap size, in MB -- see engine_jni.cpp#allocate_heap.
+    // MicroPython's heap size, in MB. See engine_jni.cpp#allocate_heap.
     // Clamped here, not in native code: the real validation boundary is
     // this setter, not downstream of it.
     var heapSizeMb: Int
@@ -39,8 +39,8 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_SSH_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_SSH_ENABLED, value).apply()
 
-    // Never pushed into :engine, never readable from a script -- see
-    // BoardManager.kt#pushSettings.
+    // Never pushed into :engine, never readable from a script.
+    // See BoardManager.kt#pushSettings.
     var sshPassword: String
         get() = prefs.getString(KEY_SSH_PASSWORD, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SSH_PASSWORD, value).apply()
@@ -49,41 +49,41 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_HTTP_SERVER_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_HTTP_SERVER_ENABLED, value).apply()
 
-    // Never pushed into :engine, never readable from a script -- see
-    // BoardManager.kt#pushSettings.
+    // Never pushed into :engine, never readable from a script.
+    // See BoardManager.kt#pushSettings.
     var httpPassword: String
         get() = prefs.getString(KEY_HTTP_PASSWORD, "") ?: ""
         set(value) = prefs.edit().putString(KEY_HTTP_PASSWORD, value).apply()
 
     // Gated behind httpServerEnabled in the UI (SettingsScreen.kt
-    // disables this row's toggle unless the base server is on) -- the
+    // disables this row's toggle unless the base server is on). The
     // stored value itself doesn't enforce that, since a base-server-off
     // + private-files-on combination is meaningless, not unsafe.
     var httpPrivateFilesEnabled: Boolean
         get() = prefs.getBoolean(KEY_HTTP_PRIVATE_FILES_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_HTTP_PRIVATE_FILES_ENABLED, value).apply()
 
-    // Persisted and exposed via android.settings only -- does not yet
+    // Persisted and exposed via android.settings only. Does not yet
     // gate a real WorkManager init, since nothing in this build calls
-    // AiPackModelProvider/AiPackManager to gate. See SESSION_STATE.yaml.
+    // AiPackModelProvider/AiPackManager to gate.
     var litertPlaystoreEnabled: Boolean
         get() = prefs.getBoolean(KEY_LITERT_PLAYSTORE_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_LITERT_PLAYSTORE_ENABLED, value).apply()
 
     // Last bundled-demo-scripts version actually copied into the VFS's
-    // own /examples/ directory -- see MainActivity's own
+    // own /examples/ directory. See MainActivity's own
     // seedDemoScriptsIfNeeded(). 0 (never seeded) on a fresh install.
     // Deliberately a version int, not a one-shot boolean: bumping
     // CURRENT_DEMO_SCRIPTS_VERSION lets a later app update that fixes a
     // bundled demo script reach existing installs too, not just new
-    // ones -- an already-seeded copy gets overwritten again once.
+    // ones. An already-seeded copy gets overwritten again once.
     var demoScriptsVersion: Int
         get() = prefs.getInt(KEY_DEMO_SCRIPTS_VERSION, 0)
         set(value) = prefs.edit().putInt(KEY_DEMO_SCRIPTS_VERSION, value).apply()
 
     // Same version-stamped-not-one-shot reasoning as demoScriptsVersion
-    // above, but for the `ml` library package (seeded to VFS ROOT, not
-    // /examples/ -- see seedMlLibraryIfNeeded()'s own comment for why).
+    // above, but for the `ml` library package (seeded to VFS root, not
+    // /examples/, see seedMlLibraryIfNeeded()'s own comment for why).
     var mlLibraryVersion: Int
         get() = prefs.getInt(KEY_ML_LIBRARY_VERSION, 0)
         set(value) = prefs.edit().putInt(KEY_ML_LIBRARY_VERSION, value).apply()

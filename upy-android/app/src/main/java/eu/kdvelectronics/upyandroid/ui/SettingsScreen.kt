@@ -54,10 +54,10 @@ private fun restartApp(context: Context) {
 }
 
 // Peer top-level destination (matching Command/Files/Camera), not an
-// inline dialog -- six-plus settings is too much for the dialog Part 1
+// inline dialog: six-plus settings is too much for the dialog Part 1
 // used for adb-exec alone. onSettingsChanged fires after every edit so
 // the caller can push the new snapshot into a live :engine connection
-// immediately (see BoardManager.kt#pushSettings); heap_size_mb still
+// immediately (see BoardManager.kt#pushSettings). heap_size_mb still
 // only takes effect at the next Reset regardless.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,7 +67,7 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
 ) {
     val context = LocalContext.current
-    // Captured once, at screen open -- the heap size the CURRENTLY
+    // Captured once, at screen open: the heap size the currently
     // running :engine process actually started with. Compared against
     // the live field below to decide whether a restart is relevant.
     val initialHeapSizeMb = remember { settingsManager.heapSizeMb }
@@ -80,14 +80,14 @@ fun SettingsScreen(
     var httpPrivateFilesEnabled by remember { mutableStateOf(settingsManager.httpPrivateFilesEnabled) }
     var litertPlaystoreEnabled by remember { mutableStateOf(settingsManager.litertPlaystoreEnabled) }
     var adbExecEnabled by remember { mutableStateOf(settingsManager.adbExecEnabled) }
-    // Settings is a peer nav-suite tab now (Part 10), not a screen with
-    // its own Back button -- the old "only prompt on Back" trigger is
-    // gone, since a tab switch/system-back gesture no longer routes
-    // through any handler this screen owns. Re-homed as an inline row,
-    // always visible whenever the field differs from the running
-    // process's own heap size, regardless of how (or whether) the user
-    // then leaves this screen -- can't be silently skipped by any
-    // particular exit path, since it isn't tied to one.
+    // Settings is a peer nav-suite tab, not a screen with its own Back
+    // button. The old "only prompt on Back" trigger is gone, since a
+    // tab switch/system-back gesture no longer routes through any
+    // handler this screen owns. Re-homed as an inline row, always
+    // visible whenever the field differs from the running process's
+    // own heap size, regardless of how (or whether) the user then
+    // leaves this screen. Can't be silently skipped by any particular
+    // exit path, since it isn't tied to one.
     val heapSizeChanged = heapSizeMb.toIntOrNull() != initialHeapSizeMb
 
     Scaffold(
@@ -106,7 +106,7 @@ fun SettingsScreen(
                 value = heapSizeMb,
                 onValueChange = { text ->
                     heapSizeMb = text
-                    // Not pushed via onSettingsChanged() -- heap size is
+                    // Not pushed via onSettingsChanged(). Heap size is
                     // read once, at process start, only. See
                     // Engine.kt#nativeSetSettings.
                     text.toIntOrNull()?.let { settingsManager.heapSizeMb = it }
@@ -118,7 +118,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     // Restores the old Back-button trigger's actual effect
                     // (an automatic confirm prompt), not just the always-
-                    // visible reminder row below -- losing focus is this
+                    // visible reminder row below. Losing focus is this
                     // screen's own equivalent of "the user is done editing
                     // this field", now that there's no Back button to hook.
                     .onFocusChanged { focusState ->
@@ -147,7 +147,7 @@ fun SettingsScreen(
                 onValueChange = {
                     sshPassword = it
                     settingsManager.sshPassword = it
-                    // Not pushed via onSettingsChanged -- passwords
+                    // Not pushed via onSettingsChanged. Passwords
                     // never cross into :engine. See SettingsManager.kt.
                 },
                 label = { Text("SSH password") },
@@ -200,7 +200,7 @@ fun SettingsScreen(
             }
 
             // Same "About phone"-style row real Android Settings puts at
-            // the bottom of its own list -- navigates to a non-peer
+            // the bottom of its own list. Navigates to a non-peer
             // detail screen (AboutScreen), same tier as EditorScreen.
             Row(
                 modifier = Modifier

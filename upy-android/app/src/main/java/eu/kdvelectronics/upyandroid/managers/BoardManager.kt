@@ -109,11 +109,11 @@ class BoardManager(
     /**
      * Pushes the current, non-secret settings snapshot into :engine.
      * Called on every successful connect (before onStatusChanges sees
-     * Connected -- see [onServiceConnected]) and again from the
+     * Connected, see [onServiceConnected]) and again from the
      * Settings screen whenever the user changes a setting while
      * connected. sshPassword/httpPassword are deliberately never put
-     * into this Bundle -- see IEngine.aidl#setSettings. heap_size_mb is
-     * deliberately not here either -- that is read once, locally, by
+     * into this Bundle, see IEngine.aidl#setSettings. heap_size_mb is
+     * deliberately not here either. That is read once, locally, by
      * EngineService.onCreate() only; see Engine.kt#nativeSetSettings.
      */
     fun pushSettings() {

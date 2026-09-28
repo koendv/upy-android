@@ -48,7 +48,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 // Four peer nav destinations, in the order they appear in the nav
-// suite -- Editor is deliberately NOT here, it's a non-peer detail
+// suite. Editor is deliberately not here, it's a non-peer detail
 // screen reached only via Explorer (see MainActivity's own NavHost).
 private enum class TopLevelDestination(val route: String, val label: String, val icon: Int) {
     TERMINAL("terminal", "Command", SymbolIcon.TERMINAL),
@@ -81,13 +81,13 @@ private fun NavHostController.navigateToTab(route: String) {
 // I/O rooted at the same filesDir the :engine process mounts as VFS
 // "/", so browsing and editing never need AIDL. Only "Run" does, via
 // the same terminalManager.eval() the terminal screen itself uses.
-// Bumped whenever a bundled demo script's own content changes -- see
+// Bumped whenever a bundled demo script's own content changes. See
 // seedDemoScriptsIfNeeded() below. Lets an app update that fixes a
 // demo script reach existing installs too, not just fresh ones.
 private const val CURRENT_DEMO_SCRIPTS_VERSION = 1
 
 // Bumped whenever the bundled `ml` library package's own content
-// changes -- see seedMlLibraryIfNeeded() below. Same reasoning as
+// changes. See seedMlLibraryIfNeeded() below. Same reasoning as
 // CURRENT_DEMO_SCRIPTS_VERSION.
 private const val CURRENT_ML_LIBRARY_VERSION = 1
 
@@ -119,8 +119,7 @@ class MainActivity : ComponentActivity() {
         // ScriptExecCore.kt#ScriptExecCore.
         //
         // android.fileprovider.share() requests, routed here (the
-        // main/UI process) from :engine -- see the plan's own Part 7
-        // cross-process constraint. this is a real Activity Context,
+        // main/UI process) from :engine. This is a real Activity Context,
         // required by FileProviderShim.shareFile()'s startActivity().
         // Cleared in onDestroy() -- see its own comment.
         ScriptExecCore.setShareRequestListener { path, mimeType -> shareFile(this, path, mimeType) }
@@ -129,17 +128,17 @@ class MainActivity : ComponentActivity() {
         settingsManager = SettingsManager(this)
         seedDemoScriptsIfNeeded()
         seedMlLibraryIfNeeded()
-        // Lives in this (default/UI) process, not :engine -- see
+        // Lives in this (default/UI) process, not :engine. See
         // HttpServerManager.kt's own header comment. A process-wide
         // singleton (not a per-Activity instance): deliberately never
         // stopped in onDestroy(), like AdbExecProvider's own
         // BoardManager, so it should keep serving for as long as this
         // process is alive, not just while MainActivity itself is on
-        // screen -- including across an Activity recreation triggered
+        // screen, including across an Activity recreation triggered
         // by a config change (e.g. a system theme switch), which a
         // per-Activity instance got wrong (see its own header comment).
         HttpServerManager.applySettings(applicationContext, settingsManager)
-        // Same lifecycle reasoning as HttpServerManager above -- also
+        // Same lifecycle reasoning as HttpServerManager above. Also
         // never stopped in onDestroy(), also a process-wide singleton.
         SshServerManager.applySettings(applicationContext, settingsManager)
         ScriptExecCore.connect(applicationContext)
@@ -171,7 +170,7 @@ class MainActivity : ComponentActivity() {
                 val currentRoute = backStackEntry?.destination?.route
                 // Real, on-device layout risk (flagged, not guessed): the
                 // terminal already stacks output + action row + input
-                // field under imePadding() -- a persistent nav band would
+                // field under imePadding(). A persistent nav band would
                 // be a fourth competing band while the soft keyboard is
                 // open. Hidden outright while the IME is visible, on
                 // every tab, not just the terminal's own.
@@ -283,7 +282,7 @@ class MainActivity : ComponentActivity() {
     // Bundled demo scripts (build.gradle.kts's own copyDemoScripts task
     // copies them from the repo's own tracked examples/ into
     // src/main/assets/examples/) seeded into the VFS's own /examples/
-    // subdirectory -- a dedicated, clearly app-managed location, never
+    // subdirectory. A dedicated, clearly app-managed location, never
     // VFS root, so this can never collide with or overwrite anything
     // the user creates themselves. Version-stamped, not a one-shot
     // boolean (see demoScriptsVersion's own comment): re-seeds (only
@@ -301,17 +300,17 @@ class MainActivity : ComponentActivity() {
         settingsManager.demoScriptsVersion = CURRENT_DEMO_SCRIPTS_VERSION
     }
 
-    // Seeds the `ml` library package into VFS ROOT (filesDir directly,
-    // NOT a subdirectory like examples/) -- a deliberate exception to
+    // Seeds the `ml` library package into VFS root (filesDir directly,
+    // not a subdirectory like examples/). A deliberate exception to
     // seedDemoScriptsIfNeeded()'s own "never VFS root" convention: this
-    // package must sit at "/ml/" for `import ml` to resolve to it at all.
-    // MicroPython's own module resolution checks non-extensible
-    // built-ins, then the filesystem (this port's own sys.path is just
-    // ["/"]), then extensible built-ins last -- so a real "/ml/__init__.py"
-    // here transparently shadows OpenMV's own extensible `ml`/`tf`
-    // built-in (still vendored, still non-commercially licensed --
-    // see SESSION_STATE.yaml), with no other change needed. Version-
-    // stamped, same reasoning as seedDemoScriptsIfNeeded().
+    // package must sit at "/ml/" for `import ml` to resolve to it at
+    // all, since MicroPython's own module resolution checks the
+    // filesystem (this port's own sys.path is just ["/"]) before any
+    // extensible built-in. OpenMV's own `ml`/`tf` built-in
+    // (py_ml.c/tflm_backend.cc) has since been removed entirely, so
+    // this is no longer a shadowing concern, just where `import ml`
+    // resolves from. Version-stamped, same reasoning as
+    // seedDemoScriptsIfNeeded().
     private fun seedMlLibraryIfNeeded() {
         if (settingsManager.mlLibraryVersion >= CURRENT_ML_LIBRARY_VERSION) return
 

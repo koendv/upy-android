@@ -25,33 +25,7 @@ import kotlinx.io.asSource
 import java.io.File
 import java.io.FileNotFoundException
 
-// Runs in the default/UI process (same process as AdbExecProvider and,
-// eventually, SSH -- see the plan's own Part 7 design), NOT :engine.
-// Serves two things, both gated behind http_server_enabled:
-// - GET /media, GET /media/{token}: android.mediastore-saved images,
-//   streamed straight from their real content:// URI via
-//   ContentResolver.openInputStream() -- no intermediate copy. Token-
-//   based, not by MediaStore's own sequential _id -- see
-//   MediaStoreTokenRegistry's own header comment.
-// - GET /files/{path...}: the same VFS root Explorer/Import/Export
-//   already expose, gated behind the separate, narrower
-//   http_private_files_enabled sub-toggle (checked live, per request,
-//   not baked in at server-start time -- flipping it off takes effect
-//   on the very next request, no restart needed).
-// Same-LAN-only v1 scope (plain HTTP, no relay/tunnel/NAT traversal) --
-// see the plan's own Part 7 scope note.
-//
-// A process-wide singleton (object, not a per-Activity class instance),
-// same pattern as ScriptExecCore/SshServerManager -- same real crash
-// class SshServerManager's own header comment documents in full: no
-// android:configChanges on MainActivity means a system config change
-// (a light/dark theme switch included) destroys and recreates the
-// whole Activity, and this server is deliberately never stopped in
-// onDestroy() (must survive Activity teardown) -- a per-Activity
-// instance meant the OLD server stayed bound to port 8080 while the
-// newly-recreated Activity's onCreate() tried to start a SECOND one on
-// the same port. A singleton means that re-run just calls
-// applySettings() again on the SAME already-running instance.
+// see session-state: HttpServerManager.kt#HttpServerManager
 object HttpServerManager {
     private const val TAG = "HttpServerManager"
     const val PORT = 8080
@@ -59,12 +33,7 @@ object HttpServerManager {
     @Volatile
     private var server: EmbeddedServer<*, *>? = null
 
-    // Called once at app start and again after every settings change
-    // (same call site as BoardManager.pushSettings() -- see
-    // MainActivity.kt) -- starts/stops the whole server in response to
-    // http_server_enabled flipping; http_password/
-    // http_private_files_enabled are read live per-request instead
-    // (see the route handlers below), so they never need a restart.
+    // see session-state: HttpServerManager.kt#HttpServerManager
     @Synchronized
     fun applySettings(context: Context, settingsManager: SettingsManager) {
         val shouldRun = settingsManager.httpServerEnabled
@@ -92,8 +61,8 @@ object HttpServerManager {
                 basic("http-password") {
                     realm = "upy-android"
                     validate { credentials ->
-                        // Empty http_password means "not configured" --
-                        // deny every request rather than treat it as
+                        // Empty http_password means "not configured".
+                        // Deny every request rather than treat it as
                         // "no auth required". Matches this project's
                         // own fail-closed default posture (see
                         // AdbExecProvider.kt's UID check).
@@ -123,10 +92,9 @@ object HttpServerManager {
                             ?: return@get call.respond(HttpStatusCode.NotFound)
                         // respondSource takes ownership of the RawSource
                         // (streamed straight from the real content://
-                        // URI, no intermediate copy -- see this file's
-                        // own header comment) and closes it once fully
-                        // consumed; not wrapped in .use{} here, which
-                        // would close it before Ktor finishes reading.
+                        // URI, no intermediate copy) and closes it once
+                        // fully consumed. Not wrapped in .use{} here,
+                        // which would close it before Ktor finishes reading.
                         call.respondSource(stream.asSource(), ContentType.parse(entry.mimeType))
                     }
                     get("/files/{path...}") {
@@ -137,7 +105,7 @@ object HttpServerManager {
                         // File(base, child) converts an absolute child
                         // pathname into a relative one before resolving
                         // it against base (see FileProviderShim.kt's own
-                        // comment on this same javadoc guarantee) -- a
+                        // comment on this same javadoc guarantee). A
                         // request path can't escape filesDir via a
                         // leading "/", only via "..", checked next.
                         if (relativePath.split('/').any { it == ".." }) {
@@ -147,8 +115,8 @@ object HttpServerManager {
                         if (!file.isFile) {
                             return@get call.respond(HttpStatusCode.NotFound)
                         }
-                        // No MIME sniffing/extension mapping for v1 --
-                        // the consumer already knows what it asked for.
+                        // No MIME sniffing/extension mapping for v1.
+                        // The consumer already knows what it asked for.
                         call.respondSource(file.inputStream().asSource(), ContentType.Application.OctetStream)
                     }
                 }

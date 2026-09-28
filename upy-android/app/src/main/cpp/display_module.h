@@ -1,5 +1,5 @@
-// upy-android native display module. OUR OWN code, NOT vendored OpenMV
-// source, same tier as camera_module.h.
+// upy-android native display module.
+// micropython android port only, same tier as camera_module.h.
 #ifndef UPY_ANDROID_DISPLAY_MODULE_H
 #define UPY_ANDROID_DISPLAY_MODULE_H
 

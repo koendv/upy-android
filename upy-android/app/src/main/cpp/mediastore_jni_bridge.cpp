@@ -1,6 +1,6 @@
 // JNI-facing implementation for android.mediastore
-// (mediastore_module.cpp). One JNI call, through MediaStoreShim.kt --
-// see mediastore_jni_bridge.h's own header comment for why
+// (mediastore_module.cpp). One JNI call, through MediaStoreShim.kt.
+// See mediastore_jni_bridge.h's own header comment for why
 // mediastore_module.cpp never sees a real jobject/JNIEnv*.
 
 #include "mediastore_jni_bridge.h"
@@ -18,9 +18,7 @@ jobject g_context = nullptr;  // global ref, the application Context
 jclass g_shim_class = nullptr;
 jmethodID g_mid_save_image = nullptr;
 
-// Same per-call JNIEnv* lookup as litert_jni_bridge.cpp's own
-// current_env() -- the worker thread is JVM-attached for :engine's
-// entire lifetime, so GetEnv() alone is enough, no Attach/Detach.
+// Same per-call JNIEnv* lookup as litert_jni_bridge.cpp's own current_env().
 // see session-state: litert_jni_bridge.cpp#threading
 JNIEnv *current_env() {
     JNIEnv *env = nullptr;
@@ -29,8 +27,8 @@ JNIEnv *current_env() {
 }
 
 // Same exception-to-string pattern as litert_jni_bridge.cpp's own
-// describe_and_clear_exception() -- ExceptionClear() must happen
-// before any further JNI call and before mediastore_module.cpp's
+// describe_and_clear_exception(). ExceptionClear() must happen before
+// any further JNI call and before mediastore_module.cpp's
 // raise_os_error() (which longjmps via nlr_raise()).
 char *describe_and_clear_exception(JNIEnv *env) {
     jthrowable exc = env->ExceptionOccurred();

@@ -1,8 +1,6 @@
-// upy-android native fileprovider module (android.fileprovider). OUR
-// OWN code, NOT vendored OpenMV source. See the plan's own Part 7
-// design (SESSION_STATE.yaml) for the cross-process routing rationale --
-// this module never starts an Activity itself, it only asks the main
-// process to.
+// upy-android native fileprovider module (android.fileprovider).
+// micropython android port only. This module never starts an
+// Activity itself, it only asks the main process to.
 
 extern "C" {
 #include "py/obj.h"
@@ -19,13 +17,12 @@ namespace {
 
 // android.fileprovider.share(path, mime_type='application/octet-stream')
 // path: a VFS path (same root Explorer/Import/Export already expose,
-// e.g. "/snapshot.jpg" or "snapshot.jpg" -- resolved against
+// e.g. "/snapshot.jpg" or "snapshot.jpg", resolved against
 // Context.filesDir on the main-process side, see FileProviderShim.kt).
 // Fire-and-forget: returns None unconditionally once the request has
-// been handed off. A missing/backgrounded main process silently drops
-// the request (see fileprovider_jni_bridge.h's own contract comment) --
-// this is not observable from the script, by design, matching the
-// oneway AIDL interface's own semantics.
+// been handed off. A missing or backgrounded main process silently
+// drops the request. This is not observable from the script, by
+// design, matching the oneway AIDL interface's own semantics.
 mp_obj_t fileprovider_share(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     enum { ARG_path, ARG_mime_type };
     static const mp_arg_t allowed_args[] = {
@@ -43,11 +40,10 @@ mp_obj_t fileprovider_share(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
     char *out_err = nullptr;
     bool ok = fileprovider_bridge_share(path, mime_type, &out_err);
     if (!ok) {
-        // A genuine local JNI failure, not "nothing was listening" --
-        // see fileprovider_jni_bridge.h's own contract comment. Rare
-        // enough (a resolution failure at bridge init would already
-        // have surfaced) that a plain RuntimeException is enough, no
-        // dedicated OSError mapping needed.
+        // A genuine local JNI failure, not "nothing was listening".
+        // Rare enough (a resolution failure at bridge init would
+        // already have surfaced) that a plain RuntimeException is
+        // enough, no dedicated OSError mapping needed.
         char buf[192];
         snprintf(buf, sizeof(buf), "android.fileprovider: %s", out_err ? out_err : "unknown error");
         free(out_err);

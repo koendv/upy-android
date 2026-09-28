@@ -39,8 +39,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 // Files/Camera/Settings navigation moved to the top-level nav suite
-// (MainActivity's own NavigationSuiteScaffold, Part 10) -- this screen
-// only owns its own terminal chrome now.
+// (MainActivity's own NavigationSuiteScaffold). This screen only owns
+// its own terminal chrome now.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalScreen(
@@ -51,7 +51,7 @@ fun TerminalScreen(
 ) {
     val coroutineScope = rememberCoroutineScope()
     var input by viewModel.terminalInput
-    // Process-wide, not per-ViewModel -- see TerminalLog.kt's own
+    // Process-wide, not per-ViewModel. See TerminalLog.kt's own
     // header comment (adb-exec/SSH both write into this same log).
     val output by TerminalLog.text.collectAsState()
     val scrollState = rememberScrollState()
@@ -78,8 +78,8 @@ fun TerminalScreen(
             TopAppBar(
                 title = { Text("Command") },
                 actions = {
-                    // Connecting reuses link_off (user's own call) --
-                    // the sheet has no dedicated "connecting" glyph, and
+                    // Connecting reuses link_off (user's own call). The
+                    // sheet has no dedicated "connecting" glyph, and
                     // link_off's "not currently connected" read fits a
                     // transient state well enough.
                     Symbol(

@@ -1,6 +1,6 @@
 /*
  * Adapted from Ma7moud3ly/micro-repl (MIT license), unchanged apart from
- * the package name -- self-contained, no dependency on the dropped
+ * the package name. Self-contained, no dependency on the dropped
  * USB-serial transport.
  */
 

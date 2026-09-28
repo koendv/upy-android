@@ -1,10 +1,10 @@
-// upy-android native settings module (android.settings). OUR OWN code,
-// NOT vendored OpenMV source. Read-only from MicroPython: values are
+// upy-android native settings module (android.settings).
+// micropython android port only. Read-only from MicroPython: values are
 // pushed from Kotlin via engine_jni.cpp's nativeSetSettings(), never
 // written here. A function returning a fresh dict, not a const module
 // dict, so every call reflects the latest push rather than a
-// build-time-frozen snapshot. Passwords (ssh/http) are never exposed --
-// see SettingsManager.kt.
+// build-time-frozen snapshot. Passwords (ssh/http) are never exposed.
+// See SettingsManager.kt.
 
 extern "C" {
 #include "py/obj.h"

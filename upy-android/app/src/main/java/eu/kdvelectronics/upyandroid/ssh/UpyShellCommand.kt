@@ -9,45 +9,7 @@ import org.apache.sshd.server.command.Command
 import java.io.InputStream
 import java.io.OutputStream
 
-// One instance per SSH channel (a real interactive shell session, not
-// a one-shot command). Confirmed via native-bringup/my-overrides/
-// embed_util.c that mp_embed_exec_str already compiles an entire
-// submitted string as one unit (MP_PARSE_FILE_INPUT), exactly like the
-// on-screen terminal's own multi-line box + Run button -- so this does
-// NOT need genuine line-by-line REPL continuation-detection
-// (mp_repl_continue_with_input()-style logic). Instead: accumulate a
-// multi-line edit buffer, submit the whole thing on a blank line,
-// reusing ScriptExecCore.run()/mp_embed_exec_str completely unchanged.
-//
-// Key bindings, all universal ASCII control codes, no client-side
-// config needed: blank line (Enter twice) submits the accumulated
-// buffer; Ctrl+C (0x03) interrupts (bypasses the busy gate, matching
-// EngineWorker.interrupt()'s own bypass of its task queue); Ctrl+D
-// (0x04) resets the shell. All three map 1:1 onto AdbExecProvider's own
-// run/interrupt/reset methods, via the SAME shared ScriptExecCore.
-// Deliberately NOT Ctrl+D-closes-the-connection (unlike a real POSIX
-// shell's own EOF-on-Ctrl+D convention) -- there was otherwise no way
-// to end the SSH session from the client's typed input at all, since
-// MINA SSHD only calls destroy() when the underlying channel/transport
-// itself closes. Fixed via a plain typed `exit`/`quit` line instead,
-// only recognized as a standalone first line of a fresh submission
-// (bufferedLines empty) -- neither word is a reserved keyword or even
-// a builtin in this MicroPython build (confirmed: `exit` only exists
-// namespaced as sys.exit/_thread.exit, `quit` isn't a registered
-// identifier at all here), so intercepting them client-side, before
-// anything reaches MicroPython, can never misfire against a real
-// script.
-//
-// No real pty is allocated on this side even when the SSH client
-// requests one (pty-req) -- MINA SSHD just tracks the requested
-// terminal modes in Environment, it never creates an OS-level pty. A
-// real OpenSSH client that believes it has a remote pty puts its own
-// local terminal into raw mode (no local echo, every keystroke --
-// including backspace/arrows -- sent raw), so this command must do its
-// own byte-by-byte echo and backspace handling, or the user sees
-// nothing while typing. Arrow keys/other multi-byte ESC sequences are
-// swallowed, not interpreted (no line-editing/history over SSH for v1
-// -- out of this plan's own stated scope).
+// see session-state: UpyShellCommand.kt#UpyShellCommand
 class UpyShellCommand(private val context: Context) : Command {
     private lateinit var input: InputStream
     private lateinit var output: OutputStream
@@ -57,14 +19,7 @@ class UpyShellCommand(private val context: Context) : Command {
     @Volatile
     private var running = true
 
-    // Guards against a second blank-line submission overlapping the
-    // first (ScriptExecCore itself already gates concurrent runs across
-    // ALL callers with its own busy flag, returning Busy -- this is a
-    // narrower, same-channel concern: don't even bother calling run()
-    // again from this channel while its own previous submission is
-    // still in flight). Deliberately NOT checked before Ctrl+C/Ctrl+D --
-    // those must always be dispatched immediately, on the read-loop's
-    // own thread, regardless of what the submit thread is doing.
+    // see session-state: UpyShellCommand.kt#UpyShellCommand
     @Volatile
     private var submitting = false
 
@@ -77,9 +32,7 @@ class UpyShellCommand(private val context: Context) : Command {
     }
 
     override fun setErrorStream(errorStream: OutputStream) {
-        // Never written to -- this shell has no separate stderr stream
-        // of its own, matching the on-screen terminal's own single
-        // combined output.
+        // see session-state: UpyShellCommand.kt#UpyShellCommand
     }
 
     override fun setExitCallback(callback: ExitCallback) {
@@ -130,20 +83,7 @@ class UpyShellCommand(private val context: Context) : Command {
                         write("\r\n")
                         val trimmed = lineBuf.toString().trim().lowercase()
                         if (bufferedLines.isEmpty() && (trimmed == "exit" || trimmed == "quit")) {
-                            // Only intercepted as a standalone first line of a
-                            // fresh submission (bufferedLines empty) -- a real
-                            // script that merely contains "exit"/"quit"
-                            // partway through a longer multi-line buffer is
-                            // never affected, since by then bufferedLines is
-                            // already non-empty and this falls through to the
-                            // plain accumulate-and-continue branch below.
-                            // Neither word is a reserved keyword or even a
-                            // builtin in this MicroPython build (confirmed:
-                            // `exit` only exists namespaced as sys.exit/
-                            // _thread.exit, `quit` isn't a registered
-                            // identifier at all here) -- safe to intercept
-                            // client-side, before anything reaches
-                            // MicroPython.
+                            // see session-state: UpyShellCommand.kt#UpyShellCommand
                             write("bye\r\n")
                             running = false
                         } else if (lineBuf.isEmpty() && bufferedLines.isNotEmpty()) {
@@ -161,7 +101,7 @@ class UpyShellCommand(private val context: Context) : Command {
                             write("\b \b")
                         }
                     }
-                    0x1b -> { // ESC -- swallow a following simple CSI sequence (arrow keys etc.)
+                    0x1b -> { // ESC: swallow a following simple CSI sequence (arrow keys etc.)
                         val next = input.read()
                         if (next == '['.code) {
                             input.read()
@@ -177,23 +117,15 @@ class UpyShellCommand(private val context: Context) : Command {
                 }
             }
         } catch (e: Exception) {
-            // Channel closed / IO error -- fall through to exit, same
+            // Channel closed or IO error. Fall through to exit, same
             // as a real shell's own EOF-on-disconnect handling.
         }
         exitCallback?.onExit(0)
     }
 
-    // Runs ScriptExecCore.run() on its own thread, never the read-loop's
-    // own -- a script that runs for a while (or forever, until Ctrl+C)
-    // must not block this channel from reading the very next byte, or
-    // Ctrl+C could never be delivered while it's running. See this
-    // class's own header comment and the `submitting` field's comment
-    // above for why.
+    // see session-state: UpyShellCommand.kt#submitAsync
     private fun submitAsync(code: String) {
-        // Only ever set true here, on the read loop's own single thread
-        // (the submit thread only ever sets it back to false, in its
-        // own finally block below) -- no genuine race, a plain
-        // @Volatile boolean is enough, no AtomicBoolean/CAS needed.
+        // see session-state: UpyShellCommand.kt#submitAsync
         if (submitting) {
             write("[a script is already running on this session]\r\n>>> ")
             return

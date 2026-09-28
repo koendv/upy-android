@@ -26,7 +26,7 @@ class EngineService : Service() {
     // instance field: android.fileprovider's native bridge (running on
     // :engine's worker thread) reaches it via FindClass+GetStaticMethodID
     // on this class, the same way engine_jni.cpp's other JNI bridges
-    // reach a known class -- there being only one EngineService instance
+    // reach a known class. There being only one EngineService instance
     // alive per process makes this equivalent to an instance field in
     // practice. @JvmStatic is required for the method to compile to a
     // real static method JNI can find, not a Companion-instance method.
@@ -61,7 +61,7 @@ class EngineService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        // Plain synchronous local read -- no AIDL round-trip needed.
+        // Plain synchronous local read. No AIDL round-trip needed.
         // heap_size_mb is fixed for this process's whole lifetime;
         // see EngineWorker.kt#start.
         val heapSizeMb = SettingsManager(applicationContext).heapSizeMb
@@ -106,7 +106,7 @@ class EngineService : Service() {
         // MicroPython/GC state, so it must not wait behind a running
         // script. See IEngine.aidl#setSettings.
         override fun setSettings(settings: Bundle) {
-            // No heap_size_mb here -- that is read once, locally, in
+            // No heap_size_mb here. That is read once, locally, in
             // onCreate() above. See Engine.kt#nativeSetSettings.
             Engine.nativeSetSettings(
                 settings.getBoolean("ssh_enabled", false),

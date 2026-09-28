@@ -1,20 +1,5 @@
-// upy-android OpenMV support layer -- stub replacement for OpenMV's
-// lib/imlib/framebuffer.h/.c. Deliberately NOT vendoring the real one:
-// it's OpenMV's fixed/pooled hardware-framebuffer + IDE-live-preview
-// subsystem (queues, double/triple buffering, fps tracking -- see
-// SESSION_STATE.yaml's OpenMV research entry), tied to their sensor
-// capture pipeline, which our own Camera2-based architecture won't use.
-//
-// Real finding from reading the source: this coupling is narrow. No
-// imlib/*.c file references framebuffer.h except framebuffer.c itself
-// (not vendored here). In py_helper.c/py_image.c it's confined to a
-// handful of specific call sites (py_helper_set_to_framebuffer/
-// update_framebuffer/is_equal_to_framebuffer -- OpenMV's IDE-streaming
-// and sensor-capture glue), none of which our own "load an image (from
-// VFS or the camera module), run an op on it" scripts should ever reach.
-// The symbols below exist only to satisfy the linker for those call
-// sites; see link_stubs.c -- each one aborts loudly if actually called,
-// which would mean this assumption was wrong.
+// upy-android OpenMV support layer. Stub replacement for OpenMV's
+// lib/imlib/framebuffer.h/.c. See session-state: framebuffer.h#UPY_ANDROID_STUB_FRAMEBUFFER_H
 #ifndef UPY_ANDROID_STUB_FRAMEBUFFER_H
 #define UPY_ANDROID_STUB_FRAMEBUFFER_H
 
@@ -37,10 +22,7 @@ typedef enum {
     FB_FLAG_INVALIDATE = (1 << 7),
 } framebuffer_flags_t;
 
-// Trimmed to just the fields our copied call sites actually read (u, v,
-// pending, buf_count) -- see SESSION_STATE.yaml for the grep that found
-// this exact set. The real struct has many more (queues, mutex, fps
-// tracking) that nothing we vendor touches.
+// See session-state: framebuffer.h#UPY_ANDROID_STUB_FRAMEBUFFER_H
 typedef struct framebuffer {
     int32_t u, v;
     uint8_t pending;

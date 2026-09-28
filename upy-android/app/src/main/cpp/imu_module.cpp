@@ -1,4 +1,4 @@
-// upy-android native imu module. OUR OWN bridge between MicroPython
+// upy-android native imu module. A bridge between MicroPython
 // and Android's NDK sensor API, deliberately shaped to match upstream
 // OpenMV's own py_imu.c Python API.
 // see session-state: imu_module.cpp#module_design
@@ -48,9 +48,9 @@ struct ImuState {
     ASensorManager *manager;
     ALooper *looper;
     ASensorEventQueue *queue;
-    const ASensor *accel;     // NULL if this device has none -- a fixed hardware fact, queried once
-    const ASensor *gyro;      // NULL if this device has none -- a fixed hardware fact, queried once
-    const ASensor *proximity; // NULL if this device has none -- a fixed hardware fact, queried once
+    const ASensor *accel;     // NULL if this device has none. A fixed hardware fact, queried once
+    const ASensor *gyro;      // NULL if this device has none. A fixed hardware fact, queried once
+    const ASensor *proximity; // NULL if this device has none. A fixed hardware fact, queried once
     bool queried_capabilities;
     bool accel_enabled;
     bool gyro_enabled;
@@ -182,8 +182,8 @@ bool wait_for_fresh_event(int32_t want_type, ASensorEvent *out) {
         if (got_one) {
             return true;
         }
-        // Raises (nlr_jump) if the user tapped Interrupt while we were
-        // waiting. Same mechanism camera_module.cpp's wait loop uses.
+        // Raises (nlr_jump) if the user tapped Interrupt during the
+        // wait. Same mechanism camera_module.cpp's wait loop uses.
         mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
     }
     // Self-heal on timeout rather than stay silently wedged.

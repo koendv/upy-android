@@ -1,23 +1,5 @@
-// upy-android OpenMV support layer -- stub replacement for ARM's
-// CMSIS-DSP arm_math.h. Confirmed via grep (see SESSION_STATE.yaml) that
-// nothing in imlib/py_image.c calls a real arm_math.h function outside
-// `#if defined(ARM_MATH_DSP)` guards, which we never define -- but
-// lib/imlib/imlib.h #includes <arm_math.h> UNCONDITIONALLY, and
-// lib/imlib/simd.h's portable (non-NEON) fallback path unconditionally
-// uses the float32_t typedef, so the header must still exist and provide
-// that one type.
-//
-// Also carries the __ARM_ARCH override both simd.h and fmath.h need (see
-// cmsis_extension.h for the simd.h/Helium-MVE finding) -- this file
-// is included first, by both of them, before either does its own
-// __ARM_ARCH check, so it's the one place to do this once. Second,
-// separate finding beyond the simd.h one: fmath.h ALSO branches on
-// __ARM_ARCH (`#if (__ARM_ARCH >= 7)`) to pick inline 32-bit ARM/Thumb
-// VFP assembly (`vsqrt.f32`, register constraint "=t") over a plain libm
-// sqrtf() fallback -- that inline asm is invalid on aarch64 (wrong
-// instruction set entirely, not just wrong calling convention), so
-// __ARM_ARCH must land BELOW 7 here, not just below simd.h's threshold
-// of 8 -- 6 clears both checks in one override.
+// upy-android OpenMV support layer. Stub replacement for ARM's
+// CMSIS-DSP arm_math.h. See session-state: arm_math.h#UPY_ANDROID_STUB_ARM_MATH_H
 #ifndef UPY_ANDROID_STUB_ARM_MATH_H
 #define UPY_ANDROID_STUB_ARM_MATH_H
 
@@ -30,18 +12,7 @@
 
 typedef float float32_t;
 
-// Third finding, different from the __ARM_ARCH branches above: imlib.c
-// calls a handful of real CMSIS-Core saturating-arithmetic intrinsics
-// (__USAT/__SSAT/__PKHBT/__SMLAD) UNCONDITIONALLY -- not gated behind
-// ARM_MATH_DSP or __ARM_ARCH at all, so OpenMV apparently treats these as
-// "always available" on every board they ship, unlike the heavier
-// arm_math.h DSP functions. Real CMSIS normally supplies these via
-// core_cm*.h (pulled in transitively through CMSIS_MCU_H, which we stub
-// to empty -- see board_config.h). Portable C equivalents below, per
-// ARM's own public CMSIS-Core documentation of each intrinsic's
-// semantics (saturate/pack/dual-multiply-accumulate) -- not copied from
-// any specific vendor header, just the well-known bit-manipulation
-// formulas any implementation of these semantics would use.
+// See session-state: arm_math.h#__USAT
 static inline int32_t __USAT(int32_t val, uint32_t sat) {
     int32_t max = (int32_t) ((1UL << sat) - 1);
     if (val > max) {
@@ -84,7 +55,7 @@ static inline int32_t __SMUAD(int32_t x, int32_t y) {
 // __USAT16: saturates each 16-bit half of a packed 32-bit value
 // independently (imlib/simd.h's vusat_s16_narrow_u8_lo macro applies it
 // to a whole packed word at once, then masks/shifts the two halves back
-// together itself -- this just needs to behave the same as two ordinary
+// together itself. This just needs to behave the same as two ordinary
 // __USAT(., sat) calls on each 16-bit lane).
 static inline uint32_t __USAT16(int32_t val, uint32_t sat) {
     int16_t lo = (int16_t) (val & 0xFFFF);
@@ -95,7 +66,7 @@ static inline uint32_t __USAT16(int32_t val, uint32_t sat) {
 }
 
 // __USAT_ASR(val, sat, shift): arithmetic-shift-right then unsigned-
-// saturate -- filter.c's own call sites (e.g. __USAT_ASR(tmp, 8, 16))
+// saturate. filter.c's own call sites (e.g. __USAT_ASR(tmp, 8, 16))
 // make the "shift then saturate" order unambiguous from usage.
 static inline int32_t __USAT_ASR(int32_t val, uint32_t sat, uint32_t shift) {
     return __USAT(val >> shift, sat);
@@ -133,7 +104,7 @@ static inline uint32_t __QADD16(int32_t x, int32_t y) {
 }
 
 // __SSUB16: subtracts each packed 16-bit half of y from x independently,
-// wrapping (not saturating) on overflow -- same lane-split pattern as
+// wrapping (not saturating) on overflow. Same lane-split pattern as
 // __QADD16 above, just subtract instead of saturating-add.
 static inline uint32_t __SSUB16(int32_t x, int32_t y) {
     int16_t x_lo = (int16_t) (x & 0xFFFF), x_hi = (int16_t) (x >> 16);

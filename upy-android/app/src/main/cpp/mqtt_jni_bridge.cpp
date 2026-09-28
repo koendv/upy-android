@@ -1,5 +1,5 @@
 // JNI-facing implementation for umqtt (mqtt_module.cpp). One JNI call
-// each, through MqttShim.kt -- see mqtt_jni_bridge.h's own header
+// each, through MqttShim.kt. See mqtt_jni_bridge.h's own header
 // comment for why mqtt_module.cpp never sees a real jobject/JNIEnv*.
 
 #include "mqtt_jni_bridge.h"
@@ -28,7 +28,7 @@ jfieldID g_message_topic_field = nullptr;
 jfieldID g_message_payload_field = nullptr;
 
 // Same per-call JNIEnv* lookup as litert_jni_bridge.cpp's own
-// current_env() -- the worker thread is JVM-attached for :engine's
+// current_env(). The worker thread is JVM-attached for :engine's
 // entire lifetime, so GetEnv() alone is enough, no Attach/Detach.
 JNIEnv *current_env() {
     JNIEnv *env = nullptr;

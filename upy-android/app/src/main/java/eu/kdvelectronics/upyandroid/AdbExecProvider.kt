@@ -13,8 +13,8 @@ import eu.kdvelectronics.upyandroid.managers.SettingsManager
 
 // adb-driven one-shot MicroPython exec. Delegates the actual
 // connect/run/reset/interrupt work to ScriptExecCore, shared with the
-// SSH shell (Part 8) -- this class is now only the UID-gated,
-// base64-decoding front door.
+// SSH shell. This class is now only the UID-gated, base64-decoding
+// front door.
 // see session-state: AdbExecProvider.kt#AdbExecProvider
 class AdbExecProvider : ContentProvider() {
     private lateinit var appContext: Context

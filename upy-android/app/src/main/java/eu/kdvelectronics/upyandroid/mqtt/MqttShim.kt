@@ -3,10 +3,10 @@
 // The only file in the app that imports com.hivemq.client.*. Every
 // function here is flat/top-level, JNI-simple parameter/return types
 // (String, ByteArray, Int, Boolean, Long via the opaque MqttConnection
-// object reference) -- same convention as LiteRtShim.kt.
+// object reference), same convention as LiteRtShim.kt.
 //
 // MQTT 3.1.1 only (useMqttVersion3()), matching real umqtt.simple's own
-// protocol version -- HiveMQ's client also supports MQTT 5, not used
+// protocol version. HiveMQ's client also supports MQTT 5, not used
 // here.
 //
 // check_msg()/wait_msg() need no manual message queue or subscribe-time
@@ -14,7 +14,7 @@
 // (obtained via publishes(MqttGlobalPublishFilter.ALL) right after a
 // successful connect) is already exactly the "poll for one queued
 // incoming message, blocking or not" primitive umqtt.simple's own
-// wait_msg()/check_msg() need -- ALL (not SUBSCRIBED) matches
+// wait_msg()/check_msg() need. ALL (not SUBSCRIBED) matches
 // umqtt.simple's own single-callback-for-every-incoming-PUBLISH model.
 package eu.kdvelectronics.upyandroid.mqtt
 
@@ -30,7 +30,7 @@ class MqttConnection(val client: Mqtt3BlockingClient) {
 
 class MqttMessage(val topic: String, val payload: ByteArray)
 
-// MqttQos.fromCode() returns null for anything outside 0..2 -- surfaced
+// MqttQos.fromCode() returns null for anything outside 0..2. Surfaced
 // here as a real, catchable exception (caught by mqtt_jni_bridge.cpp's
 // ExceptionCheck() same as any other Kotlin exception) rather than a
 // bare NPE, so a script passing a bad qos gets an OSError with a
@@ -66,7 +66,7 @@ fun connect(conn: MqttConnection, username: String?, password: ByteArray?,
     } else {
         builder.send()
     }
-    // Opened once per connection, right after connect -- closed again
+    // Opened once per connection, right after connect. Closed again
     // in disconnect(). Must exist before check_msg()/wait_msg() can
     // poll anything.
     conn.publishes = conn.client.publishes(MqttGlobalPublishFilter.ALL)
@@ -95,10 +95,10 @@ fun subscribe(conn: MqttConnection, topic: String, qos: Int) {
         .send()
 }
 
-// timeoutMs < 0 blocks indefinitely (wait_msg() -- called in a chunked
+// timeoutMs < 0 blocks indefinitely (wait_msg() is called in a chunked
 // loop from the native side, not with a truly indefinite value, so a
-// pending interrupt can still be observed between chunks -- see
-// mqtt_module.cpp's own wait_msg() comment); timeoutMs == 0 polls once,
+// pending interrupt can still be observed between chunks, see
+// mqtt_module.cpp's own wait_msg() comment). timeoutMs == 0 polls once,
 // right now, without waiting (check_msg()). Returns null on timeout/no
 // message queued, matching umqtt.simple's own check_msg() returning
 // None when nothing is available.

@@ -1,17 +1,16 @@
-# umqtt confidence test -- confirms the JNI/Kotlin bridge (MqttShim.kt,
-# mqtt_jni_bridge.cpp) actually connects to a REAL external MQTT broker
+# umqtt confidence test. Confirms the JNI/Kotlin bridge (MqttShim.kt,
+# mqtt_jni_bridge.cpp) actually connects to a real external MQTT broker
 # over a real network, not just that the code compiles.
 #
-# Uses a public test broker (test.mosquitto.org, plain TCP, no auth) and
-# two RETAINED messages so this script's own network round trip can be
-# independently cross-checked from a completely separate MQTT client
-# (see the accompanying verification driven from the host machine,
-# documented in SESSION_STATE.yaml): a retained "ping" message is
-# published from the host BEFORE this script runs, and this script
-# publishes a retained "pong" reply the host checks for afterward --
-# retained delivery means the exact order/timing between the two
-# clients doesn't matter, only that both sides genuinely reach the same
-# real broker.
+# Uses a public test broker (test.mosquitto.org, plain TCP, no auth)
+# and two retained messages so this script's own network round trip
+# can be independently cross-checked from a completely separate MQTT
+# client driven from the host machine: a retained "ping" message is
+# published from the host before this script runs, and this script
+# publishes a retained "pong" reply the host checks for afterward.
+# Retained delivery means the exact order or timing between the two
+# clients doesn't matter, only that both sides genuinely reach the
+# same real broker.
 import time
 import umqtt
 

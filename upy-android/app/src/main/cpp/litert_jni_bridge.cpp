@@ -1,5 +1,5 @@
 // JNI-facing implementation for litert (litert_module.cpp). One JNI
-// call each, through LiteRtShim.kt -- see litert_jni_bridge.h's own
+// call each, through LiteRtShim.kt. See litert_jni_bridge.h's own
 // header comment for why litert_module.cpp never sees a real
 // jobject/JNIEnv*.
 // see session-state: litert_jni_bridge.cpp#hot_path_mechanism
@@ -45,10 +45,10 @@ JNIEnv *current_env() {
     return env;
 }
 
-// Applied after EVERY Call*Method/CallStatic*Method in this file, no
+// Applied after every Call*Method/CallStatic*Method in this file, no
 // exceptions. ExceptionClear() must happen before any further JNI call
 // and before litert_module.cpp's raise_os_error() (which longjmps via
-// nlr_raise()) -- a pending Java exception surviving a longjmp corrupts
+// nlr_raise()). A pending Java exception surviving a longjmp corrupts
 // JVM state.
 char *describe_and_clear_exception(JNIEnv *env) {
     jthrowable exc = env->ExceptionOccurred();
@@ -71,12 +71,11 @@ char *describe_and_clear_exception(JNIEnv *env) {
 // Extracts JniHandle's raw native handle from a real litert-api object
 // (Environment/CompiledModel/TensorBuffer all extend JniHandle). The
 // fieldID was resolved from JniHandle itself, which JNI guarantees
-// works across that class's subclasses -- no per-instance FindClass
+// works across that class's subclasses, no per-instance FindClass
 // needed. GetFieldID/GetLongField operate on the compiled classfile
 // directly and are blind to Kotlin's compiler-level `internal`
-// visibility check (which is why this extraction lives here, in C++,
-// and not in LiteRtShim.kt -- see that file's own header comment for
-// the empirical proof).
+// visibility check, which is why this extraction lives here, in C++,
+// and not in LiteRtShim.kt.
 long extract_handle(JNIEnv *env, jobject obj) {
     return (long) env->GetLongField(obj, g_handle_field);
 }
@@ -139,8 +138,8 @@ extern "C" void litert_bridge_init_impl(void *jni_env) {
         "closeCompiledModel", "(Lcom/google/ai/edge/litert/CompiledModel;)V");
     g_mid_close_tensor_buffer = env->GetStaticMethodID(g_shim_class,
         "closeTensorBuffer", "(Lcom/google/ai/edge/litert/TensorBuffer;)V");
-    // Any null jfieldID/jmethodID above is a packaging/signature bug --
-    // caught at first use (a pending NoSuchFieldError/NoSuchMethodError
+    // Any null jfieldID/jmethodID above is a packaging/signature bug.
+    // Caught at first use (a pending NoSuchFieldError/NoSuchMethodError
     // surfaces through describe_and_clear_exception() the moment
     // something calls it), not silently ignored here.
 }
@@ -180,9 +179,7 @@ extern "C" bool litert_bridge_create_compiled_model(void *env_global_ref, const 
 
 namespace {
 
-// v0: no packed-size query here at all (not just deferred -- see this
-// file's own header comment on litert_bridge_kotlin_read_int8 for why
-// buffer byte-size isn't tracked up front in this build).
+// see session-state: litert_jni_bridge.h#litert_bridge_kotlin_read_int8
 bool create_buffers(jmethodID mid, void *model_global_ref, long **out_handles,
                      void ***out_global_refs, size_t *out_count, char **out_err) {
     JNIEnv *env = current_env();
@@ -238,12 +235,7 @@ extern "C" bool litert_bridge_kotlin_write_int8(void *buf_global_ref, const int8
     return true;
 }
 
-// Reads TensorBuffer.readInt8()'s real length directly from the
-// jbyteArray it returns (GetArrayLength), rather than requiring a
-// pre-known size -- learning a Kotlin-created buffer's byte size via
-// the C API (LiteRtGetTensorBufferPackedSize) returned inconsistent
-// garbage during v0 development. *out_data is malloc'd here; the
-// caller (litert_module.cpp) frees it.
+// see session-state: litert_jni_bridge.h#litert_bridge_kotlin_read_int8
 extern "C" bool litert_bridge_kotlin_read_int8(void *buf_global_ref, int8_t **out_data,
                                                 size_t *out_len, char **out_err) {
     JNIEnv *env = current_env();
@@ -262,7 +254,7 @@ extern "C" bool litert_bridge_kotlin_read_int8(void *buf_global_ref, int8_t **ou
     return true;
 }
 
-// write_ndarray()'s float32 path -- a real typed TensorBuffer.writeFloat(),
+// write_ndarray()'s float32 path, a real typed TensorBuffer.writeFloat(),
 // not a byte-reinterpret through writeInt8. num_elements is a count of
 // floats, not bytes.
 extern "C" bool litert_bridge_kotlin_write_float(void *buf_global_ref, const float *data,
@@ -333,8 +325,8 @@ extern "C" bool litert_bridge_kotlin_read_int(void *buf_global_ref, int32_t **ou
 }
 
 // bool <-> jboolean marshaled explicitly (via a temporary jboolean
-// array) rather than reinterpret-casting a bool* directly -- jboolean
-// is an unsigned char with JNI_TRUE/JNI_FALSE values; C++ bool's
+// array) rather than reinterpret-casting a bool* directly. jboolean is
+// an unsigned char with JNI_TRUE/JNI_FALSE values; C++ bool's
 // representation is not guaranteed identical, so this avoids relying
 // on that.
 extern "C" bool litert_bridge_kotlin_write_bool(void *buf_global_ref, const bool *data,
@@ -436,7 +428,7 @@ extern "C" bool litert_bridge_kotlin_run(void *model_global_ref, void *const *in
     return true;
 }
 
-// ---- close(), always through the shim regardless of backend. ----
+// ---- close(), always through the shim. ----
 
 namespace {
 

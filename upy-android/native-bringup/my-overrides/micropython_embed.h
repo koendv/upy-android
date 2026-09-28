@@ -30,8 +30,8 @@
 #include <stdint.h>
 
 // stack_size is the actual size (bytes) of the calling thread's stack,
-// measured from stack_top -- required for MICROPY_STACK_CHECK to work (see
-// port/embed_util.c). root_path is the app's private storage directory,
+// measured from stack_top. MICROPY_STACK_CHECK requires this to work
+// (see port/embed_util.c). root_path is the app's private storage directory,
 // mounted as a VfsPosix at "/" (see port/embed_util.c's mp_embed_mount_vfs).
 void mp_embed_init(void *gc_heap, size_t gc_heap_size, void *stack_top, size_t stack_size, const char *root_path);
 void mp_embed_deinit(void);
@@ -46,16 +46,24 @@ void mp_embed_exec_mpy(const uint8_t *mpy, size_t len);
 // mp_embed_output_clear() before, and mp_embed_output_get() after, each
 // mp_embed_exec_str()/mp_embed_exec_mpy() call. Output includes both
 // normal print() text and any uncaught-exception traceback.
+//
+// The only output some callers get: AdbExecProvider runs a script via
+// one-shot adb shell content call, with no live channel back to the
+// shell, so this return value is the whole answer.
 void mp_embed_output_clear(void);
 const char *mp_embed_output_get(void);
 
-// Optional live output tap (upy-android addition, port/mphalport.c),
-// invoked once per mp_hal_stdout_tx_strn_cooked() write -- i.e. once per
-// print()/traceback write, not once per mp_embed_exec_str() call like
-// mp_embed_output_get() above. str is not null-terminated; use len. Pass
-// cb == NULL to disable (the default). Set this around a single
-// mp_embed_exec_str()/mp_embed_exec_mpy() call and clear it again after
-// -- context is caller-owned and only valid for that one call.
+// Optional live output tap (upy-android addition, port/mphalport.c).
+// Needed for long-running/infinite scripts (e.g. while True:
+// print(...)): mp_embed_exec_str() only returns once the script stops,
+// so without live chunks the terminal would show nothing at all while
+// such a script runs, only a dump at the end. Invoked once per
+// mp_hal_stdout_tx_strn_cooked() write, i.e. once per print()/
+// traceback write, not once per mp_embed_exec_str() call like
+// mp_embed_output_get() above. str is not null-terminated; use len.
+// Pass cb == NULL to disable (the default). Set this around a single
+// mp_embed_exec_str()/mp_embed_exec_mpy() call and clear the callback
+// again after. Context is caller-owned and only valid for that one call.
 typedef void (*mp_embed_output_chunk_cb_t)(const char *str, size_t len, void *context);
 void mp_embed_set_output_chunk_cb(mp_embed_output_chunk_cb_t cb, void *context);
 

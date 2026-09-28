@@ -1,25 +1,7 @@
 @file:JvmName("LiteRtShim")
 // Thin JNI-facing glue for litert (litert_module.cpp/
-// litert_jni_bridge.cpp). The only file in the app that imports
-// com.google.ai.edge.litert.*. Every function here is flat/top-level
-// (not inside a class or object), with JNI-simple parameter/return
-// types (Long, Int, String, ByteArray, TensorBuffer arrays) -- no
-// default parameters, no nullable types, on this file's own JNI-facing
-// surface. @file:JvmName pins the compiled class name so
-// litert_jni_bridge.cpp's FindClass() doesn't depend on guessing
-// Kotlin's default file-name-mangling convention.
-//
-// Deliberately does NOT extract JniHandle's raw native handle -- that
-// field is Kotlin `internal`, and Kotlin enforces `internal` visibility
-// in the compiler frontend across module boundaries, independent of
-// the bytecode access modifier. Confirmed directly: three separate
-// attempts to reach it from Kotlin source (direct property access, a
-// backtick-escaped mangled getter call, a plain mangled getter call)
-// all failed to compile. Raw JNI (GetFieldID/GetLongField in
-// litert_jni_bridge.cpp) operates on the compiled classfile itself and
-// is completely blind to that compiler-level check, so extraction
-// happens there, not here.
-// see session-state: litert_module.cpp#module_design
+// litert_jni_bridge.cpp).
+// see session-state: LiteRtShim.kt#createEnvironment
 package eu.kdvelectronics.upyandroid.litert
 
 import com.google.ai.edge.litert.Accelerator
@@ -30,7 +12,7 @@ import com.google.ai.edge.litert.TensorBuffer
 fun createEnvironment(): Environment = Environment.create()
 
 // acceleratorValue is Accelerator's own .value int (NONE=0, CPU=1,
-// GPU=2, NPU=3), not an enum -- an Int is JNI-simple, an enum isn't.
+// GPU=2, NPU=3), not an enum. An Int is JNI-simple, an enum isn't.
 fun createCompiledModel(env: Environment, path: String, acceleratorValue: Int): CompiledModel {
     val accelerator = Accelerator.entries.first { it.value == acceleratorValue }
     return CompiledModel.create(path, CompiledModel.Options(accelerator), env)
@@ -70,7 +52,7 @@ fun readLong(buf: TensorBuffer): LongArray = buf.readLong()
 fun run(model: CompiledModel, inputs: Array<TensorBuffer>, outputs: Array<TensorBuffer>) =
     model.run(inputs.toList(), outputs.toList())
 
-// close() always goes through here -- the underlying native object has
+// close() always goes through here. The underlying native object has
 // exactly one owner (Kotlin's own AutoCloseable).
 fun closeEnvironment(env: Environment) = env.close()
 fun closeCompiledModel(model: CompiledModel) = model.close()

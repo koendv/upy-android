@@ -7,8 +7,8 @@
 
 #include "port/micropython_embed.h"
 
-// Standalone-test-only root path (the real engine gets this from Kotlin's
-// Context.filesDir instead -- see engine_jni.cpp).
+// Standalone-test-only root path. The real engine gets this from
+// Kotlin's Context.filesDir instead, see engine_jni.cpp.
 #define TEST_ROOT_PATH "/data/local/tmp/upy_vfs_test"
 
 static const char *example_1 =
@@ -42,9 +42,9 @@ static const char *example_3 =
     "    print('stack check caught', repr(er))\n"
 ;
 
-// VFS test: write a file, read it back, list the directory, then import
-// it as a module -- exercises open()/os.listdir()/import all landing on
-// real files under the mounted root (see mp_embed_mount_vfs).
+// VFS test: write a file, read it back, list the directory, then
+// import it as a module. Exercises open()/os.listdir()/import all
+// landing on real files under the mounted root (see mp_embed_mount_vfs).
 static const char *example_4 =
     "with open('hello.txt', 'w') as f:\n"
     "    f.write('hello from vfs')\n"
@@ -63,8 +63,8 @@ static const char *example_4 =
 ;
 
 // math module test: not overridden in mpconfigport.h, so MICROPY_PY_MATH
-// should already be on by default at our CORE_FEATURES rom level -- this
-// checks whether that's actually true (verify, don't assume).
+// should already be on by default at this port's CORE_FEATURES rom
+// level. This checks whether that's actually true. Verify, don't assume.
 static const char *example_5 =
     "import math\n"
     "print('math:', math.sqrt(16), math.pi, math.floor(3.7))\n"
@@ -73,8 +73,8 @@ static const char *example_5 =
 // random module test: exercises the seed-on-import path
 // (MICROPY_PY_RANDOM_SEED_INIT_FUNC -> mp_android_random_seed_init ->
 // arc4random_buf) plus the EXTRA_FUNCS surface (randint/choice/random).
-// randint(1, 1) forces a known value (range of exactly one option) as a
-// sanity check that isn't just "did it crash".
+// randint(1, 1) forces a known value, a range of exactly one option, as
+// a sanity check that isn't just "did it crash".
 static const char *example_6 =
     "import random\n"
     "print('random:', random.randint(1, 1), random.choice([42]), 0.0 <= random.random() < 1.0)\n"
@@ -98,11 +98,12 @@ static const char *example_8 =
     "print('re sub:', re.sub(r'\\d+', '#', 'a1b22c333'))\n"
 ;
 
-// time module test: ticks/sleep (chunked, non-busy-waiting mp_hal_delay_ms
-// -- see mphalport.c) plus real gmtime/localtime/mktime (mod_time_android.c
-// -- distinct UTC vs. device-local, not aliased like the esp32/rp2-style
-// generic path). t0/t1 sanity-check that sleep_ms(50) actually elapsed
-// roughly 50ms via ticks_diff, not just that it returned without crashing.
+// time module test: ticks/sleep (chunked, non-busy-waiting
+// mp_hal_delay_ms, see mphalport.c) plus real gmtime/localtime/mktime
+// (mod_time_android.c: distinct UTC vs. device-local, not aliased like
+// the esp32/rp2-style generic path). t0/t1 sanity-check that
+// sleep_ms(50) actually elapsed roughly 50ms via ticks_diff, not just
+// that it returned without crashing.
 static const char *example_9 =
     "import time\n"
     "t0 = time.ticks_ms()\n"
@@ -138,7 +139,7 @@ static const char *example_11 =
 ;
 
 // errno module test: pairs with the VFS jail-check in example_4, which
-// already raises OSError(2,) for a nonexistent path -- confirm that 2
+// already raises OSError(2,) for a nonexistent path. Confirm that 2
 // really is errno.ENOENT by name, not just a number that happens to work.
 static const char *example_12 =
     "import errno\n"
@@ -151,14 +152,14 @@ static const char *example_12 =
 // help('modules') test: py/builtinhelp.c is already core-compiled, this
 // is purely a config-flag addition (MICROPY_PY_BUILTINS_HELP{,_MODULES}).
 // Enumerates every MP_REGISTER_MODULE'd module automatically (walks
-// genhdr's module registry) -- confirms ulab shows up alongside the
+// genhdr's module registry). Confirms ulab shows up alongside the
 // stdlib additions with zero separate maintenance.
 static const char *example_13 =
     "help('modules')\n"
 ;
 
 // ulab module test: numpy/scipy-like numerical extension, not a core
-// MicroPython module -- vendored separately (my-overrides/ulab/, see
+// MicroPython module. Vendored separately (my-overrides/ulab/, see
 // micropython_embed.mk). Deliberately a non-trivial array (1000 elements,
 // not a 3-element toy) since ndarrays allocate from the GC heap and the
 // point of this test is partly to see whether a real numeric workload fits
@@ -173,13 +174,14 @@ static const char *example_14 =
     "print('ulab dot', np.sum(a * a))\n"
 ;
 
-// OpenMV image/imlib module test: vendored separately (my-overrides/openmv/,
-// see micropython_embed.mk), same tier as ulab above -- not a core
-// MicroPython module. First real end-to-end run of this module through the
-// actual main.c/mpconfigport.h pipeline (not the throwaway compile-only
-// spike's own standalone spike_main.c) -- same script the spike already
-// proved works on this hardware (native-bringup/openmv-spike/spike_main.c),
-// repeated here as the permanent regression test.
+// OpenMV image/imlib module test: vendored separately (my-overrides/
+// openmv/, see micropython_embed.mk), same tier as ulab above. Not a
+// core MicroPython module. First real end-to-end run of this module
+// through the actual main.c/mpconfigport.h pipeline, not the throwaway
+// compile-only spike's own standalone spike_main.c. Same script the
+// spike already proved works on this hardware
+// (native-bringup/openmv-spike/spike_main.c), repeated here as the
+// permanent regression test.
 static const char *example_15 =
     "import image\n"
     "print('image module imported ok')\n"
@@ -190,16 +192,15 @@ static const char *example_15 =
     "print('find_blobs on blank image:', img.find_blobs([(0, 255)]))\n"
     "for x in range(10):\n"
     "    for y in range(10):\n"
-    "        _ = img.set_pixel((x, y), 255)\n"  // set_pixel returns self (chaining) -- discard, or the bare statement's REPL-style auto-print floods output 100x
+    "        _ = img.set_pixel((x, y), 255)\n"  // set_pixel returns self (chaining). Discard, or the bare statement's REPL-style auto-print floods output 100x
     "print('find_blobs on filled square:', img.find_blobs([(200, 255)]))\n"
 ;
 
 // time.clock() test: OpenMV script compatibility (find_apriltags.py,
 // lcd_shield.py, single_color_rgb565_blob_tracking.py all do
-// `clock = time.clock()` once, then clock.tick()/clock.fps() in a loop
-// -- see py_clock.c/SESSION_STATE.yaml). Exercises the
-// MICROPY_PY_TIME_EXTRA_GLOBALS wiring in modtime_android.c, not just
-// that py_clock.c compiles.
+// `clock = time.clock()` once, then clock.tick()/clock.fps() in a
+// loop). Exercises the MICROPY_PY_TIME_EXTRA_GLOBALS wiring in
+// modtime_android.c, not just that py_clock.c compiles.
 static const char *example_16 =
     "import time\n"
     "clock = time.clock()\n"
@@ -216,26 +217,26 @@ static const char *example_16 =
 
 // Barcode/QR/keypoint test: zbar.c (find_barcodes, LGPL-2.1+),
 // qrcode.c/quirc (find_qrcodes, MIT), orb.c+fast.c (find_keypoints,
-// both BSD-3-Clause -- agast.c dropped, see SESSION_STATE.yaml) all
+// both BSD-3-Clause, agast.c dropped, see SESSION_STATE.yaml) all
 // newly vendored. No real barcode/QR image data available in this
 // smoke test, so find_barcodes()/find_qrcodes() are only proven to run
-// cleanly (empty result, not a crash) on a blank image -- genuine
+// cleanly (empty result, not a crash) on a blank image. Genuine
 // decode-a-real-code verification is a separate, later exercise.
 // find_keypoints() gets the stronger test: a filled square with real
 // corners, same idea as example_15's find_blobs() test.
-// corner_detector=image.CORNER_FAST is REQUIRED explicitly: py_image.c's
-// allowed_args default is CORNER_AGAST (hardcoded, unconditional) --
-// since agast.c is deliberately not vendored (dropped, see
+// corner_detector=image.CORNER_FAST is required explicitly. py_image.c's
+// allowed_args default is CORNER_AGAST, hardcoded, unconditional. Since
+// agast.c is deliberately not vendored (dropped, see
 // SESSION_STATE.yaml), that default now points at a detector that was
 // never compiled in, so kpts silently stays empty unless FAST is
 // requested by name.
 // Canvas size: orb_find_keypoints() (orb.c) computes
 // roi_scaled.w = image_w - PATCH_SIZE*2 (PATCH_SIZE=31) and returns
-// immediately with zero keypoints -- never even calling fast_detect()
-// -- whenever roi_scaled.w <= PATCH_SIZE*2, i.e. whenever image_w <=
-// 124. A first attempt at 32x32, then 96x96, both silently hit this
-// guard before fast_detect() ever ran -- misread as "the detector
-// found nothing" when the detector was never actually invoked. 160x160
+// immediately with zero keypoints, never even calling fast_detect(),
+// whenever roi_scaled.w <= PATCH_SIZE*2, i.e. whenever image_w <= 124.
+// A first attempt at 32x32, then 96x96, both silently hit this guard
+// before fast_detect() ever ran. Misread as "the detector found
+// nothing" when the detector was never actually invoked. 160x160
 // clears it with real margin.
 static const char *example_17 =
     "import image\n"
@@ -250,8 +251,8 @@ static const char *example_17 =
     "print('find_keypoints found something:', kpts is not None)\n"
 ;
 
-// Real GC heap size (crash-mitigation requirement #6) -- the 8KB demo size
-// is a toy value, not representative of what a REPL needs.
+// Real GC heap size (crash-mitigation requirement #6). The 8KB demo
+// size is a toy value, not representative of what a REPL needs.
 static char heap[2 * 1024 * 1024];
 
 // Explicit stack size for this test, smaller than the OS-provided main

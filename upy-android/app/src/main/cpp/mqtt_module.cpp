@@ -1,38 +1,5 @@
-// upy-android native umqtt module (top-level `umqtt`, matching a real/
-// expected module name -- same tier as `litert`/`ulab`, not
-// Android-specific glue, see Part 7 of the dev-workflow-speedups plan).
-// OUR OWN code, NOT vendored OpenMV/micropython-lib source.
-//
-// Matches real umqtt.simple's own script-facing API shape:
-// MQTTClient(client_id, server, port=0, user=None, password=None,
-// keepalive=0), set_callback(f), connect(clean_session=True),
-// disconnect(), ping(), publish(topic, msg, retain=False, qos=0),
-// subscribe(topic, qos=0), check_msg(), wait_msg() -- backed by HiveMQ
-// MQTT Client (com.hivemq:hivemq-mqtt-client) via MqttShim.kt/
-// mqtt_jni_bridge.cpp, not a from-scratch MQTT wire-protocol
-// implementation. Also exposed as umqtt.simple.MQTTClient (the SAME
-// type object, not a copy) for real drop-in compatibility with scripts
-// written against micropython-lib's `from umqtt.simple import
-// MQTTClient` -- umqtt.robust is deliberately NOT aliased the same way:
-// robust.MQTTClient's whole point is transparent auto-reconnect/retry
-// logic on top of simple's API, which this module does not implement,
-// and aliasing it would silently overclaim that behavior.
-//
-// KNOWN, DELIBERATE GAPS vs. real umqtt.simple (documented, not hidden):
-// - ssl=True raises NotImplementedError rather than silently connecting
-//   in plaintext -- TLS wiring is real future work, not done here.
-// - ping() checks HiveMQ's own client connection state rather than
-//   sending a real PINGREQ and waiting for PINGRESP -- HiveMQ's
-//   Mqtt3BlockingClient has no public ping() of its own; the client
-//   already sends real keep-alive PINGREQs internally in the
-//   background for as long as the connection is open, so this is a
-//   liveness check, not a wire-level round trip.
-// - set_last_will (real umqtt.simple) is not implemented.
-//
-// This file is qstr-scanned (SRC_QSTR in micropython_embed.mk).
-// #include <jni.h> is banned (no qstr-stub for it) -- all JNI calls
-// live in mqtt_jni_bridge.cpp, reached only through mqtt_jni_bridge.h's
-// primitive-typed (void*) boundary.
+// upy-android native umqtt module.
+// see session-state: mqtt_module.cpp#mqtt_client_make_new
 
 #include <cstdlib>
 #include <cstring>
@@ -57,7 +24,7 @@ void raise_os_error(int errno_, const char *msg) {
 }
 
 // msg is a malloc'd (strdup'd) string from mqtt_jni_bridge.cpp,
-// describing a real Kotlin/JNI exception -- copied into a new
+// describing a real Kotlin/JNI exception. Copied into a new
 // MicroPython str (which copies internally) before being freed here.
 void raise_os_error_free(int errno_, char *msg) {
     mp_obj_t args[2] = {
@@ -68,11 +35,7 @@ void raise_os_error_free(int errno_, char *msg) {
     nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
 }
 
-// Native-only registry, same reasoning as litert_module.cpp's own
-// LitertHandleNode/registry_design -- deliberately never holds an
-// mp_obj_t pointer, so mqtt_close_all() (called from engine_jni.cpp
-// BEFORE mp_embed_deinit(), when no Python object graph can be walked
-// safely any more) can still disconnect every open connection.
+// see session-state: mqtt_module.cpp#registry_add
 struct MqttHandleNode {
     void *global_ref;
     MqttHandleNode *next;
@@ -103,14 +66,7 @@ void registry_remove(MqttHandleNode *node) {
     }
 }
 
-// user/password/keepalive are captured at construction time and reused
-// at connect() time, matching real umqtt.simple's own constructor
-// (which stashes them as self.user/self.pswd/self.keepalive for the
-// same reason). Storing them as plain mp_obj_t fields on a
-// mp_obj_malloc'd struct is safe: MicroPython's GC is a conservative
-// mark-sweep over the whole heap, not schema-driven, so it traces any
-// pointer-shaped field regardless of the struct's own layout -- same
-// reasoning already relied on for the `callback` field below.
+// see session-state: mqtt_module.cpp#mqtt_client_obj_t
 struct mqtt_client_obj_t {
     mp_obj_base_t base;
     MqttHandleNode *node;  // null once closed
@@ -281,10 +237,10 @@ mp_obj_t mqtt_client_subscribe(size_t n_args, const mp_obj_t *pos_args, mp_map_t
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(mqtt_client_subscribe_obj, 2, mqtt_client_subscribe);
 
-// Shared by check_msg()/wait_msg() -- polls once with the given
+// Shared by check_msg()/wait_msg(). Polls once with the given
 // timeout, and if a message was queued, invokes self->callback(topic,
 // msg) (real umqtt.simple contract: the callback receives bytes for
-// both topic and msg, not str -- matched here via mp_obj_new_bytes for
+// both topic and msg, not str, matched here via mp_obj_new_bytes for
 // both, not mp_obj_new_str).
 bool poll_and_dispatch(mqtt_client_obj_t *self, long timeout_ms) {
     bool has_message = false;
@@ -317,14 +273,7 @@ mp_obj_t mqtt_client_check_msg(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mqtt_client_check_msg_obj, mqtt_client_check_msg);
 
-// Chunked-wait pattern, same reasoning/idiom as camera_module.cpp's own
-// wait_and_acquire_frame(): a single truly-indefinite blocking JNI call
-// would never observe a pending interrupt (Ctrl-C/interrupt()), since
-// nothing polls mp_handle_pending() while blocked inside Kotlin/Java
-// code. Real umqtt.simple's own wait_msg() blocks the whole interpreter
-// uninterruptibly (a raw blocking socket recv()) -- this is a real,
-// deliberate improvement over that upstream limitation, not a
-// deviation script authors need to work around.
+// see session-state: mqtt_module.cpp#mqtt_client_wait_msg
 constexpr long kWaitChunkMs = 250;
 
 mp_obj_t mqtt_client_wait_msg(mp_obj_t self_in) {
@@ -392,7 +341,7 @@ extern MP_DEFINE_CONST_OBJ_TYPE(
 
 namespace {
 
-// umqtt.simple submodule -- SAME MQTTClient type object as the
+// umqtt.simple submodule. Same MQTTClient type object as the
 // top-level one, not a copy, so `isinstance()`/type identity checks
 // behave exactly as if only one module existed. Real drop-in
 // compatibility target: `from umqtt.simple import MQTTClient`.
@@ -416,9 +365,9 @@ MP_DEFINE_CONST_DICT(umqtt_module_globals, umqtt_module_globals_table);
 
 }  // namespace
 
-// Top-level module -- matches a real/expected module name (umqtt.simple/
-// umqtt.robust from micropython-lib), same tier as litert/ulab, not
-// Android-specific glue. See this file's own header comment.
+// Top-level module, matches a real/expected module name
+// (umqtt.simple/umqtt.robust from micropython-lib).
+// see session-state: mqtt_module.cpp#mqtt_client_make_new
 extern "C" const mp_obj_module_t umqtt_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &umqtt_module_globals,

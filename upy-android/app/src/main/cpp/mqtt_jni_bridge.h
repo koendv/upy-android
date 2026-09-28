@@ -1,5 +1,5 @@
-// JNI-facing bridge for umqtt (mqtt_module.cpp). Deliberately NOT
-// included by mqtt_module.cpp with <jni.h> types exposed -- same
+// JNI-facing bridge for umqtt (mqtt_module.cpp). Deliberately not
+// included by mqtt_module.cpp with <jni.h> types exposed, same
 // qstr-scanning reasoning as litert_jni_bridge.h/mediastore_jni_bridge.h.
 // Every function here uses only primitive C types (void* for the JNI
 // global ref to the backing Kotlin MqttConnection object) so
@@ -22,7 +22,7 @@ void mqtt_bridge_init_impl(void *jni_env);
 
 // Every function below: returns true on success. On failure, returns
 // false and sets *out_err to a malloc'd (strdup'd) error string the
-// caller (mqtt_module.cpp) must free() -- same contract as
+// caller (mqtt_module.cpp) must free(), same contract as
 // litert_jni_bridge.h's own functions.
 
 bool mqtt_bridge_create(const char *client_id, const char *host, int port,
@@ -44,7 +44,7 @@ bool mqtt_bridge_publish(void *global_ref, const char *topic,
 
 bool mqtt_bridge_subscribe(void *global_ref, const char *topic, int qos, char **out_err);
 
-// timeout_ms < 0 blocks indefinitely (a single HiveMQ receive() call --
+// timeout_ms < 0 blocks indefinitely (a single HiveMQ receive() call,
 // mqtt_module.cpp's own wait_msg() calls this in a chunked loop, never
 // with a raw negative value directly from Python, so a pending
 // interrupt can still be observed between chunks). timeout_ms == 0
@@ -59,7 +59,7 @@ bool mqtt_bridge_poll(void *global_ref, long timeout_ms, bool *out_has_message,
 
 bool mqtt_bridge_is_connected(void *global_ref, bool *out_connected, char **out_err);
 
-// Releases the JNI global ref. Does NOT call disconnect() itself --
+// Releases the JNI global ref. Does not call disconnect() itself.
 // mqtt_module.cpp's own close path always calls mqtt_bridge_disconnect
 // first (matching a script's own explicit disconnect(), or
 // mqtt_close_all()'s reset/deinit teardown), then this.

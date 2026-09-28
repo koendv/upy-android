@@ -14,11 +14,11 @@ object Engine {
 
     // rootPath: app-private storage dir (Context.filesDir.absolutePath),
     // mounted as a jailed VfsPosix at "/". heapSizeMb is fixed for this
-    // :engine process's entire lifetime -- changing it needs a real app
+    // :engine process's entire lifetime. Changing it needs a real app
     // restart, not just Reset. See EngineWorker.kt#start. applicationContext:
     // needed by mediastore_module.cpp's own MediaStore/ContentResolver
-    // access (Part 7) -- read once here, same tier as rootPath/
-    // heapSizeMb, never re-passed on nativeReset().
+    // access, read once here, same tier as rootPath/heapSizeMb, never
+    // re-passed on nativeReset().
     external fun nativeInit(stackSizeBytes: Int, heapSizeMb: Int, rootPath: String, applicationContext: Context): Boolean
 
     // sink: optional, invoked synchronously on this same call/thread once
@@ -39,9 +39,9 @@ object Engine {
     external fun nativeSetDisplaySurface(surface: Surface?)
 
     // Writes directly into a mutex-protected native struct on the
-    // calling thread -- safe from any thread, same as
-    // nativeSetDisplaySurface. No heapSizeMb parameter here -- that is
-    // read once, in nativeInit() only; see this file's own comment on
+    // calling thread. Safe from any thread, same as
+    // nativeSetDisplaySurface. No heapSizeMb parameter here: that is
+    // read once, in nativeInit() only. See this file's own comment on
     // nativeInit and engine_jni.cpp#nativeSetSettings for why.
     external fun nativeSetSettings(
         sshEnabled: Boolean,

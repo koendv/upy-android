@@ -1,21 +1,5 @@
-// upy-android OpenMV support layer -- Android replacement for
-// OpenMV's common/umalloc.c (a TLSF-based pooled allocator with
-// STM32-specific memory-region tagging -- ITCM/DTCM/DMA_D1/D2/D3 -- see
-// SESSION_STATE.yaml). Android has a flat memory model, no such regions,
-// so the memory-attribute bits in `flags` (UMA_ITCM etc, common/umalloc.h)
-// are meaningless here and simply ignored, same tier of replacement as
-// this project's own modtime_android.c.
-//
-// Confirmed via grep (SESSION_STATE.yaml) that only uma_malloc/calloc/
-// realloc/free/avail are actually called anywhere in this port's
-// vendored file set -- the pool-management/stats functions (uma_pool_*,
-// uma_*_stats, uma_collect*) are declared in umalloc.h but never
-// referenced, so they're deliberately NOT implemented here; if a later
-// addition needs one, the linker will say so precisely. uma_malign()
-// used to be implemented too (added for py_ml.c's model-loading
-// fallback path, its only caller) -- removed along with py_ml.c/
-// tflm_backend.cc (see git history/SESSION_STATE.yaml); nothing else
-// ever called it.
+// upy-android OpenMV support layer. Android replacement for OpenMV's
+// common/umalloc.c. See session-state: umalloc_android.c#uma_malloc
 #include <stdlib.h>
 #include "umalloc.h"
 
@@ -40,9 +24,9 @@ void uma_free(void *ptr) {
 
 size_t uma_avail(uint32_t flags) {
     (void) flags;
-    // No real pool accounting on Android's flat heap -- a large-but-finite
-    // placeholder so callers that just sanity-check "is there roughly
-    // enough room" don't misbehave. Revisit if a real caller needs an
-    // honest number.
+    // No real pool accounting on Android's flat heap. A large-but-
+    // finite placeholder so callers that just sanity-check "is there
+    // roughly enough room" don't misbehave. Revisit if a real caller
+    // needs an honest number.
     return (size_t) 256 * 1024 * 1024;
 }

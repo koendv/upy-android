@@ -1,11 +1,10 @@
-# ml confidence test -- confirms `import ml` (the clean-room, litert-
+# ml confidence test. Confirms `import ml` (the clean-room, litert-
 # backed replacement for OpenMV's own non-commercially-licensed py_ml.c/
-# tflm_backend.cc, see git history/SESSION_STATE.yaml) actually runs
-# inference on THIS device and THIS build, not just that the code
-# compiles. This exact script, UNMODIFIED, was also the acceptance test
-# proving drop-in compatibility with OpenMV's own module while both
-# still existed side by side (shadowing) -- see SESSION_STATE.yaml for
-# that verification. Runs the SAME known-good fixture android.tf/
+# tflm_backend.cc) actually runs inference on this device and this
+# build, not just that the code compiles. This exact script,
+# unmodified, was also the acceptance test proving drop-in
+# compatibility with OpenMV's own module while both still existed side
+# by side (shadowing). Runs the same known-good fixture android.tf/
 # android.rt's own selftests used to (all three since deleted).
 #
 # Setup: copy add_simple.tflite onto the device's VFS root first, e.g.
@@ -28,7 +27,7 @@ def main():
 
     try:
         # postprocess is a required kwarg (matches OpenMV's own py_ml.c
-        # behavior, despite having a None default) -- must be passed
+        # behavior, despite having a None default). Must be passed
         # explicitly.
         model = ml.Model(MODEL_PATH, postprocess=None)
     except OSError as e:

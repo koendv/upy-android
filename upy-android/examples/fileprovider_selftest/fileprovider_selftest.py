@@ -1,14 +1,13 @@
-# android.fileprovider confidence test -- confirms the JNI/AIDL chain
+# android.fileprovider confidence test. Confirms the JNI/AIDL chain
 # (fileprovider_module.cpp -> EngineService.requestShare() ->
 # IEngineShareListener -> MainActivity's shareRequestListener ->
 # FileProviderShim.shareFile()) actually reaches the main process and
-# raises no exception. The one thing this script CANNOT confirm on its
-# own: that the OS share chooser sheet actually appeared on screen --
-# that is a real, visually-verifiable side effect (see project memory:
-# don't claim a UI effect happened just because the API call
-# succeeded), checked separately via a screenshot after running this.
+# raises no exception. The one thing this script cannot confirm on its
+# own is that the OS share chooser sheet actually appeared on screen.
+# That is a real, visually-verifiable side effect, checked separately
+# via a screenshot after running this.
 #
-# Same self-contained 1x1 JPEG fixture as mediastore_selftest.py -- no
+# Same self-contained 1x1 JPEG fixture as mediastore_selftest.py. No
 # camera/ulab dependency.
 import android
 

@@ -1,11 +1,11 @@
 package eu.kdvelectronics.upyandroid.model
 
 /**
- * A file or directory entry under the app's sandboxed storage root --
+ * A file or directory entry under the app's sandboxed storage root,
  * the same root MicroPython's VFS mounts as "/" (see EngineService /
  * mpconfigport.h). Adapted from micro-repl's MicroFile (MIT, see
  * NOTICE.html), simplified: no remote-board stat type bits, no REPL-string
- * decoding -- this app has no remote board, so a plain isDirectory flag
+ * decoding. This app has no remote board, so a plain isDirectory flag
  * is enough.
  */
 data class MicroFile(

@@ -1,9 +1,9 @@
-// upy-android native imu module. OUR OWN code, NOT vendored OpenMV
-// source. A from-scratch module against Android's NDK sensor API, not a
-// vendoring job: upstream py_imu.c is raw I2C/SPI register-level code
-// for a specific ST chip (LSM6DS3/DSM/DSOX), not portable. Android
-// exposes motion sensors only through ASensorManager/ASensorEventQueue,
-// never raw register access.
+// upy-android native imu module.
+// micropython android port only. A from-scratch module against
+// Android's NDK sensor API, not a vendoring job: upstream py_imu.c is
+// raw I2C/SPI register-level code for a specific ST chip (LSM6DS3/
+// DSM/DSOX), not portable. Android exposes motion sensors only
+// through ASensorManager/ASensorEventQueue, never raw register access.
 #ifndef UPY_ANDROID_IMU_MODULE_H
 #define UPY_ANDROID_IMU_MODULE_H
 

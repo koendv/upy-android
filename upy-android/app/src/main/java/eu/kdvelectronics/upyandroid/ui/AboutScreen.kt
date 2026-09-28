@@ -20,14 +20,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 
-// Non-peer detail screen, reached only via Settings' own "About" row --
-// same tier as EditorScreen (reached only via Explorer), not a
+// Non-peer detail screen, reached only via Settings' own "About" row.
+// Same tier as EditorScreen (reached only via Explorer), not a
 // NavigationSuiteScaffold destination of its own.
 //
 // NOTICE.html is bundled as a plain asset (build.gradle.kts's own
 // copyNotice task copies the repo-root file in at build time) and
 // rendered via the platform's own android.text.Html.fromHtml() into a
-// plain TextView -- no markdown/HTML rendering library needed, and
+// plain TextView. No markdown/HTML rendering library needed, and
 // LinkMovementMethod makes the <a href> source links actually tappable.
 // minSdk is 27, well above the API 24 the single-arg Html.fromHtml()
 // was deprecated at, so the two-arg FROM_HTML_MODE_COMPACT form is used

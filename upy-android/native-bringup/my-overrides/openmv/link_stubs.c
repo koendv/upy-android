@@ -1,15 +1,11 @@
-// upy-android OpenMV support layer -- link-satisfying stub bodies for
-// framebuffer.h and omv_csi.h. Each one aborts loudly if actually called:
-// our Camera2/NDK-based architecture replaces OpenMV's own hardware-
-// framebuffer/sensor-capture pipeline entirely (see framebuffer.h/
-// omv_csi.h), so nothing in this port should ever reach these -- hitting
-// one means that assumption needs revisiting, not that the stub needs
-// quiet fallback behavior that would hide the surprise.
-//
-// Proven correct (not just written) by the compile-only spike
-// (native-bringup/openmv-spike/, 2026-09-16): a "load a static image from
-// the VFS and run an op on it" test script compiled, linked, and ran
-// find_blobs() on-device without ever hitting one of these.
+// upy-android OpenMV support layer. Link-satisfying stub bodies for
+// framebuffer.h and omv_csi.h. Each one aborts loudly if actually
+// called. This project's own Camera2/NDK-based architecture replaces
+// OpenMV's own hardware-framebuffer/sensor-capture pipeline entirely
+// (see framebuffer.h/omv_csi.h), so nothing in this port should ever
+// reach these. Hitting one means that assumption needs revisiting, not
+// that the stub needs quiet fallback behavior that would hide the
+// surprise.
 #include <stdio.h>
 #include <stdlib.h>
 #include "framebuffer.h"

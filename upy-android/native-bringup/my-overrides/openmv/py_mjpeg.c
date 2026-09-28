@@ -25,18 +25,18 @@
  *
  * upy-android PATCH (this file replaces vendor/openmv/py_mjpeg.c, see
  * apply-overrides.sh): same patch as my-overrides/openmv/py_gif.c, see
- * that file's own header comment for the full rationale -- the
+ * that file's own header comment for the full rationale. The
  * unmodified py_mjpeg_open() unconditionally calls
  * framebuffer_get(FB_MAINFB_ID) to default width/height from OpenMV's
  * live sensor-capture framebuffer singleton, a hardware subsystem this
  * port never vendors (my-overrides/openmv/framebuffer.h's own stub
- * aborts if actually called). Patched to default from our own
- * camera_module.cpp's camera_get_current_size() instead -- restores the
- * exact unmodified-script call convention (mjpeg.Mjpeg(path), no
+ * aborts if actually called). Patched to default from
+ * camera_module.cpp's camera_get_current_size() instead. This restores
+ * the exact unmodified-script call convention (mjpeg.Mjpeg(path), no
  * explicit width=/height= needed); explicit kwargs, when given, still
- * take precedence. write()/add_frame() itself needed no change -- it
- * already takes an explicit image_t from the caller, never touching
- * any framebuffer.
+ * take precedence. write()/add_frame() itself needed no change,
+ * already taking an explicit image_t from the caller and never
+ * touching any framebuffer.
  */
 #include "imlib_config.h"
 #if defined(IMLIB_ENABLE_IMAGE_FILE_IO)
@@ -200,8 +200,8 @@ static mp_obj_t py_mjpeg_open(size_t n_args, const mp_obj_t *pos_args, mp_map_t 
 
     // upy-android PATCH: default from the csi module's own currently
     // -configured size (camera_module.cpp, see this file's own header
-    // comment) instead of OpenMV's framebuffer_get(FB_MAINFB_ID) --
-    // explicit width=/height= kwargs still win when given.
+    // comment) instead of OpenMV's framebuffer_get(FB_MAINFB_ID).
+    // Explicit width=/height= kwargs still win when given.
     int32_t cam_width, cam_height;
     bool cam_color;
     camera_get_current_size(&cam_width, &cam_height, &cam_color);

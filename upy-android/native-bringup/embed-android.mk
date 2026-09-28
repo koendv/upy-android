@@ -1,25 +1,24 @@
 # Android-specific tuned-down extmod.mk. Real MicroPython ports
 # (unix, stm32, esp32, rp2, ...) get extmod modules and lib/re1.5 by
 # including $(MICROPYTHON_TOP)/extmod/extmod.mk and compiling straight
-# from the monorepo tree -- ports/embed/embed.mk deliberately does NOT
-# pull that in (most extmod modules -- networking, flash filesystems,
-# bluetooth, ssl -- don't make sense for "embed MicroPython in an
+# from the monorepo tree. ports/embed/embed.mk deliberately does not
+# pull that in (most extmod modules, networking, flash filesystems,
+# bluetooth, ssl, don't make sense for "embed MicroPython in an
 # arbitrary host app"), so this project has to opt the few modules it
 # actually uses back in itself: json, os, random, re, time, binascii,
 # and the VFS/POSIX-file layer.
 #
 # Every file below was confirmed byte-identical to its real upstream
-# path before this was written (see SESSION_STATE.yaml's extmod audit) --
-# this file's whole point is to fetch them fresh from the pinned
-# $(MICROPYTHON_TOP) clone at generation time instead of vendoring
-# copies into this repo's own git history (my-overrides/extmod/ no
-# longer exists -- see the commit that added this file).
+# path before this was written. This file's whole point is to fetch
+# them fresh from the pinned $(MICROPYTHON_TOP) clone at generation
+# time instead of vendoring copies into this repo's own git history
+# (my-overrides/extmod/ no longer exists as of this file).
 #
-# lib/re1.5/*.c are NOT separate compile units here, matching real
+# lib/re1.5/*.c are not separate compile units here, matching real
 # upstream: extmod/modre.c #includes them textually (a quoted #include
-# resolves relative to the INCLUDING FILE'S OWN DIRECTORY first, before
-# any -I path), so they only need to exist at extmod/lib/re1.5/
-# alongside the copied modre.c -- never compiled separately, never in
+# resolves relative to the including file's own directory first,
+# before any -I path), so they only need to exist at extmod/lib/re1.5/
+# alongside the copied modre.c. Never compiled separately, never in
 # SRC_QSTR.
 
 ANDROID_EXTMOD_FILES = \
@@ -53,7 +52,7 @@ ANDROID_RE15_FILES = \
 # time, so this append must land before that include.
 SRC_QSTR += $(addprefix $(MICROPYTHON_TOP)/extmod/,$(filter %.c,$(ANDROID_EXTMOD_FILES)))
 
-# Accumulates onto embed.mk's own `all: micropython-embed-package` --
+# Accumulates onto embed.mk's own `all: micropython-embed-package`.
 # GNU Make merges prerequisite lists declared across multiple
 # `target: prereqs` lines for the same target, so this doesn't need to
 # come after that line, just before `all` is actually built (i.e.
@@ -62,8 +61,8 @@ SRC_QSTR += $(addprefix $(MICROPYTHON_TOP)/extmod/,$(filter %.c,$(ANDROID_EXTMOD
 all: android-extmod-package
 
 # Depends on micropython-embed-package (not just "all") so this runs
-# AFTER embed.mk's own recipe wipes and recreates $(PACKAGE_DIR)/extmod
-# -- running before that would have these files deleted immediately.
+# after embed.mk's own recipe wipes and recreates $(PACKAGE_DIR)/extmod.
+# Running before that would have these files deleted immediately.
 .PHONY: android-extmod-package
 android-extmod-package: micropython-embed-package
 	$(ECHO) "- extmod (android)"

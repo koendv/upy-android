@@ -86,7 +86,7 @@
 // call. Only the initial seed needs real entropy, via this hook.
 // mp_android_random_seed_init() (mphalport.c) wraps Bionic's
 // arc4random_buf(). No JNI/Kotlin round-trip, no fd/permission
-// handling, available since long before our minSdk 26.
+// handling, available since long before this port's minSdk 26.
 #define MICROPY_PY_RANDOM                        (1)
 #define MICROPY_PY_RANDOM_EXTRA_FUNCS            (1)
 unsigned long mp_android_random_seed_init(void);
@@ -108,10 +108,11 @@ unsigned long mp_android_random_seed_init(void);
 #define MICROPY_PY_RE_MATCH_SPAN_START_END       (1)
 
 // time module: off by default at CORE_FEATURES (needs BASIC_FEATURES,
-// numerically 20 vs our 10). Higher number is MORE features, easy to
-// misread. ports/embed provides NO time HAL at all (unlike math/json/
-// random/re, which needed nothing beyond a config flag + vendoring).
-// Every mp_hal_ticks_*/delay_*/time_ns primitive below is ours.
+// numerically 20 vs this port's 10). Higher number is MORE features,
+// easy to misread. ports/embed provides NO time HAL at all (unlike
+// math/json/random/re, which needed nothing beyond a config flag +
+// vendoring). Every mp_hal_ticks_*/delay_*/time_ns primitive below is
+// implemented in this port.
 //
 // MICROPY_PY_TIME_GMTIME_LOCALTIME_MKTIME (the generic extmod/modtime.c
 // path) is deliberately left OFF: that path registers gmtime() and
@@ -120,12 +121,12 @@ unsigned long mp_android_random_seed_init(void);
 // gmtime() real UTC and localtime() real device-local time at once.
 // Most embedded ports using it just fake localtime()==UTC because they
 // have no OS timezone database anyway. Android has a real one (Bionic's
-// tzset()/localtime_r(), timezone/DST-aware), so we use it: our
+// tzset()/localtime_r(), timezone/DST-aware), so this port uses it:
 // MICROPY_PY_TIME_INCLUDEFILE provides real, distinct gmtime_r()/
 // localtime_r()/mktime()-backed implementations via
 // MICROPY_PY_TIME_EXTRA_GLOBALS instead. Same pattern ports/unix uses,
-// minus its custom interruptible-select sleep (we already get an
-// interruptible, non-busy-waiting sleep for free from the generic
+// minus its custom interruptible-select sleep (this port already gets
+// an interruptible, non-busy-waiting sleep for free from the generic
 // time_sleep() -> mp_hal_delay_ms(), see mphalport.c).
 #define MICROPY_PY_TIME                          (1)
 #define MICROPY_PY_TIME_TIME_TIME_NS              (1)
@@ -218,42 +219,4 @@ unsigned long mp_android_random_seed_init(void);
 #define MICROPY_PY_BUILTINS_HELP                 (1)
 #define MICROPY_PY_BUILTINS_HELP_MODULES         (1)
 
-// OpenMV's own py_ml.c/tflm_backend.cc (`import ml`/`import tf`) --
-// REMOVED. Both were under a restrictive, non-commercial-use-only
-// license (see git history/SESSION_STATE.yaml's clean-room ml-wrapper
-// entry). Superseded by a from-scratch, clean-room `ml` package
-// (libraries/ml/__init__.py, seeded to VFS root) built on this
-// project's own `litert` module -- it shadows `import ml` automatically
-// via MicroPython's own extensible-built-in-vs-filesystem resolution
-// order, so no MICROPY_PY_ML flag is needed here at all any more.
-// Verified both-devices-equivalent before this removal (Tab A7 + Redmi
-// Note 15), per SESSION_STATE.yaml.
-
-// OpenMV's own py_crc.c (vendor/openmv/py_crc.c) + common/omv_crc.c --
-// NOT a core MicroPython flag; OpenMV's own board configs define it
-// directly, same tier of flag as the since-removed MICROPY_PY_ML was
-// (see git history/SESSION_STATE.yaml). import crc: crc16()/
-// crc32(). Deliberately NOT the same thing as binascii.crc32() (see
-// MICROPY_PY_BINASCII's own comment below, which stays off) even if
-// that flag were enabled: omv_crc32_start/update is a non-reflected,
-// MSB-first CRC32 variant (confirmed by reading its own table-driven
-// implementation), not the standard reflected zlib/PNG/zip CRC32
-// uzlib_crc32 provides -- different algorithms sharing a name, not
-// redundant. crc16() has no core-MicroPython equivalent at all.
-//
-// MICROPY_PY_CRC is deliberately NOT defined here -- REAL BUG, caught
-// by a real -Werror "redefined" failure during qstr-scan generation
-// (silently dropped that file's own contribution, including its
-// MP_REGISTER_MODULE -- no compile error, `import crc` just failed
-// with ImportError; the since-removed tflm_backend.cc hit the same bug
-// class first, see git history/SESSION_STATE.yaml): py_crc.c's own
-// #if MICROPY_PY_CRC guard is
-// its first real line, wrapping even its own #include "py/runtime.h",
-// so a define reachable only transitively through that include (i.e.
-// one placed here) is never visible in time -- it must be a command-
-// line -D instead (see CMakeLists.txt's set_source_files_properties for
-// the real compile, and micropython_embed.mk's own CFLAGS += for the
-// qstr-scan). A #define here too would just redefine the same value
-// with a different literal token form (1 vs (1)) and trigger exactly
-// the -Wmacro-redefined-turned-fatal-by-Werror warning that caused
-// this bug in the first place.
+// see session-state: mpconfigport.h#MICROPY_PY_CRC

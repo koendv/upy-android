@@ -1,6 +1,5 @@
-// upy-android native csi (camera) module. OUR OWN bridge between
-// py_image.c's Image type and Android's NDK Camera2 API, not vendored
-// OpenMV source.
+// upy-android native csi (camera) module.
+// bridge between py_image.c's Image type and Android's NDK Camera2 API
 // see session-state: camera_module.cpp#module_design
 
 #include "camera_module.h"
@@ -305,7 +304,7 @@ AImage *wait_and_acquire_frame() {
                 break;
             }
             // Raises (nlr_jump into the `else` branch below) if the user
-            // tapped Interrupt while we were waiting.
+            // tapped Interrupt during the wait.
             mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
         }
 

@@ -1,10 +1,10 @@
-# android.mediastore confidence test -- confirms the JNI/Kotlin bridge
+# android.mediastore confidence test. Confirms the JNI/Kotlin bridge
 # (MediaStoreShim.kt, mediastore_jni_bridge.cpp) actually saves real
-# bytes into a real, gallery-visible MediaStore item on THIS device,
+# bytes into a real, gallery-visible MediaStore item on this device,
 # not just that the code compiles.
 #
 # A tiny, real, valid JPEG (1x1 pixel, hand-verified minimal encoder
-# output) -- doesn't need a camera or ulab/imlib to produce, keeps this
+# output). Doesn't need a camera or ulab/imlib to produce, keeps this
 # test self-contained and fast.
 import android
 
@@ -34,7 +34,7 @@ def main():
         return
 
     # Printing the URI itself would make this test's output non-
-    # deterministic (real per-item IDs) -- check it, but print only a
+    # deterministic (real per-item IDs). Check it, but print only a
     # fixed-text confirmation so a plain .exp diff still works.
     if not uri.startswith("content://"):
         print("FAIL: unexpected uri", uri)

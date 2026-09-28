@@ -1,4 +1,4 @@
-// upy-android native display module. OUR OWN bridge between
+// upy-android native display module. A bridge between
 // py_image.c's Image type and a real Android Surface. Not vendored
 // OpenMV source.
 // see session-state: display_module.cpp#module_design
@@ -61,17 +61,6 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 2, pos_args + 2, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-    // x=/y= accepted but not yet interpreted -- position offsets, no
-    // stated need yet, and would need to interact with the letterbox
-    // centering below. hint= interprets exactly HMIRROR/VFLIP/TRANSPOSE
-    // (real OpenMV's own rotation primitives -- see imlib.h, there is
-    // no dedicated ROTATE_90 bit upstream either; image.ROTATE_90/180/
-    // 270 are themselves just these three bits combined, confirmed by
-    // reading py_image.c directly). The rest of the real hint bit space
-    // (AREA/BILINEAR/BICUBIC interpolation quality, SCALE_ASPECT_*
-    // modes, the two channel-order flags, BLACK_BACKGROUND) is NOT
-    // implemented -- this module always does one fixed integer-upscale
-    // strategy regardless, same scope decision as x=/y= above.
     // see session-state: display_module.cpp#module_design
     int32_t hint = args[ARG_hint].u_int;
     bool transpose = (hint & IMAGE_HINT_TRANSPOSE) != 0;
@@ -93,9 +82,7 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
         return mp_const_none;
     }
 
-    // TRANSPOSE swaps which axis is "wide" -- the drawn footprint's
-    // width/height swap with it, same as a real 90-degree rotation
-    // does on any display.
+    // see session-state: display_module.cpp#module_design
     int32_t logical_w = transpose ? src->h : src->w;
     int32_t logical_h = transpose ? src->w : src->h;
 
@@ -109,29 +96,10 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
     // Opaque black. Fills the letterbox/pillarbox margin in one pass.
     memset(pixels, 0, (size_t) buffer.stride * buffer.height * 4);
 
-    // hmirror/vflip/transpose are each involutions (self-cancelling),
-    // so ANY combination -- hardware-level (self->vflip/hmirror) AND
-    // hint-level (hint_vflip/hint_hmirror) composed together -- reduces
-    // to exactly two independent per-axis flip decisions plus one
-    // axis-swap decision, not a per-named-rotation branch. transpose
-    // decides whether read_x is driven by the row loop var or the
-    // column one; flip_x/flip_y decide whether EACH of those, once
-    // chosen, also runs backwards. Computed once, outside both loops
-    // -- neither depends on ly/lx.
+    // see session-state: display_module.cpp#module_design
     bool flip_x = transpose ? hint_vflip : hint_hmirror;
     bool flip_y = transpose ? hint_hmirror : hint_vflip;
 
-    // Single pass over the (possibly rotated) logical destination
-    // space -- ly/lx are destination-space loop variables (like the
-    // pre-existing sy/sx), never touched by any mirror/rotate; only
-    // read_x/read_y (which SOURCE pixel gets fetched) changes.
-    // self->vflip/self->hmirror (fixed hardware-orientation correction
-    // from the constructor, e.g. lcd_shield.py's own vflip=True,
-    // hmirror=True) apply first, via the hy/hx substitution below,
-    // same "substitute before reading, never touch what's written"
-    // technique the pre-existing vflip/hmirror-only code already used;
-    // hint='s HMIRROR/VFLIP/TRANSPOSE apply on top of that
-    // substitution, via flip_x/flip_y above.
     for (int32_t ly = 0; ly < logical_h; ly++) {
         int32_t hy = self->vflip ? (logical_h - 1 - ly) : ly;
         for (int32_t lx = 0; lx < logical_w; lx++) {

@@ -1,7 +1,6 @@
-// upy-android native mediastore module (android.mediastore). OUR OWN
-// code, NOT vendored OpenMV source. Write-only -- see this file's own
-// header comment in mediastore_module.h and the plan's own Part 7
-// design (SESSION_STATE.yaml).
+// upy-android native mediastore module (android.mediastore).
+// micropython android port only. Write-only, see mediastore_module.h's
+// own header comment.
 
 extern "C" {
 #include "py/obj.h"
@@ -26,7 +25,7 @@ void raise_os_error(int errno_, const char *msg) {
 }
 
 // android.mediastore.save_image(data, name, mime_type='image/jpeg') -> str
-// data: anything with the buffer protocol (bytes/bytearray) -- a
+// data: anything with the buffer protocol (bytes/bytearray), a
 // script's own already-encoded image (e.g. img.compress().bytearray()).
 // This module doesn't know or care about pixel formats, same "just
 // bytes" contract as ordinary file I/O. Returns the new item's real

@@ -28,14 +28,14 @@
  * framebuffer_get(FB_MAINFB_ID) to default width/height/color from
  * OpenMV's live sensor-capture framebuffer singleton when those kwargs
  * are omitted (the real upstream example script always omits them:
- * `gif.Gif("example.gif", loop=True)`). This port has no such singleton
- * -- framebuffer.h is only a stub here (my-overrides/openmv/
+ * `gif.Gif("example.gif", loop=True)`). This port has no such singleton.
+ * framebuffer.h is only a stub here (my-overrides/openmv/
  * framebuffer.h) whose framebuffer_get() aborts unconditionally if
- * actually called (link_stubs.c). Patched to default from our own
+ * actually called (link_stubs.c). Patched to default from
  * camera_module.cpp's camera_get_current_size() instead (the csi
- * module's own currently-configured width/height/pixfmt -- set via
+ * module's own currently-configured width/height/pixfmt, set via
  * csi.framesize()/csi.pixformat(), always a sane default even before
- * reset()) -- this restores the exact unmodified-script call
+ * reset()). This restores the exact unmodified-script call
  * convention (gif.Gif(path, loop=True), no explicit width=/height=/
  * color= needed) rather than requiring callers to pass an image's own
  * dimensions by hand. Explicit width=/height=/color= kwargs, when
@@ -149,8 +149,8 @@ static mp_obj_t py_gif_open(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
 
     // upy-android PATCH: default from the csi module's own currently
     // -configured size/format (camera_module.cpp, see this file's own
-    // header comment) instead of OpenMV's framebuffer_get(FB_MAINFB_ID)
-    // -- explicit width=/height=/color= kwargs still win when given.
+    // header comment) instead of OpenMV's framebuffer_get(FB_MAINFB_ID).
+    // Explicit width=/height=/color= kwargs still win when given.
     int32_t cam_width, cam_height;
     bool cam_color;
     camera_get_current_size(&cam_width, &cam_height, &cam_color);

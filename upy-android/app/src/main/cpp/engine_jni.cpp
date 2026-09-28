@@ -79,18 +79,15 @@ SettingsSnapshot settings_snapshot_get() {
 
 // heapSizeMb: read once here, from EngineWorker's own constructor arg
 // (itself read synchronously from SettingsManager in
-// EngineService.onCreate(), no AIDL involved) -- see
-// EngineWorker.kt#start for why this must NOT depend on anything
-// pushed over IEngine.aidl#setSettings. Fixed for this :engine
+// EngineService.onCreate(), no AIDL involved). Fixed for this :engine
 // process's entire lifetime; changing it needs a real app restart, not
-// just Reset -- see nativeReset below.
+// just Reset. See session-state: engine_jni.cpp#allocate_heap
 // applicationContext: a real android.content.Context, needed by
 // mediastore_module.cpp's own MediaStore access (ContentResolver is
-// only reachable through a Context -- unlike litert_bridge_init, which
-// needs nothing beyond a JNIEnv). See EngineWorker.kt#start /
-// EngineService.kt for where this comes from (EngineService's own
-// applicationContext, read once here, at :engine's own init time --
-// same "read once, not pushed live" tier as heapSizeMb/rootPath).
+// only reachable through a Context, unlike litert_bridge_init, which
+// needs nothing beyond a JNIEnv). Read once here, at :engine's own
+// init time, same "read once, not pushed live" tier as
+// heapSizeMb/rootPath.
 extern "C" JNIEXPORT jboolean JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint stackSizeBytes, jint heapSizeMb, jstring rootPath, jobject applicationContext) {
     if (g_initialized) {
@@ -150,11 +147,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInterrupt(JNIEnv *, jobject) {
     camera_interrupt_active_wait();
 }
 
-// Must be called on the worker thread, like nativeExec. Reuses the
-// SAME g_heap buffer nativeInit() allocated -- heap size is fixed for
-// this :engine process's whole lifetime (set once at nativeInit(),
-// changed only by a real app restart, not by Reset -- see
-// nativeInit's own comment); no free/realloc here.
+// Must be called on the worker thread, like nativeExec.
 // see session-state: engine_jni.cpp#nativeReset
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint stackSizeBytes, jstring rootPath) {
@@ -193,11 +186,6 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
 }
 
 // nativeSetSettings: safe from any thread, same as nativeSetDisplaySurface.
-// heap_size_mb is deliberately NOT a parameter here -- it is read once,
-// at nativeInit() time only, and is immutable for this :engine
-// process's lifetime (see nativeInit's own comment); this call must
-// not overwrite g_settings_snapshot's own heap_size_mb field with a
-// not-yet-applied edit, or android.settings() would misreport it.
 // see session-state: engine_jni.cpp#nativeSetSettings
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeSetSettings(

@@ -1,91 +1,6 @@
-// upy-android native litert module (top-level `litert`, matching a
-// real/expected module name -- see Part 4 of the dev-workflow-speedups
-// plan). OUR OWN code, NOT vendored OpenMV source.
-// litert matches com.google.ai.edge.litert:litert-api's own Kotlin
-// interface with literal method-name parity (Python snake_case, not a
-// redesign, and not extended with a convenience layer of our own --
-// see this file's own header comment on why an ndarray convenience
-// layer was tried and dropped) -- Environment, CompiledModel,
-// TensorBuffer, Options, Accelerator, each exposed separately, not
-// folded into one Model god-object the way android.tf/android.rt were.
-// android.tf/android.rt (this project's original, NNAPI/LiteRt-C-API-
-// based modules) have since been deleted -- Part 5's `ml`/`tf` module
-// was their first replacement (initially OpenMV's own py_ml.c + a
-// vendored TFLM backend), both-devices-verified; that backend has SINCE
-// been removed too (restrictively licensed, see git history/
-// SESSION_STATE.yaml's clean-room ml-wrapper entry) and replaced again,
-// by a from-scratch `ml` package (libraries/ml/__init__.py) built on
-// THIS module -- get_input_tensor_type()/get_input_tensor_quantization()
-// etc. exist specifically to support that. litert itself stays its own
-// separate, lower-level path against litert-api's own Kotlin surface --
-// it never grew the ndarray convenience layer android.rt had (see
-// below), and the newer C API this module wraps has zero NNAPI code
-// anywhere (confirmed against LiteRT's own source), so it was never a
-// hardware-acceleration replacement for android.tf either.
-//
-// TensorBuffer exposes all five of the real litert-api's own typed
-// read/write pairs (int8, float, int, bool, long -- matching
-// TensorBuffer.writeInt8/writeFloat/writeInt/writeBoolean/writeLong
-// and their reads exactly, confirmed via javap against the real
-// litert-api-2.2.0 jar), all going through LiteRtShim.kt (JNI hops,
-// unavoidable -- that logic only exists as Kotlin bytecode, reusing
-// Google's own tested buffer-type/accelerator-option handling rather
-// than re-deriving it, the way rt_module.cpp had to and got wrong
-// twice along the way). There is no 'c' backend (v0 designed one;
-// dropped, not merely disabled). close()/__del__ likewise always goes
-// through the shim -- the underlying native object has exactly one
-// owner (Kotlin's own AutoCloseable).
-//
-// An ndarray convenience layer (write_ndarray/read_ndarray, auto-
-// quantizing against ulab.numpy.ndarray, matching android.rt's own
-// set_input_ndarray/get_output_ndarray) was designed and partially
-// built, then dropped: it needs per-tensor scale/zero_point, which
-// litert-api's own Kotlin surface does not expose at all (TensorType
-// has only ElementType+Layout, confirmed via javap -- no quantization
-// fields anywhere), and a Kotlin JniHandle's numeric `handle` field is
-// NOT a directly usable LiteRt C-API pointer (confirmed the hard way:
-// casting a Kotlin-extracted CompiledModel handle and calling
-// LiteRtGetCompiledModelInputBufferRequirements on it segfaulted on
-// real hardware -- almost certainly the same underlying fact as v0's
-// own LiteRtGetTensorBufferPackedSize-returns-garbage finding on
-// TensorBuffer handles, which in hindsight explains why the 'c'
-// backend could never have worked either). Recovering that
-// information would have needed a second, fully independent native
-// Environment/Model/Options/CompiledModel per CompiledModel construction,
-// purely for introspection -- real complexity and real risk for a
-// convenience layer this module's own design philosophy ("literal
-// method-name parity... not a redesign") argues against anyway.
-// android.rt had a proven, working ndarray convenience layer for
-// exactly this numeric-workload use case, but has since been deleted
-// (see this file's own top comment) -- scripts wanting one should use
-// `ml`/`tf` (Part 5's OpenMV-compatible module) instead of expecting
-// litert to grow one.
-//
-// UPDATE: get_input_tensor_type()/get_output_tensor_type()/
-// get_input_tensor_quantization()/get_output_tensor_quantization()
-// below DO now recover shape/dtype/scale/zero_point -- but NOT via the
-// Kotlin-handle-cast path ruled out above. They go through LiteRT's
-// own separate, lower-level C API (litert/c/litert_model.h:
-// LiteRtCreateModelFromFile + LiteRtGetSignatureInputTensorByIndex/
-// LiteRtGetQuantizationTypeId/LiteRtGetPerTensorQuantization/etc.),
-// which re-parses the same .tflite FILE directly -- a plain flatbuffer
-// read (no interpreter, no arena, no delegates), not a second
-// CompiledModel and not a cast of any Kotlin object's handle. Real
-// cost: the file's schema is parsed twice (once here, once inside
-// whatever CompiledModel.create() already did) -- negligible next to
-// actual inference cost, and only paid once per get_*() call, not per
-// frame. This still doesn't unblock the ndarray convenience layer on
-// its own (that would additionally need routing quantized bytes through
-// this module's own read/write_int8, not attempted here) -- this is
-// purely the metadata half of that old blocker, resolved because it
-// turned out answerable without touching Kotlin/JNI at all.
+// upy-android native litert module (top-level `litert`).
+// micropython android port only.
 // see session-state: litert_module.cpp#module_design
-//
-// This file is qstr-scanned (SRC_QSTR in micropython_embed.mk).
-// #include <jni.h> is banned (no qstr-stub for it, same reason
-// engine_jni.cpp is excluded from that list) -- all JNI calls live in
-// litert_jni_bridge.cpp, reached only through litert_jni_bridge.h's
-// primitive-typed (void*/long) boundary.
 
 #include <cstdlib>
 #include <cstring>
@@ -99,30 +14,13 @@ extern "C" {
 #include "litert_jni_bridge.h"
 #include "litert_module.h"
 
-// Plain C API, NOT JNI -- these headers declare functions exported
-// directly by the already-linked libLiteRt.so (see CMakeLists.txt's own
-// `litert` IMPORTED target), reached without going through Kotlin/JNI at
-// all. Used only by get_input_tensor_type()/get_output_tensor_type()/
-// get_input_tensor_quantization()/get_output_tensor_quantization() below
-// -- everything else in this file talks to litert-api's Kotlin surface
-// via litert_jni_bridge.cpp instead, per this file's own #include <jni.h>
-// ban above; that ban is about JNI specifically, not about LiteRT's own
-// headers in general.
+// see session-state: litert_module.cpp#module_design
 #include "litert/c/litert_common.h"
 #include "litert/c/litert_environment.h"
 #include "litert/c/litert_model.h"
 #include "litert/c/litert_model_types.h"
 
-// Forward declarations needed inside the anonymous namespace below --
-// these types are only DEFINED (extern MP_DEFINE_CONST_OBJ_TYPE) after
-// the namespace closes, same reasoning as rt_model_type's own forward
-// declaration in rt_module.cpp. Declaring them OUTSIDE the namespace
-// (not just with `extern` inside it) matters: an `extern` declaration
-// written inside an anonymous namespace refers to a distinct,
-// internally-linked entity of the same name, not the externally-linked
-// one defined later outside it -- a real link failure hit and fixed
-// while building this file (ld.lld: undefined symbol
-// "(anonymous namespace)::litert_tensor_buffer_type").
+// see session-state: litert_module.cpp#module_design
 extern const mp_obj_type_t litert_environment_type;
 extern const mp_obj_type_t litert_compiled_model_type;
 extern const mp_obj_type_t litert_tensor_buffer_type;
@@ -139,7 +37,7 @@ void raise_os_error(int errno_, const char *msg) {
 }
 
 // msg is a malloc'd (strdup'd) string from litert_jni_bridge.cpp,
-// describing a real Kotlin/JNI exception -- copied into a new MicroPython
+// describing a real Kotlin/JNI exception. Copied into a new MicroPython
 // str (which copies internally) before being freed here.
 void raise_os_error_free(int errno_, char *msg) {
     mp_obj_t args[2] = {
@@ -150,17 +48,6 @@ void raise_os_error_free(int errno_, char *msg) {
     nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
 }
 
-// Native-only registry node, deliberately never holds an mp_obj_t
-// pointer -- a raw pointer to a GC-heap object in a plain C global
-// would be invisible to the GC, so a Model/Environment/TensorBuffer
-// with no remaining Python references could be collected while still
-// linked into this registry, leaving litert_close_all() walking a
-// dangling pointer the next time reset() runs. global_ref is a JNI
-// global reference to the backing Kotlin object (Environment/
-// CompiledModel/TensorBuffer) instead. Three separate lists (not one)
-// so litert_close_all() can order teardown correctly: buffers and
-// models first (independently script-visible, closed in any order),
-// environments last (everything else can depend on one outliving it).
 // see session-state: litert_module.cpp#registry_design
 struct LitertHandleNode {
     long raw_handle;
@@ -205,7 +92,7 @@ struct litert_compiled_model_obj_t {
     mp_obj_base_t base;
     LitertHandleNode *node;
     // strdup'd copy of the (already VFS-leading-slash-stripped) path this
-    // model was constructed from -- only used by get_input_tensor_type()/
+    // model was constructed from. Only used by get_input_tensor_type()/
     // get_output_tensor_type()/get_input_tensor_quantization()/
     // get_output_tensor_quantization() below, which reopen the same file
     // directly via the plain C API (LiteRtCreateModelFromFile) rather
@@ -316,7 +203,7 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
     const char *path = mp_obj_str_get_str(parsed[ARG_path].u_obj);
     // CompiledModel.create() -> LiteRtCreateModelFromFile is not
     // VFS-aware (it's a real fopen() underneath, on the raw filesystem,
-    // not this port's own VfsPosix-mounted "/") -- strip the leading
+    // not this port's own VfsPosix-mounted "/"). Strip the leading
     // '/' so a VFS-absolute path resolves relative to cwd (the app's
     // own private storage root) instead of the real device filesystem
     // root.
@@ -347,7 +234,7 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
     return MP_OBJ_FROM_PTR(self);
 }
 
-// Shared by create_input_buffers()/create_output_buffers() -- same
+// Shared by create_input_buffers()/create_output_buffers(). Same
 // bridge call shape, only the jmethodID differs (handled inside
 // litert_jni_bridge.cpp, not here).
 mp_obj_t create_buffers(litert_compiled_model_obj_t *self, bool is_output) {
@@ -443,25 +330,9 @@ mp_obj_t litert_compiled_model_run(mp_obj_t self_in, mp_obj_t inputs_in, mp_obj_
 static MP_DEFINE_CONST_FUN_OBJ_3(litert_compiled_model_run_obj, litert_compiled_model_run);
 
 // ---------------- CompiledModel tensor introspection ----------------
-// get_input_tensor_type()/get_output_tensor_type()/
-// get_input_tensor_quantization()/get_output_tensor_quantization(): see
-// this file's own top comment (the ndarray-convenience-layer UPDATE) for
-// why this goes through LiteRT's plain C API instead of Kotlin/JNI.
+// see session-state: litert_module.cpp#module_design
 
-// Opens self->path's default (index 0) signature and looks up one
-// input/output tensor BY INDEX -- matches how scripts already address
-// model inputs/outputs everywhere else in this module (create_input_
-// buffers()/create_output_buffers() return a plain tuple, indexed 0..N,
-// no name lookup anywhere), so this stays consistent rather than
-// introducing a second, name-based addressing scheme nothing else here
-// uses. On success, *out_environment/*out_model own the resources
-// backing *out_tensor -- caller must LiteRtDestroyModel +
-// LiteRtDestroyEnvironment when done, BEFORE any raise_os_error call
-// (MicroPython's nlr_raise longjmps past C++ destructors, so cleanup can
-// never be left to RAII in this codebase). On failure, cleans up
-// whatever it already opened itself and raises directly -- never
-// returns without either a valid tensor or an exception already in
-// flight.
+// see session-state: litert_module.cpp#find_tensor_or_raise
 void find_tensor_or_raise(const char *path, bool is_output, mp_int_t index,
                            LiteRtEnvironment *out_environment, LiteRtModel *out_model,
                            LiteRtTensor *out_tensor) {
@@ -565,12 +436,12 @@ mp_obj_t tensor_type_to_mp_obj(LiteRtEnvironment environment, LiteRtModel model,
 }
 
 // Returns a tuple whose first element is always a scheme-tag string,
-// followed by scheme-specific fields (no shared shape across schemes --
+// followed by scheme-specific fields (no shared shape across schemes,
 // callers destructure the tag first):
 //   ("none",)
 //   ("per_tensor", scale: float, zero_point: int)
 //   ("per_channel", quantized_dimension: int, scales: tuple[float, ...], zero_points: tuple[int, ...])
-//   ("block_wise", block_size: int) -- LiteRT itself has no models
+//   ("block_wise", block_size: int). LiteRT itself has no models
 //   producing this yet (the schema is marked "not implemented" upstream);
 //   included so callers can already handle it instead of being surprised
 //   later.
@@ -645,7 +516,7 @@ mp_obj_t quantization_to_mp_obj(LiteRtEnvironment environment, LiteRtModel model
     LiteRtDestroyModel(model);
     LiteRtDestroyEnvironment(environment);
     raise_os_error(MP_EIO, "litert: unsupported quantization type id");
-    return mp_const_none;  // unreachable -- raise_os_error() never returns
+    return mp_const_none;  // unreachable: raise_os_error() never returns
 }
 
 mp_obj_t litert_compiled_model_get_tensor_type(litert_compiled_model_obj_t *self, mp_obj_t index_in, bool is_output) {
@@ -740,7 +611,7 @@ const mp_rom_map_elem_t litert_compiled_model_locals_dict_table[] = {
 MP_DEFINE_CONST_DICT(litert_compiled_model_locals_dict, litert_compiled_model_locals_dict_table);
 
 // ---------------- TensorBuffer ----------------
-// No make_new -- only ever constructed internally (create_buffers()
+// No make_new. Only ever constructed internally (create_buffers()
 // above), via CompiledModel.create_input_buffers()/
 // create_output_buffers(), matching the real litert-api's own shape
 // (TensorBuffer has no public constructor of its own either).
@@ -757,7 +628,7 @@ mp_obj_t litert_tensor_buffer_write_int8(mp_obj_t self_in, mp_obj_t data_in) {
 
     mp_buffer_info_t bufinfo;
     mp_get_buffer_raise(data_in, &bufinfo, MP_BUFFER_READ);
-    // No pre-check against a cached size here -- litert-api's own
+    // No pre-check against a cached size here. litert-api's own
     // TensorBuffer.writeInt8() validates length itself and raises its
     // own LiteRtException on mismatch, which the bridge's exception
     // handling already surfaces as an OSError below.
@@ -790,10 +661,10 @@ static MP_DEFINE_CONST_FUN_OBJ_1(litert_tensor_buffer_read_int8_obj, litert_tens
 // write_float/read_float, write_int/read_int, write_bool/read_bool,
 // write_long/read_long: same shape as write_int8/read_int8 above, one
 // real typed TensorBuffer method each (writeFloat/readFloat/writeInt/
-// readInt/writeBoolean/readBoolean/writeLong/readLong -- confirmed via
-// javap, see this file's own header comment). Takes/returns a plain
-// MicroPython sequence/tuple of the matching Python type, not bytes --
-// these are typed arrays on the Kotlin side, not raw byte buffers.
+// readInt/writeBoolean/readBoolean/writeLong/readLong, confirmed via
+// javap). Takes/returns a plain MicroPython sequence/tuple of the
+// matching Python type, not bytes: these are typed arrays on the
+// Kotlin side, not raw byte buffers.
 
 mp_obj_t litert_tensor_buffer_write_float(mp_obj_t self_in, mp_obj_t data_in) {
     auto *self = (litert_tensor_buffer_obj_t *) MP_OBJ_TO_PTR(self_in);
@@ -1063,9 +934,8 @@ extern MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &litert_tensor_buffer_locals_dict
     );
 
-// Top-level module -- see this file's own header comment for why
-// (matches a real/expected module name, same tier as ulab/image, not
-// android-specific glue).
+// Top-level module, matches a real/expected module name, same tier as
+// ulab/image, not android-specific glue.
 extern "C" const mp_obj_module_t litert_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &litert_module_globals,
@@ -1079,9 +949,8 @@ extern "C" void litert_bridge_init(void *jni_env) {
 
 extern "C" void litert_close_all(void) {
     // Buffers and models first (independently script-visible, either
-    // order is fine among themselves), environments last -- an
-    // environment must outlive every compiled model created from it,
-    // same reasoning as rt_close_all()'s own ordering.
+    // order is fine among themselves), environments last. An
+    // environment must outlive every compiled model created from it.
     while (g_litert_buffers) {
         LitertHandleNode *node = g_litert_buffers;
         char *err = nullptr;

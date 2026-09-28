@@ -15,11 +15,11 @@ import java.util.concurrent.LinkedBlockingQueue
 // the :engine process via EngineService's own Context. heapSizeMb: read
 // once by the caller (EngineService.onCreate(), a plain synchronous
 // SettingsManager read, no AIDL involved) and fixed for this process's
-// entire lifetime -- changing it needs a real app restart. See
+// entire lifetime. Changing it needs a real app restart. See
 // EngineWorker.kt#start for why this must be read locally like this,
 // not pushed over IEngine.aidl#setSettings. applicationContext: passed
 // straight through to Engine.nativeInit() for mediastore_module.cpp's
-// own MediaStore access (Part 7) -- EngineService's own Context, not
+// own MediaStore access. EngineService's own Context, not
 // re-read/re-passed on reset().
 class EngineWorker(
     private val rootPath: String,

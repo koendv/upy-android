@@ -3,7 +3,7 @@
 // mp_obj_print_exception() (called by mp_embed_exec_str on an uncaught
 // exception) goes through this same function, so tracebacks land in the
 // captured buffer exactly like normal print() output would on a real
-// terminal -- no separate "traceback string" field needed. The engine's
+// terminal. No separate "traceback string" field needed. The engine's
 // JNI wrapper is expected to call mp_embed_output_clear() before, then
 // mp_embed_output_get() after, each mp_embed_exec_str() call.
 
@@ -41,8 +41,8 @@ void mp_embed_set_output_chunk_cb(mp_embed_output_chunk_cb_t cb, void *context) 
 
 // random module seed (see MICROPY_PY_RANDOM_SEED_INIT_FUNC in
 // mpconfigport.h). arc4random_buf() is Bionic's standard entropy source
-// (stdlib.h), available since long before our minSdk 26 -- no fd/
-// permission handling needed, unlike ports/unix's getrandom()/
+// (stdlib.h), available since long before this project's minSdk 26. No
+// fd or permission handling needed, unlike ports/unix's getrandom()/
 // /dev/random fallback.
 #include <stdlib.h>
 
@@ -52,9 +52,10 @@ unsigned long mp_android_random_seed_init(void) {
     return seed;
 }
 
-// time module HAL primitives (see mpconfigport.h's MICROPY_PY_TIME block).
-// clock_gettime(CLOCK_MONOTONIC) mirrors ports/unix's own mp_hal_ticks_ms/
-// us implementation exactly -- standard POSIX, nothing Bionic-specific.
+// time module HAL primitives (see mpconfigport.h's MICROPY_PY_TIME
+// block). clock_gettime(CLOCK_MONOTONIC) mirrors ports/unix's own
+// mp_hal_ticks_ms/us implementation exactly, standard POSIX, nothing
+// Bionic-specific.
 #include <time.h>
 
 mp_uint_t mp_hal_ticks_ms(void) {
@@ -75,15 +76,15 @@ uint64_t mp_hal_time_ns(void) {
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-// Chunked, NOT busy-waiting: each chunk is a real nanosleep() (thread
+// Chunked, not busy-waiting: each chunk is a real nanosleep() (thread
 // actually blocked/parked by the OS scheduler, no CPU spent), with a
 // mp_handle_pending() check between chunks so a long time.sleep() is
 // genuinely interruptible via the app's existing Interrupt button
 // (mp_sched_keyboard_interrupt() sets a pending exception that
 // MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS raises via nlr_raise,
-// unwinding out of this loop) -- not just at fixed VM bytecode points.
-// 5ms chunk = worst-case interrupt latency, negligible per-chunk syscall
-// overhead at this granularity.
+// unwinding out of this loop), not just at fixed VM bytecode points.
+// 5ms chunk is the worst-case interrupt latency, negligible per-chunk
+// syscall overhead at this granularity.
 #define MP_HAL_DELAY_CHUNK_MS (5)
 
 void mp_hal_delay_ms(mp_uint_t ms) {

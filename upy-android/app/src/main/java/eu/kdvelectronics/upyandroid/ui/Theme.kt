@@ -8,15 +8,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
 // Brand accent, matching the launcher icon's own cyan-on-charcoal
-// design (see colors.xml/ic_launcher_foreground.xml) -- deliberately
-// NOT dynamic/Material-You color (dynamicLightColorScheme/
+// design (see colors.xml/ic_launcher_foreground.xml). Deliberately
+// not dynamic/Material-You color (dynamicLightColorScheme/
 // dynamicDarkColorScheme), which would replace this with whatever the
 // device wallpaper happens to produce, fighting the identity that icon
 // redesign was for. System light/dark switching only.
 private val BrandAccent = Color(0xFF35D0FF)
 
 // Plain black/white rather than Material3's own muted off-black/off-
-// white tonal defaults -- matches this app's own terminal/command-line
+// white tonal defaults. Matches this app's own terminal/command-line
 // feel (see the Command screen's ">>>" prompt) more directly than a
 // softened neutral gray would.
 private val LightColors = lightColorScheme(

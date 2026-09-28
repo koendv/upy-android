@@ -11,17 +11,17 @@ import java.security.SecureRandom
 // Both processes share the same physical filesDir (Android's per-app
 // data directory is keyed by package/UID, not by process name), so a
 // plain file-per-token directory under it is a real, if informal, IPC
-// channel -- no AIDL/Binder plumbing needed for something this simple.
+// channel. No AIDL/Binder plumbing needed for something this simple.
 // One file per token (not one shared index file) is deliberate: each
 // save_image() call only ever creates a brand new file, so there is no
 // shared mutable state for a concurrent read (an HTTP GET /media
 // request) and a concurrent write (another save_image() call, from a
 // different process) to corrupt.
 //
-// Tokens are the "non-enumerable random tokens for served MediaStore
-// items (not sequential/guessable IDs)" the plan's own Part 7 security
-// section calls for -- 24 bytes of SecureRandom, base64url-encoded, one
-// per saved item; knowing one token reveals nothing about any other.
+// Tokens are non-enumerable random tokens for served MediaStore items
+// (not sequential/guessable IDs): 24 bytes of SecureRandom, base64url-
+// encoded, one per saved item. Knowing one token reveals nothing about
+// any other.
 object MediaStoreTokenRegistry {
     data class Entry(val token: String, val uri: String, val displayName: String, val mimeType: String)
 
@@ -31,7 +31,7 @@ object MediaStoreTokenRegistry {
     private fun dir(context: Context): File =
         File(context.filesDir, DIR_NAME).apply { mkdirs() }
 
-    // Called once per successful save_image() -- see MediaStoreShim.kt.
+    // Called once per successful save_image(). See MediaStoreShim.kt.
     fun register(context: Context, uri: String, displayName: String, mimeType: String): String {
         val tokenBytes = ByteArray(24)
         secureRandom.nextBytes(tokenBytes)
@@ -49,7 +49,7 @@ object MediaStoreTokenRegistry {
 
     // Called from HttpServerManager's GET /media/{token} route.
     fun resolve(context: Context, token: String): Entry? {
-        // Reject anything that isn't a plain token filename outright --
+        // Reject anything that isn't a plain token filename outright.
         // token is used directly as a File name below, so this is the
         // one path-traversal check that matters (e.g. a request for
         // "../../shared_prefs/upy_android_settings.xml" must never
