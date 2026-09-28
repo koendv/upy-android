@@ -58,6 +58,7 @@ object SymbolIcon {
     const val DELETE = 0xe92e
     const val DRIVE_FILE_RENAME_OUTLINE = 0xe9a2
     const val FOLDER_OPEN = 0xe2c8
+    const val VERTICAL_ALIGN_BOTTOM = 0xe258
 }
 
 private val symbolFontFamily = FontFamily(Font(R.font.upy_symbols))
