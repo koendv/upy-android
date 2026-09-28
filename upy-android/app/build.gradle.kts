@@ -179,6 +179,16 @@ dependencies {
     // same author as micro-repl, same version they depend on. Verified
     // MIT-licensed before adding (see NOTICE.html).
     implementation("io.github.ma7moud3ly:nemo-editor:1.0.4")
+    // LazyColumnScrollbar (MIT, https://github.com/nanihadesuka/LazyColumnScrollbar) --
+    // TerminalScreen's own scrollbar; spike-tested on-device against
+    // real mixed-height terminal output before adopting, see
+    // session-state. Compose Multiplatform-only as of 3.0.0, so this
+    // pulls in a parallel org.jetbrains.compose.* dependency tree
+    // alongside this project's own androidx.compose.* (BOM
+    // 2026.09.00) -- resolved cleanly in the spike (this project
+    // already pins Kotlin 2.4.20, matching this library's own
+    // requirement exactly), a real but accepted added-dependency cost.
+    implementation("com.github.nanihadesuka.LazyColumnScrollbar:lazycolumnscrollbar:3.0.0")
     // LiteRT's Kotlin/Java API (android.litert module, see
     // litert_module.cpp/LiteRtShim.kt) -- reuses Google's own tested
     // setup/buffer-type-resolution/accelerator-option logic rather than
