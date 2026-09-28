@@ -14,12 +14,21 @@ import kotlinx.coroutines.flow.asStateFlow
 // MutableStateFlow, so this keeps working even before MainActivity has
 // ever been created (a cold-started adb/SSH-only session).
 object TerminalLog {
+    // Real bug hit and confirmed on-device: unbounded `+= chunk` rebuilds
+    // the whole string on every chunk, so a long-running fast print loop
+    // (e.g. a camera fps demo) makes append() progressively more
+    // expensive with no ceiling. 8x mphalport.c's own
+    // MP_EMBED_OUTPUT_BUF_SIZE (that one bounds a single run's captured
+    // output at 32KB; this is cross-run scrollback, so a multiple of it).
+    // see session-state: TerminalLog.kt#TerminalLog
+    private const val MAX_CHARS = 8 * 32 * 1024
+
     private val _text = MutableStateFlow("")
     val text = _text.asStateFlow()
 
     @Synchronized
     fun append(chunk: String) {
-        _text.value += chunk
+        _text.value = (_text.value.takeLast(MAX_CHARS) + chunk).takeLast(MAX_CHARS)
     }
 
     @Synchronized
