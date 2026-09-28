@@ -1,5 +1,8 @@
 package eu.kdvelectronics.upyandroid.ui
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -27,9 +30,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import eu.kdvelectronics.upyandroid.MainViewModel
 import eu.kdvelectronics.upyandroid.TerminalLog
@@ -37,6 +47,44 @@ import eu.kdvelectronics.upyandroid.managers.TerminalManager
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+
+// Compose Foundation has no built-in scrollbar for a plain ScrollState
+// on Android (unlike classic View, unlike JetBrains Compose
+// Multiplatform's Desktop-only VerticalScrollbar) -- confirmed by
+// inspecting the actual foundation jars for this project's BOM. Drawn
+// by hand instead.
+private fun Modifier.simpleVerticalScrollbar(
+    state: ScrollState,
+    width: Dp = 4.dp,
+    minThumbHeight: Dp = 24.dp,
+): Modifier = composed {
+    val alpha by animateFloatAsState(
+        targetValue = if (state.isScrollInProgress) 1f else 0f,
+        animationSpec = tween(durationMillis = if (state.isScrollInProgress) 150 else 500)
+    )
+    drawWithContent {
+        drawContent()
+        if (state.maxValue > 0) {
+            val viewportHeight = size.height
+            val contentHeight = viewportHeight + state.maxValue
+            // A long-running fps loop can push contentHeight far past
+            // viewportHeight, shrinking the proportional thumb to a
+            // near-invisible sliver -- confirmed on-device. Clamped to
+            // stay visible/grabbable regardless of log length.
+            val thumbHeight = (viewportHeight * (viewportHeight / contentHeight))
+                .coerceAtLeast(minThumbHeight.toPx())
+                .coerceAtMost(viewportHeight)
+            val thumbOffsetY = (viewportHeight - thumbHeight) * (state.value.toFloat() / state.maxValue)
+            drawRoundRect(
+                color = Color.Gray,
+                topLeft = Offset(size.width - width.toPx(), thumbOffsetY),
+                size = Size(width.toPx(), thumbHeight),
+                alpha = alpha,
+                cornerRadius = CornerRadius(width.toPx() / 2, width.toPx() / 2)
+            )
+        }
+    }
+}
 
 // Files/Camera/Settings navigation moved to the top-level nav suite
 // (MainActivity's own NavigationSuiteScaffold). This screen only owns
@@ -109,6 +157,7 @@ fun TerminalScreen(
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(scrollState)
+                    .simpleVerticalScrollbar(scrollState)
             )
 
             if (status !is ConnectionStatus.Connected) {
