@@ -35,28 +35,14 @@
 #include "shared/runtime/gchelper.h"
 #include "port/micropython_embed.h"
 
-// Mounts a VfsPosix rooted at root_path at "/" and points sys.path at it,
-// so scripts get a clean, jailed filesystem view (open("/foo.txt") or
-// open("foo.txt")) transparently mapped to the app's real private
-// storage -- nothing outside root_path is reachable. Runs as ordinary
-// Python via mp_embed_exec_str, so a failure here (shouldn't happen,
-// root_path always exists) is caught and printed like any other
-// exception, not a crash.
+// Set micropython virtual file system (vfs) to app private storage
+// Gives scripts a clean, jailed filesystem.
 static void mp_embed_mount_vfs(const char *root_path) {
     char cmd[512];
     snprintf(cmd, sizeof(cmd),
         "import os, sys\n"
         "os.mount(os.VfsPosix('%s'), '/')\n"
-        // VfsPosix only root-prefixes paths starting with '/' --
-        // extmod/vfs_posix.c:vfs_posix_get_path_str() passes a bare
-        // relative path through completely unmodified, straight to the
-        // real POSIX open(), which then resolves against the process's
-        // real OS-level cwd (Android's real "/", genuinely read-only) --
-        // not our VFS root. os.chdir('/') does a real chdir() syscall
-        // into the (root-prefixed, since '/' starts with '/') real
-        // directory, so relative paths resolve correctly via normal OS
-        // mechanics afterwards. Without this, open("foo.txt") fails with
-        // EROFS even though open("/foo.txt") would have worked.
+        // do a chdir to private storage root, so relative paths resolve correctly.
         "os.chdir('/')\n"
         "sys.path[:] = ['/']\n",
         root_path);
@@ -65,16 +51,11 @@ static void mp_embed_mount_vfs(const char *root_path) {
 
 // Initialise the runtime.
 //
-// stack_size must be the actual size (in bytes) of the calling thread's
-// stack, measured from stack_top. mp_cstack_init_with_top() sets both the
-// stack top AND the stack_limit used by MICROPY_STACK_CHECK from it; the
-// upstream embed port's plain mp_stack_set_top() only sets the top, which
-// makes MICROPY_STACK_CHECK a no-op (stack_limit stays unset) -- see project
-// memory, crash-mitigation requirement #1.
+// stack_size is size in bytes of calling thread's stack, measured from stack_top.
+// root_path is the app's own private storage directory. see mp_embed_mount_vfs.
 //
-// root_path is the app's own private storage directory (passed in from
-// Kotlin, e.g. Context.filesDir.absolutePath) -- see mp_embed_mount_vfs.
 void mp_embed_init(void *gc_heap, size_t gc_heap_size, void *stack_top, size_t stack_size, const char *root_path) {
+    // set stack top and stack_limit used by MICROPY_STACK_CHECK
     mp_cstack_init_with_top(stack_top, stack_size);
     gc_init(gc_heap, (uint8_t *)gc_heap + gc_heap_size);
     mp_init();
@@ -135,14 +116,10 @@ void gc_collect(void) {
 #endif
 
 // Called if an exception is raised outside all C exception-catching handlers.
-//
-// Upstream's stock version is `for (;;) {}` -- an infinite loop, not a
-// crash. On Android that hangs the calling thread (ANR-like) instead of
-// actually terminating the process, which defeats the crash+restart+
-// persisted-state recovery the whole engine-process design depends on. See
-// project memory, crash-mitigation requirement #3.
+
 void nlr_jump_fail(void *val) {
     fprintf(stderr, "upy-android: fatal: nlr_jump_fail (uncaught exception with no handler)\n");
+    // android: `abort();` instead of `for (;;) {}`, restart instead of hang.
     abort();
 }
 

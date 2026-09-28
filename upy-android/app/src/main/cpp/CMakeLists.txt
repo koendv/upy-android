@@ -1,50 +1,25 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(upy_engine)
 
-# Matches the flags validated standalone in native-bringup/ (see project
-# memory) -- CORE_FEATURES level, rooted VfsPosix + os module, crash-mitigation
-# overrides in micropython_embed/port/*.c and shared/runtime/interrupt_char.c.
 file(GLOB MPY_PY_SOURCES micropython_embed/py/*.c)
 file(GLOB MPY_PORT_SOURCES micropython_embed/port/*.c)
 file(GLOB MPY_SHARED_SOURCES micropython_embed/shared/runtime/*.c)
 
-# Explicit list (MPY_EXTMOD_SOURCES), not a glob -- generated fresh
-# alongside the extmod files themselves by native-bringup's
-# embed-android.mk (android-extmod-package target), from the exact same
-# manifest that drives which files get copied in. Self-documents exactly
-# which extmod modules this project uses (json/os/random/re/time/
-# binascii/vfs) and catches a missing or stray file at configure time
-# instead of silently globbing whatever happens to be on disk.
+# Explicit list, not a glob: generated alongside the extmod files
+# themselves by native-bringup's embed-android.mk, so a missing or
+# stray file fails at configure time instead of silently globbing
+# whatever is on disk.
 include(micropython_embed/extmod/sources.cmake)
 
-# ulab (numpy/scipy-like numerical extension, not a core MicroPython
-# module, see native-bringup's micropython_embed.mk) -- its tree is up to
-# 4 path components deep (e.g. ulab/numpy/fft/fft.c), unlike the other
-# globs above which are intentionally shallow. GLOB_RECURSE is safe here
-# since micropython_embed/ulab/ contains nothing else that's textually
-# #include'd into a sibling file the way extmod/lib/re1.5/*.c or
-# modtime_android.c are (re1.5 doesn't even reach this file -- it's not
-# globbed at all, see sources.cmake's own generation in embed-android.mk).
+# ulab's tree is nested up to 4 levels deep (e.g. ulab/numpy/fft/fft.c),
+# unlike the other globs here. GLOB_RECURSE is safe: nothing under it
+# is #include'd into a sibling file the way some other globbed trees are.
 file(GLOB_RECURSE MPY_ULAB_SOURCES micropython_embed/ulab/*.c)
 
-# OpenMV imlib/py_image (machine vision, not a core MicroPython module,
-# same tier as ulab -- see native-bringup's micropython_embed.mk and
-# SESSION_STATE.yaml's "vendor unwired"/"wire up in native-bringup"
-# commits). Flat directory, non-recursive glob is correct and sufficient
-# -- unlike ulab, nothing under micropython_embed/openmv/ is nested more
-# than one level except ulab-shim/ulab/code/ndarray.h, a header only, not
-# a .c file this glob would need to reach.
+# OpenMV imlib/py_image is flat, so a plain non-recursive glob is enough.
 file(GLOB MPY_OPENMV_SOURCES micropython_embed/openmv/*.c)
 
-# camera_module.cpp/display_module.cpp/imu_module.cpp/android_module.cpp
-# -- OUR OWN native modules, NOT vendored OpenMV source, so they live
-# here directly rather than under micropython_embed/openmv/ (see
-# SESSION_STATE.yaml's camera/display native-code-location scoping
-# discussion, and the py_imu.c entries for why imu_module.cpp is a
-# from-scratch module too). android_module.cpp nests imu_module.cpp's
-# module struct (and, over time, proximity/light/touch) under a single
-# top-level `android` module -- see android_module.cpp's own header
-# comment.
+# micropython android port only, not vendored OpenMV source.
 add_library(upy_engine SHARED
     engine_jni.cpp
     camera_module.cpp
@@ -78,14 +53,10 @@ target_include_directories(upy_engine PRIVATE
     litert/include
 )
 
-# CMSIS_MCU_H: see my-overrides/openmv/board_config.h -- must be a command-
-# line define, not a #define inside board_config.h itself (imlib.h
-# includes fmath.h, which needs it, BEFORE including board_config.h).
-#
-# ULAB_CONFIG_FILE: see my-overrides/ulab/ulab_config.h -- ulab.h
-# `#include`s it under `#if defined(ULAB_CONFIG_FILE)`, so, same as
-# CMSIS_MCU_H, it must be a command-line define (ulab.h has no
-# built-in ULAB_CONFIG_FILE fallback to redefine).
+# Both must be command-line defines, not #defines in the header itself:
+# imlib.h includes fmath.h (which needs CMSIS_MCU_H) before it includes
+# board_config.h, and ulab.h has no built-in ULAB_CONFIG_FILE fallback
+# to redefine.
 target_compile_definitions(upy_engine PRIVATE
     CMSIS_MCU_H="cmsis_mcu_stub.h"
     ULAB_CONFIG_FILE="ulab_config.h"
@@ -97,57 +68,32 @@ target_compile_options(upy_engine PRIVATE
     -fno-common
 )
 
-# py_crc.c -- MICROPY_PY_CRC must ALSO be a command-line define here,
-# not just set in mpconfigport.h: py_crc.c's #if MICROPY_PY_CRC guard is
-# its own first real line, before its own #include "py/runtime.h", so
-# mpconfigport.h's define is never visible in time (same bug class the
-# since-removed tflm_backend.cc/MICROPY_PY_ML_TFLM hit first -- see git
-# history/SESSION_STATE.yaml). No extra include dirs are needed here --
-# omv_crc.h is already reachable via the same -Imy-overrides/openmv
-# -Ivendor/openmv pair every other vendored openmv/ file gets
-# project-wide.
+# Must be a command-line define here too: py_crc.c's #if MICROPY_PY_CRC
+# guard comes before its own #include "py/runtime.h", so a define in
+# mpconfigport.h is never visible in time.
 set_source_files_properties(micropython_embed/openmv/py_crc.c
     PROPERTIES
     COMPILE_DEFINITIONS "MICROPY_PY_CRC=1"
 )
 
-# LiteRT (litert_module.cpp, see SESSION_STATE.yaml's design discussion)
-# -- this project's first PREBUILT BINARY dependency (see NOTICE.md),
-# fetched by native-bringup/fetch-litert.sh (run it before building if
-# app/src/main/cpp/litert/ doesn't exist -- same "populate before build"
-# step as micropython_embed/'s own apply-overrides.sh, not auto-run by
-# CMake itself). IMPORTED SHARED, not a source target: libLiteRt.so is a
-# real prebuilt .so, not something this project compiles.
+# libLiteRt.so is a real prebuilt .so (see NOTICE.html for licensing;
+# fetched by native-bringup/fetch-litert.sh), not something this
+# project compiles.
 add_library(litert SHARED IMPORTED)
 set_target_properties(litert PROPERTIES
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/litert/lib/libLiteRt.so
 )
 
-# camera2ndk/mediandk: NDK Camera2 API used by camera_module.cpp (stable
-# public NDK libs since API 24, no vendoring needed -- same libs the
-# earlier camera probe already confirmed link/work, see SESSION_STATE.yaml).
-# android: ANativeWindow_fromSurface() (engine_jni.cpp), the rest of the
-# ANativeWindow_* API (display_module.cpp), and ASensorManager_*/
-# ASensorEventQueue_*/ALooper_* (imu_module.cpp) -- all exported from
-# libandroid.so, no separate library needed for the sensor API.
-# litert: no upy_engine source calls a LiteRT C-API symbol directly any
-# more (litert_module.cpp talks to litert-api's Kotlin surface via JNI
-# only) -- this link line's real purpose now is just getting AGP to
-# package libLiteRt.so into the APK's jniLibs, which LiteRtShim.kt still
-# needs present at runtime (see this file's own `litert` target comment
-# above and build.gradle.kts's litert-api dependency comment).
+# camera2ndk/mediandk/android: stable NDK libs for the camera, display,
+# and sensor APIs, no vendoring needed.
+# This link line's only real purpose is getting AGP to package
+# libLiteRt.so into the APK's jniLibs, which LiteRtShim.kt needs at
+# runtime.
 target_link_libraries(upy_engine log m camera2ndk mediandk android litert)
 
-# Linker map for libupy_engine.so -- static-link internals only (which
-# MicroPython/ulab/openmv/our own object files pulled in, section sizes,
-# confirms prebuilt deps like libLiteRt.so show up as NEEDED). Does NOT
-# cover what's inside a prebuilt dependency itself, or what AGP packages
-# into the final APK from an AAR's jni/ folder (that's a Gradle/AGP
-# packaging concern, not a link-map one -- see SESSION_STATE.yaml's
-# litert-api/libLiteRtClGlAccelerator.so findings, both caught via
-# `unzip -l`/`nm -D` on the real APK, not a map file). Generated fresh
-# per build under app/.cxx/ (already gitignored, not committed), same
-# ephemeral treatment as every other build artifact.
+# Linker map for libupy_engine.so. Doesn't cover what's inside a
+# prebuilt dependency, or what AGP packages into the APK from an AAR's
+# jni/ folder. Generated fresh per build under app/.cxx/, not committed.
 target_link_options(upy_engine PRIVATE
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/upy_engine.map
 )

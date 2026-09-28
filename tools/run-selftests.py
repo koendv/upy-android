@@ -1,31 +1,22 @@
 #!/usr/bin/env python3
-# Runs this project's OWN examples/*_selftest confidence tests on a
-# connected device via Part 1's AdbExecProvider, comparing captured
-# output against a companion .exp file next to each script (same
-# convention upstream MicroPython's own run-tests.py uses, see
-# tools/upy-adb/tools/run-upstream-tests.sh for that side of Part 9).
+# Runs this project's own examples/*_selftest confidence tests via
+# AdbExecProvider. Diffs captured output against a companion .exp
+# file next to each script, the same convention run-upstream-tests.sh
+# uses for real upstream MicroPython tests. These are this project's
+# own module tests, so there's no CPython ground truth to diff against.
 #
-# These are NOT upstream MicroPython tests -- they're this project's
-# own Android-module confidence tests (mediastore/litert/ml/...), so
-# there's no CPython ground truth to diff against the way run-tests.py
-# gets one. First run against a given script has no baseline yet: it
-# records the actual captured output as the new .exp and reports
-# RECORDED rather than PASS/FAIL. Only trust a RECORDED baseline once
-# you've read it and confirmed it looks right -- this script has no way
-# to know a first-ever run's output is correct, only that it's
-# deterministic-looking (see --record to intentionally re-baseline).
+# A script with no .exp yet gets one recorded on first run, reported as
+# RECORDED rather than PASS/FAIL. A RECORDED baseline is not verified
+# correct, only deterministic-looking. Read it before trusting it. Use
+# --record to force a new baseline.
 #
-# Default set is deterministic and self-contained: mediastore, litert,
-# ml. Left OUT of the default set, opt-in only:
-#   fileprovider -- pops a real OS share sheet; the API call succeeding
-#     is not the same as the sheet actually appearing on screen (see
-#     project memory: don't claim a hardware/UI effect happened just
-#     because the API call succeeded) -- only visually verifiable.
-#   mqtt -- needs a real external broker (test.mosquitto.org) AND a
-#     retained "ping" message already published from the host before
-#     this runs (see examples/mqtt_selftest/mqtt_selftest.py's own
-#     header comment) -- this script does not publish that ping for
-#     you.
+# Default set: mediastore, litert, ml. Deterministic, self-contained.
+# fileprovider and mqtt are opt-in only:
+#   fileprovider pops a real OS share sheet. A successful API call does
+#   not mean the sheet appeared on screen. Only verify this visually.
+#   mqtt needs a real external broker (test.mosquitto.org) with a
+#   retained "ping" message already published from the host. This
+#   script does not publish that ping.
 #
 # Usage:
 #   tools/run-selftests.py                        # default set

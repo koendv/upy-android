@@ -22,13 +22,13 @@
 # - local builds
 #
 # Two-phase locally: build "tools" once (rebuild only when a pinned SDK/
-# NDK/cmake version above changes), then "build" every time after --
+# NDK/cmake version above changes), then "build" every time after.
 # BuildKit's own layer cache already makes an unchanged "tools" stage a
 # no-op, this split just documents/names that so it's not accidental.
 # The "build" stage's own compile step is BuildKit-cache-mounted
 # (Gradle's cache dir + app/.cxx + app/build), so a rebuild after a small
 # source change only recompiles/relinks what actually changed instead of
-# a full cold build -- requires a BuildKit-enabled `docker build` (the
+# a full cold build. Requires a BuildKit-enabled `docker build` (the
 # default on any reasonably recent Docker).
 #
 # Local debug build:
@@ -128,18 +128,17 @@ RUN git clone https://github.com/openmv/openmv.git /home/devuser/openmv \
 RUN git clone https://github.com/v923z/micropython-ulab.git /home/devuser/ulab \
     && git -C /home/devuser/ulab checkout $ULAB_SHA
 
-# upy-android's own sources, embedded in this repo, not cloned (see
-# header comment). This includes my-overrides/openmv/'s 14 files with no
-# fetchable upstream equivalent and my-overrides/ulab/'s one (ulab_
-# config.h) -- native-bringup/vendor/{openmv,ulab}/ is gitignored (see
-# .gitignore) and not part of this COPY at all; populated from the
-# clones above, next.
+# upy-android's own sources, embedded in this repo, not cloned. This
+# includes my-overrides/openmv/'s files with no fetchable upstream
+# equivalent, and my-overrides/ulab/'s one (ulab_config.h).
+# native-bringup/vendor/{openmv,ulab}/ is gitignored (see .gitignore),
+# not part of this COPY at all. Populated from the clones above, next.
 COPY --chown=devuser:devuser upy-android /home/devuser/upy-android
 COPY --chown=devuser:devuser tools/docker/openmv-manifest.tsv /home/devuser/openmv-manifest.tsv
 
 WORKDIR /home/devuser/upy-android/native-bringup
 
-# Populate vendor/openmv/ with the 68 confirmed-pristine files from the
+# Populate vendor/openmv/ with the confirmed-pristine files from the
 # pinned OpenMV clone, per-file (not a directory copy). The manifest maps
 # this flat directory's filenames back to their real, differently
 # structured upstream paths, e.g. lib/imlib/blob.c -> blob.c.
@@ -163,8 +162,8 @@ RUN mkdir -p vendor/ulab \
     && find /home/devuser/ulab/code -mindepth 1 -maxdepth 1 -type d -exec cp -r {} vendor/ulab/ \;
 
 # Regenerate the MicroPython embed-port tree fresh from the pinned
-# upstream clone, then reapply our own override/new files on top. Same
-# two-step process the real project's own dev workflow uses.
+# upstream clone, then reapply this project's own override/new files
+# on top. Same two-step process the real project's own dev workflow uses.
 # MICROPYTHON_TOP is overridden on the command line (a plain `=`
 # assignment in micropython_embed.mk, not `override`, so this wins). No
 # source file needs patching for this container's own paths.
@@ -174,8 +173,8 @@ RUN rm -rf build-embed micropython_embed \
 
 # Sync the freshly-regenerated tree into the app's own source tree,
 # replacing whatever came along in the COPY above. This is what makes
-# the build genuinely reproducible from upstream + our own patches,
-# rather than silently depending on a pre-generated snapshot.
+# the build genuinely reproducible from upstream plus this project's
+# own patches, rather than silently depending on a pre-generated snapshot.
 RUN rm -rf ../app/src/main/cpp/micropython_embed \
     && cp -r micropython_embed ../app/src/main/cpp/micropython_embed
 
@@ -195,8 +194,8 @@ RUN chmod +x ./gradlew
 # state (app/build) all survive across separate `docker build`
 # invocations, so an unchanged source tree recompiles nothing and a
 # small change only rebuilds what depends on it. A cache mount's
-# contents are NOT part of the image filesystem once this RUN ends --
-# the APK copy below must happen in this same RUN, not a later one, or
+# contents are not part of the image filesystem once this RUN ends.
+# The APK copy below must happen in this same RUN, not a later one, or
 # it would see an empty app/build.
 RUN --mount=type=cache,target=/home/devuser/.gradle,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/app/.cxx,uid=1000,gid=1000 \

@@ -1,24 +1,13 @@
 #!/usr/bin/env bash
-# Regenerates upy-android/app/src/main/res/font/upy_symbols.ttf -- a
-# static-instance, subsetted Material Symbols Rounded font holding only
-# the icons this app actually uses (see ~/Downloads/new_icons.html, the
-# confirmed icon sheet Part 10 of the dev-workflow-speedups plan is
-# built from). The committed .ttf is a deterministic build OUTPUT of
-# this script, from a pinned upstream commit -- same
-# vendor-fetched-not-hand-crafted reasoning as native-bringup's own
-# fetch-litert.sh, just for a font instead of a native library. Run
-# this again only when the icon set itself changes (new_icons.html
-# gets a new icon added/removed) or the pinned commit needs bumping.
-#
-# Used to also merge in a MicroPython-logo glyph (fontforge,
-# tools/merge-logo-glyph.py) -- dropped, along with the app's own
-# MicroPython-logo-derived launcher icon, to avoid any third-party
-# copyright/trademark association in this app's own assets entirely
-# (a product decision, not because that asset's own license -- OFL-1.1 --
-# was actually in question). See NOTICE.md's own history.
+# Regenerates upy-android/app/src/main/res/font/upy_symbols.ttf,
+# a static-instance, subsetted Material Symbols Rounded font holding only
+# the icons this app actually uses.
+# Run this again only when the icon set itself changes
+# (new_icons.html gets a new icon added or removed) or the pinned
+# commit needs bumping.
 #
 # Requires: curl, python3 with fonttools installed
-# (`pip install fonttools`) -- pyftsubset/fonttools.varLib.instancer
+# (`pip install fonttools`). pyftsubset and fonttools.varLib.instancer
 # are both part of that one package.
 #
 # Usage: ./tools/generate-icon-font.sh
@@ -26,17 +15,11 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-# google/material-design-icons, pinned commit (confirmed via GitHub API
-# to have variablefont/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf
-# + a matching .codepoints file, and to contain every icon name this
-# script subsets below -- terminal_2/password_2/adb are comparatively
-# recent additions, an older pin could plausibly lack them).
+# google/material-design-icons
 MDI_SHA=bd8cb85bd4bad964fe6918f79665bb40c3a8efef
 MDI_RAW_BASE="https://raw.githubusercontent.com/google/material-design-icons/$MDI_SHA/variablefont"
 
-# Every icon name this app uses, anywhere -- see new_icons.html. Kept as
-# one flat list (not grouped by screen) since fonttools subsets by
-# codepoint regardless of where a glyph is used.
+# Every icon name this app uses, anywhere.
 ICON_NAMES=(
     terminal folder camera settings
     link link_off stop play_arrow restart_alt delete_sweep

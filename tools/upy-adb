@@ -1,26 +1,24 @@
 #!/usr/bin/env python3
 # Stand-in for MICROPY_MICROPYTHON, the executable upstream MicroPython's
 # tests/run-tests.py normally builds and runs on the host (the "unix"
-# test-instance, -t unix, the default -- see test_utils.py's
-# get_test_instance(): anything other than "unix"/"webassembly" is
-# treated as a pyboard.py raw-REPL device path, which this project's
-# engine does NOT speak -- ScriptExecCore.run() executes a whole script
-# in one MP_PARSE_FILE_INPUT call, no raw-REPL continuation protocol).
-# This script instead runs each test ON THE DEVICE, through Part 1's
-# AdbExecProvider (`adb ... content call`), matching the user's own
-# decision for Part 9: "use on-device test, using adb exec."
+# test instance, -t unix, the default). Real MicroPython treats anything
+# other than "unix"/"webassembly" as a pyboard.py raw-REPL device path,
+# which this project's engine does not speak. ScriptExecCore.run()
+# executes a whole script in one MP_PARSE_FILE_INPUT call, with no
+# raw-REPL continuation protocol. This script instead runs each test on
+# the device, through AdbExecProvider (`adb ... content call`).
 #
 # run-tests.py invokes this exactly like it would invoke the real unix
 # binary: `$MICROPY_MICROPYTHON -X emit=... [-X heapsize=...] test.py`
 # for a standard test, or `$MICROPY_MICROPYTHON [extra cmdline flags]
-# test.py` for a "special" test (cmdline/, feature_check/, repl_*) --
-# see run-tests.py's run_micropython(). We don't have a matching
-# per-invocation cmdline surface on the device side, so every argument
-# except the last (the script path) is accepted and ignored.
+# test.py` for a "special" test (cmdline/, feature_check/, repl_*).
+# There is no matching per-invocation cmdline surface on the device
+# side, so every argument except the last (the script path) is
+# accepted and ignored.
 #
 # Usage:
 #   MICROPY_MICROPYTHON=$(pwd)/tools/upy-adb python3 <run-tests.py> ...
-# See tools/run-upstream-tests.sh for the full wiring (result-dir,
+# See tools/run-upstream-tests.sh for the full wiring (result dir,
 # -j1, etc).
 import os
 import re
@@ -30,15 +28,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _upy_adb_core as core
 
 # SystemExit (e.g. every "print('SKIP'); raise SystemExit" test) is
-# silently absorbed by CPython's/upstream unix port's own main loop --
-# nothing reaches stdout beyond what the script itself printed. This
-# port's own mp_embed_exec_str (my-overrides/embed_util.c) has no such
-# port-level special case -- it calls the generic mp_obj_print_exception
-# for every uncaught exception alike (py/obj.c, unmodified upstream),
-# so a SystemExit here leaves a real trailing traceback in the captured
-# output. Stripped here to match what run-tests.py actually expects
-# (exact-match comparisons like `output_mupy == b"SKIP\n"` would
-# otherwise misclassify every SKIP as a FAIL).
+# silently absorbed by CPython's and upstream unix port's own main
+# loop. Nothing reaches stdout beyond what the script itself printed.
+# This port's own mp_embed_exec_str (my-overrides/embed_util.c) has no
+# such port-level special case. It calls the generic
+# mp_obj_print_exception for every uncaught exception alike (py/obj.c,
+# unmodified upstream), so a SystemExit here leaves a real trailing
+# traceback in the captured output. Stripped here to match what
+# run-tests.py actually expects: exact-match comparisons like
+# `output_mupy == b"SKIP\n"` would otherwise misclassify every SKIP as
+# a FAIL.
 _SYSTEMEXIT_TRACEBACK_RE = re.compile(
     r"Traceback \(most recent call last\):\n(?:  File .*\n)*SystemExit(?::[^\n]*)?\n?$"
 )
@@ -54,7 +53,7 @@ def main():
     with open(script_path, "r", encoding="utf-8") as f:
         src = f.read()
 
-    # Fresh interpreter state per test -- ScriptExecCore's globals/
+    # Fresh interpreter state per test. ScriptExecCore's globals and
     # sys.modules otherwise persist across adb-exec calls, unlike a
     # freshly launched subprocess.
     output, error = core.run_script(src, reset_first=True)
