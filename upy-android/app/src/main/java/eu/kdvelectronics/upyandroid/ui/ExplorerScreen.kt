@@ -181,7 +181,7 @@ fun ExplorerScreen(
             title = { Text(file?.name.orEmpty()) },
             text = {
                 Column {
-                    if (file?.canRun == true) TextButton(onClick = {
+                    if (file?.canRun == true) OptionRow(SymbolIcon.PLAY_ARROW, "Run", onClick = {
                         showOptions = false
                         // onRun (MainActivity's runAndShowTerminal) calls
                         // navController.navigate(), which requires the main
@@ -191,23 +191,23 @@ fun ExplorerScreen(
                             val content = withContext(Dispatchers.IO) { filesManager.read(file) }
                             onRun(content)
                         }
-                    }) { Text("Run") }
-                    if (file?.isFile == true) TextButton(onClick = {
+                    })
+                    if (file?.isFile == true) OptionRow(SymbolIcon.EDIT, "Edit", onClick = {
                         showOptions = false
                         onEdit(file, path)
-                    }) { Text("Edit") }
-                    if (file?.isDirectory == true) TextButton(onClick = {
+                    })
+                    if (file?.isDirectory == true) OptionRow(SymbolIcon.FOLDER_OPEN, "Open", onClick = {
                         showOptions = false
                         path = file.fullPath
-                    }) { Text("Open") }
-                    TextButton(onClick = {
+                    })
+                    OptionRow(SymbolIcon.DRIVE_FILE_RENAME_OUTLINE, "Rename", onClick = {
                         showOptions = false
                         showRename = true
-                    }) { Text("Rename") }
-                    TextButton(onClick = {
+                    })
+                    OptionRow(SymbolIcon.DELETE, "Delete", onClick = {
                         showOptions = false
                         showDelete = true
-                    }) { Text("Delete") }
+                    })
                 }
             },
             confirmButton = {
@@ -282,6 +282,22 @@ fun ExplorerScreen(
                     }
                 )
             }
+        }
+    }
+}
+
+// Icon-left, text-right menu row for the file options dialog.
+// contentDescription = null on the icon: the label text right next to
+// it already carries the meaning, per Symbol.kt's own convention.
+@Composable
+private fun OptionRow(icon: Int, label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Symbol(icon, contentDescription = null, modifier = Modifier.padding(end = 12.dp))
+            Text(label)
         }
     }
 }

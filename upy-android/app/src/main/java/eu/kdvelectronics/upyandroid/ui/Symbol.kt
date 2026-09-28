@@ -54,6 +54,10 @@ object SymbolIcon {
     const val LOCK = 0xe899
     const val SHOP = 0xe8c9
     const val ADB = 0xe60e
+    const val EDIT = 0xf097
+    const val DELETE = 0xe92e
+    const val DRIVE_FILE_RENAME_OUTLINE = 0xe9a2
+    const val FOLDER_OPEN = 0xe2c8
 }
 
 private val symbolFontFamily = FontFamily(Font(R.font.upy_symbols))
