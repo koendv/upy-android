@@ -106,7 +106,7 @@ fun TerminalScreen(
 
     fun run() {
         val code = input
-        if (code.isBlank()) return
+        if (code.isBlank() || status !is ConnectionStatus.Connected) return
         viewModel.history.push(code)
         TerminalLog.append("\n>>> $code\n")
         input = ""
@@ -224,7 +224,11 @@ fun TerminalScreen(
                     keyboardActions = KeyboardActions(onSend = { run() }),
                     singleLine = false
                 )
-                Button(onClick = ::run, modifier = Modifier.padding(start = 8.dp)) {
+                Button(
+                    onClick = ::run,
+                    enabled = status is ConnectionStatus.Connected,
+                    modifier = Modifier.padding(start = 8.dp),
+                ) {
                     Symbol(SymbolIcon.PLAY_ARROW, contentDescription = "Run")
                 }
             }
