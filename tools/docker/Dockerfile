@@ -105,6 +105,9 @@ RUN yes | sdkmanager --licenses >/dev/null 2>&1; \
 FROM tools AS build
 
 ARG BUILD_TYPE=debug
+# Source commit shown in the app's About screen. .git is not part of the
+# build context, so CI passes it in (see .github/workflows/build.yml).
+ARG GIT_COMMIT=
 
 # upy-android's own sources. Third-party sources are not part of this
 # COPY: Gradle fetches them at the commits pinned in upstream.properties

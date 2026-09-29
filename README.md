@@ -49,7 +49,7 @@ fork, run the upy-android workflow, download the APK artifact.
 # once: SDK, NDK, CMake
 docker build --target tools -t upy-android-tools -f tools/docker/Dockerfile .
 # every build (incremental)
-docker build --target build --build-arg BUILD_TYPE=debug -t upy-android -f tools/docker/Dockerfile .
+docker build --target build --build-arg BUILD_TYPE=debug --build-arg GIT_COMMIT=$(git rev-parse HEAD) -t upy-android -f tools/docker/Dockerfile .
 id=$(docker create upy-android)
 docker cp "$id":/output/upy-debug.apk ~/Downloads/
 docker rm "$id"

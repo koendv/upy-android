@@ -35,6 +35,8 @@ import eu.kdvelectronics.upyandroid.managers.TerminalManager
 import eu.kdvelectronics.upyandroid.model.MicroFile
 import eu.kdvelectronics.upyandroid.ssh.SshServerManager
 import eu.kdvelectronics.upyandroid.ui.AboutScreen
+import eu.kdvelectronics.upyandroid.ui.AttributionsScreen
+import eu.kdvelectronics.upyandroid.ui.LicensesScreen
 import eu.kdvelectronics.upyandroid.ui.CameraScreen
 import eu.kdvelectronics.upyandroid.ui.EditorScreen
 import eu.kdvelectronics.upyandroid.ui.ExplorerScreen
@@ -244,7 +246,17 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("about") {
-                            AboutScreen(onBack = { navController.popBackStack() })
+                            AboutScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenAttributions = { navController.navigate("attributions") },
+                                onOpenLicenses = { navController.navigate("licenses") },
+                            )
+                        }
+                        composable("attributions") {
+                            AttributionsScreen(onBack = { navController.popBackStack() })
+                        }
+                        composable("licenses") {
+                            LicensesScreen(onBack = { navController.popBackStack() })
                         }
                     }
                 }

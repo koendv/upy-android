@@ -1,3 +1,7 @@
+import java.io.IOException
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Properties
 
 plugins {
@@ -112,7 +116,7 @@ android {
 // accurate and it can't silently drift out of sync with what actually
 // ships.
 val copyNotice = tasks.register<Copy>("copyNotice") {
-    from(rootProject.file("NOTICE.html"))
+    from(rootProject.file("NOTICE.html"), rootProject.file("LICENSES.txt"))
     into(layout.projectDirectory.dir("src/main/assets"))
 }
 
@@ -206,6 +210,16 @@ val extractLitert = tasks.register<Copy>("extractLitert") {
     into(layout.projectDirectory.dir("src/main/cpp/litert/lib"))
 }
 
+// LiteRT's third-party notices, shown after LICENSES.txt in Settings >
+// About > Licenses. Taken from the AAR, so they match the shipped version.
+val extractLitertNotices = tasks.register<Copy>("extractLitertNotices") {
+    from({ zipTree(litertNative.singleFile) }) {
+        include("THIRD_PARTY_NOTICE.txt")
+        rename { "litert_third_party_notices.txt" }
+    }
+    into(layout.projectDirectory.dir("src/main/assets"))
+}
+
 val stageLitertDelegate = tasks.register<Copy>("stageLitertDelegate") {
     dependsOn(extractLitert)
     from(layout.projectDirectory.file("src/main/cpp/litert/lib/libLiteRtClGlAccelerator.so"))
@@ -233,8 +247,47 @@ val copyRom = tasks.register<Copy>("copyRom") {
     into(layout.projectDirectory.dir("src/main/assets/rom"))
 }
 
+// Build date, source commit and MicroPython version, shown in Settings >
+// About. An asset, not BuildConfig, so a new build date does not force a
+// Kotlin recompile. Commit: GIT_COMMIT (set by Docker/CI, which have no
+// .git) or git rev-parse; "unknown" otherwise.
+val generateBuildInfo = tasks.register("generateBuildInfo") {
+    dependsOn(fetchUpstream)
+    val out = layout.projectDirectory.file("src/main/assets/build_info.properties").asFile
+    val repoDir = rootProject.projectDir
+    val mpconfig = rootProject.file("upstream/micropython/py/mpconfig.h")
+    val micropythonSha = upstreamProperties.getProperty("micropython.sha")
+    outputs.file(out)
+    outputs.upToDateWhen { false }
+    doLast {
+        val commit = System.getenv("GIT_COMMIT")?.takeIf { it.isNotBlank() } ?: try {
+            val p = ProcessBuilder("git", "rev-parse", "HEAD").directory(repoDir).start()
+            p.inputStream.bufferedReader().readText().trim().takeIf { p.waitFor() == 0 && it.isNotEmpty() }
+        } catch (e: IOException) {
+            null
+        } ?: "unknown"
+        val defines = mpconfig.readLines().mapNotNull {
+            Regex("""#define MICROPY_VERSION_(MAJOR|MINOR|MICRO|PRERELEASE) (\d+)""").find(it)?.destructured
+        }.associate { (k, v) -> k to v }
+        val mpVersion = "${defines["MAJOR"]}.${defines["MINOR"]}.${defines["MICRO"]}" +
+            if (defines["PRERELEASE"] == "1") "-preview" else ""
+        val date = ZonedDateTime.now(ZoneOffset.UTC)
+            .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm 'UTC'"))
+        out.parentFile.mkdirs()
+        out.writeText(
+            "build.date=$date\n" +
+                "git.commit=$commit\n" +
+                "micropython.version=$mpVersion\n" +
+                "micropython.sha=$micropythonSha\n",
+        )
+    }
+}
+
 tasks.named("preBuild") {
-    dependsOn(copyNotice, copyDemoScripts, copyMlLibrary, copyRom, generateEmbed, extractLitert, stageLitertDelegate)
+    dependsOn(
+        copyNotice, copyDemoScripts, copyMlLibrary, copyRom, generateEmbed, extractLitert, stageLitertDelegate,
+        extractLitertNotices, generateBuildInfo,
+    )
 }
 
 // CMake configure/build read micropython_embed/ and litert/lib/ directly.
