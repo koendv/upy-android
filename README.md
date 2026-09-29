@@ -68,6 +68,8 @@ export JAVA_HOME=/path/to/jdk-21
 
 The build fetches MicroPython, OpenMV, ulab and LiteRT at the versions pinned in `upstream.properties`, and regenerates the native sources when their inputs change.
 
+Exception: LiteRT's C API headers are committed in `upy-android/app/src/main/cpp/litert/include/`. Upgrading LiteRT is a manual step, see [`litert/README.md`](upy-android/app/src/main/cpp/litert/README.md).
+
 ### Install / run
 
 ```bash

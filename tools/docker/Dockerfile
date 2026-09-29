@@ -132,7 +132,7 @@ RUN --mount=type=cache,target=/home/devuser/.gradle,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/upstream,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/native-bringup/vendor,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/app/src/main/cpp/micropython_embed,uid=1000,gid=1000 \
-    --mount=type=cache,target=/home/devuser/upy-android/app/src/main/cpp/litert,uid=1000,gid=1000 \
+    --mount=type=cache,target=/home/devuser/upy-android/app/src/main/cpp/litert/lib,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/app/src/main/jniLibs,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/app/.cxx,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/app/build,uid=1000,gid=1000 \

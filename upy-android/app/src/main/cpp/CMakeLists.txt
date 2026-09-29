@@ -77,8 +77,9 @@ set_source_files_properties(micropython_embed/openmv/py_crc.c
 )
 
 # libLiteRt.so is a real prebuilt .so (see NOTICE.html for licensing;
-# fetched by native-bringup/fetch-litert.sh), not something this
-# project compiles.
+# extracted from the litert AAR by build.gradle.kts's extractLitert
+# task), not something this project compiles. Headers: litert/include/,
+# committed, see litert/README.md.
 add_library(litert SHARED IMPORTED)
 set_target_properties(litert PROPERTIES
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/litert/lib/libLiteRt.so

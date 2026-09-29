@@ -98,14 +98,12 @@ android {
     }
 
     // libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate) is staged
-    // directly into src/main/jniLibs/arm64-v8a/ by native-bringup/
-    // fetch-litert.sh, not sourced from an AAR's own jni/ folder any
-    // more (see the litert-api dependency's own comment below for why)
-    // -- android.rt's/android.litert's LiteRtEnvironment auto-discovers
-    // and dlopen()s it by name at runtime, see rt_module.cpp, so it
-    // must actually ship in the APK. AGP scans jniLibs/<abi>/ by
-    // convention, no extra packaging config needed. See NOTICE.html for
-    // licensing.
+    // into src/main/jniLibs/arm64-v8a/ by the stageLitertDelegate task
+    // below, from the litert AAR (see the litert-api dependency's own
+    // comment below for why that AAR is not a normal dependency).
+    // LiteRtEnvironment dlopen()s it by name at runtime, so it must
+    // ship in the APK. AGP scans jniLibs/<abi>/ by convention. See
+    // NOTICE.html for licensing.
 }
 
 // NOTICE.html is shown in-app (Settings > About) via AboutScreen.kt,
@@ -172,16 +170,48 @@ val genCascades = tasks.register<Exec>("genCascades") {
     commandLine(bringup.resolve("gen-cascades.sh").path)
 }
 
-val fetchLitert = tasks.register<Exec>("fetchLitert") {
-    inputs.files(upstreamFile, bringup.resolve("fetch-litert.sh"))
-    outputs.dir(layout.projectDirectory.dir("src/main/cpp/litert"))
-    outputs.file(layout.projectDirectory.file("src/main/jniLibs/arm64-v8a/libLiteRtClGlAccelerator.so"))
-    commandLine(bringup.resolve("fetch-litert.sh").path)
+// LiteRT: C headers are committed (src/main/cpp/litert/include/, see the
+// README.md there); the two .so files come from the litert AAR. A separate
+// configuration, so AGP never merges this AAR (it shares its namespace
+// with litert-api).
+val litertVersion: String = upstreamProperties.getProperty("litert.version")
+val litertHeadersVersion = file("src/main/cpp/litert/include/LITERT_VERSION").readText().trim()
+if (litertHeadersVersion != litertVersion) {
+    throw GradleException(
+        "LiteRT headers are $litertHeadersVersion, upstream.properties says $litertVersion: " +
+            "run native-bringup/update-litert-headers.sh, see app/src/main/cpp/litert/README.md",
+    )
+}
+
+val litertNative: Configuration by configurations.creating {
+    isCanBeConsumed = false
+    isTransitive = false
+}
+
+dependencies {
+    litertNative("com.google.ai.edge.litert:litert:$litertVersion@aar")
+}
+
+// libLiteRt.so: linked by CMakeLists.txt. libLiteRtClGlAccelerator.so:
+// loaded at runtime by name, so it is also staged in jniLibs/ to ship.
+val extractLitert = tasks.register<Copy>("extractLitert") {
+    from({ zipTree(litertNative.singleFile) }) {
+        include("jni/arm64-v8a/*.so")
+        eachFile { path = name }
+    }
+    includeEmptyDirs = false
+    into(layout.projectDirectory.dir("src/main/cpp/litert/lib"))
+}
+
+val stageLitertDelegate = tasks.register<Copy>("stageLitertDelegate") {
+    dependsOn(extractLitert)
+    from(layout.projectDirectory.file("src/main/cpp/litert/lib/libLiteRtClGlAccelerator.so"))
+    into(layout.projectDirectory.dir("src/main/jniLibs/arm64-v8a"))
 }
 
 // The qstr scan also reads this app's own top-level native sources.
 val generateEmbed = tasks.register<Exec>("generateEmbed") {
-    dependsOn(populateVendor, fetchLitert)
+    dependsOn(populateVendor)
     inputs.files(upstreamFile)
     inputs.files(fileTree(bringup.resolve("vendor/openmv")), fileTree(bringup.resolve("vendor/ulab")))
     inputs.files(fileTree(bringup.resolve("my-overrides")), fileTree(bringup.resolve("qstr-stub")))
@@ -200,15 +230,15 @@ val copyRom = tasks.register<Copy>("copyRom") {
 }
 
 tasks.named("preBuild") {
-    dependsOn(copyNotice, copyDemoScripts, copyMlLibrary, copyRom, generateEmbed, fetchLitert)
+    dependsOn(copyNotice, copyDemoScripts, copyMlLibrary, copyRom, generateEmbed, extractLitert, stageLitertDelegate)
 }
 
-// CMake configure/build read micropython_embed/ and litert/ directly.
+// CMake configure/build read micropython_embed/ and litert/lib/ directly.
 tasks.matching {
     it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake") ||
         it.name.startsWith("generateJsonModel")
 }.configureEach {
-    dependsOn(generateEmbed, fetchLitert)
+    dependsOn(generateEmbed, extractLitert)
 }
 
 dependencyLocking {
@@ -285,12 +315,13 @@ dependencies {
     // depending on litert:2.2.0 at all: its only two .so's
     // (libLiteRt.so, libLiteRtClGlAccelerator.so) are already covered
     // by CMakeLists.txt's own `litert` IMPORTED target (auto-packaged
-    // by AGP, confirmed present in the built APK) and by
-    // fetch-litert.sh's jniLibs staging step, respectively -- neither
-    // needs a Gradle dependency to ship. This is still the project's
+    // by AGP, confirmed present in the built APK) and by the
+    // stageLitertDelegate task, respectively. Both are extracted from the
+    // litert AAR through the separate litertNative configuration, which
+    // AGP never merges. This is still the project's
     // first prebuilt-binary native dependency (see NOTICE.html) --
     // everything else vendored is compiled from source.
-    implementation("com.google.ai.edge.litert:litert-api:${upstreamProperties.getProperty("litert.version")}")
+    implementation("com.google.ai.edge.litert:litert-api:$litertVersion")
     // umqtt module (umqtt_module.cpp/MqttShim.kt) -- Part 7. Chosen over
     // Eclipse Paho Android: Paho Android has zero tagged GitHub releases
     // (Maven-only publishing), 241 open issues/29 open PRs, and a dual

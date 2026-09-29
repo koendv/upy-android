@@ -41,7 +41,7 @@
     </li>
     <li>License: Apache License 2.0</li>
   </ul>
-  <p>libLiteRt.so is a prebuilt binary dependency (resolved via Gradle from Google's own Maven repository), not compiled from source by this project. C headers are fetched separately from a pinned LiteRT source tag, since the published binary ships none.</p>
+  <p>libLiteRt.so and libLiteRtClGlAccelerator.so are prebuilt binaries (the litert AAR, resolved via Gradle from Google's own Maven repository), not compiled from source by this project. LiteRT's C API headers (litert/c/) are included in source form, copied from the matching LiteRT source tag, since the published binaries ship none.</p>
   <h2>Haar cascades (/rom/)</h2>
   <p>haarcascade_frontalface.cascade, haarcascade_eye.cascade: converted by OpenMV's tools/haar2c.py from the OpenCV cascades in OpenMV's lib/haar/.</p>
   <ul>
