@@ -68,9 +68,16 @@ class BoardManager(
     @Volatile
     private var shareRequestListener: ((path: String, mimeType: String) -> Unit)? = null
 
+    @Volatile
+    private var permissionRequestListener: ((permissions: Array<String>) -> Unit)? = null
+
     private val shareListenerStub = object : IEngineShareListener.Stub() {
         override fun onShareRequest(path: String, mimeType: String) {
             shareRequestListener?.invoke(path, mimeType)
+        }
+
+        override fun onPermissionRequest(permissions: Array<String>) {
+            permissionRequestListener?.invoke(permissions)
         }
     }
 
@@ -200,6 +207,10 @@ class BoardManager(
      */
     fun setShareRequestListener(listener: ((path: String, mimeType: String) -> Unit)?) {
         shareRequestListener = listener
+    }
+
+    fun setPermissionRequestListener(listener: ((permissions: Array<String>) -> Unit)?) {
+        permissionRequestListener = listener
     }
 
     /**

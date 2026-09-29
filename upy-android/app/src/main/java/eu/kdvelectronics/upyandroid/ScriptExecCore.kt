@@ -129,8 +129,20 @@ object ScriptExecCore {
         boardManager?.setDisplaySurface(surface)
     }
 
+    // Kept here too, not only passed to boardManager: MainActivity sets
+    // these before connect() creates boardManager, and ensureBoardManager()
+    // hands them over when it does.
+    @Volatile private var shareRequestListener: ((path: String, mimeType: String) -> Unit)? = null
+    @Volatile private var permissionRequestListener: ((permissions: Array<String>) -> Unit)? = null
+
     fun setShareRequestListener(listener: ((path: String, mimeType: String) -> Unit)?) {
+        shareRequestListener = listener
         boardManager?.setShareRequestListener(listener)
+    }
+
+    fun setPermissionRequestListener(listener: ((permissions: Array<String>) -> Unit)?) {
+        permissionRequestListener = listener
+        boardManager?.setPermissionRequestListener(listener)
     }
 
     private fun ensureBoardManager(context: Context): BoardManager {
@@ -144,6 +156,8 @@ object ScriptExecCore {
             }
         }.also {
             it.setOutputListener { chunk -> TerminalLog.append(chunk) }
+            it.setShareRequestListener(shareRequestListener)
+            it.setPermissionRequestListener(permissionRequestListener)
             boardManager = it
         }
     }

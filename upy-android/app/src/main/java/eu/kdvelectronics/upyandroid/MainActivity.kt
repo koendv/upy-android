@@ -86,7 +86,7 @@ private fun NavHostController.navigateToTab(route: String) {
 // Bumped whenever a bundled demo script's own content changes. See
 // seedDemoScriptsIfNeeded() below. Lets an app update that fixes a
 // demo script reach existing installs too, not just fresh ones.
-private const val CURRENT_DEMO_SCRIPTS_VERSION = 9
+private const val CURRENT_DEMO_SCRIPTS_VERSION = 10
 
 // Bumped whenever the bundled `ml` library package's own content
 // changes. See seedMlLibraryIfNeeded() below. Same reasoning as
@@ -113,6 +113,12 @@ class MainActivity : ComponentActivity() {
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    // Prompts requested by a script (android.location.start()). The
+    // result needs no handling: the script checks the permission itself
+    // when it runs again.
+    private val scriptPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -128,6 +134,10 @@ class MainActivity : ComponentActivity() {
         // required by FileProviderShim.shareFile()'s startActivity().
         // Cleared in onDestroy() -- see its own comment.
         ScriptExecCore.setShareRequestListener { path, mimeType -> shareFile(this, path, mimeType) }
+        // Called on a Binder thread; the launcher must run on the main thread.
+        ScriptExecCore.setPermissionRequestListener { permissions ->
+            runOnUiThread { scriptPermissionLauncher.launch(permissions) }
+        }
         terminalManager = TerminalManager(applicationContext)
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)
@@ -277,6 +287,7 @@ class MainActivity : ComponentActivity() {
         // a stale Activity reference wired into the process-lifetime
         // ScriptExecCore singleton.
         ScriptExecCore.setShareRequestListener(null)
+        ScriptExecCore.setPermissionRequestListener(null)
     }
 
     // Android cannot distinguish "never asked" from "permanently
@@ -325,6 +336,7 @@ class MainActivity : ComponentActivity() {
             "find_displacement.py",
             "find_datamatrices.py",
             "find_template.py",
+            "location.py",
         )) {
             assets.open("examples/$name").use { input ->
                 File(examplesDir, name).outputStream().use { output ->

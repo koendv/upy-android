@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.RemoteException
 import android.view.Surface
+import eu.kdvelectronics.upyandroid.location.LocationShim
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 
 // Runs in the :engine process (android:process=":engine" in the
@@ -46,6 +47,18 @@ class EngineService : Service() {
                 // oneway AIDL interface).
             }
         }
+
+        // Asks the main process to show the permission prompt. Same
+        // fire-and-forget reasoning as requestShare(). Used by LocationShim.
+        @JvmStatic
+        fun requestPermissions(permissions: Array<String>) {
+            try {
+                shareListener?.onPermissionRequest(permissions)
+            } catch (e: RemoteException) {
+                // Main process is gone; the caller already reports the
+                // missing permission to the script.
+            }
+        }
     }
 
     // Constructed in onCreate(), not as a property initializer. filesDir,
@@ -67,6 +80,7 @@ class EngineService : Service() {
         val heapSizeMb = SettingsManager(applicationContext).heapSizeMb
         worker = EngineWorker(filesDir.absolutePath, heapSizeMb, applicationContext)
         worker.start()
+        LocationShim.init(applicationContext)
     }
 
     private val binder = object : IEngine.Stub() {
@@ -81,7 +95,11 @@ class EngineService : Service() {
         }
 
         override fun interrupt() = worker.interrupt()
-        override fun reset() = worker.reset()
+        // A reset ends the script, so its location updates end too.
+        override fun reset() {
+            LocationShim.stop()
+            worker.reset()
+        }
 
         override fun setOutputListener(listener: IEngineOutputListener?) {
             outputListener = listener
