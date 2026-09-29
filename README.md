@@ -46,7 +46,10 @@ fork, run the upy-android workflow, download the APK artifact.
 ### Docker target build
 
 ```bash
-docker build --no-cache --target build --build-arg BUILD_TYPE=debug -t upy-android -f tools/docker/Dockerfile .
+# once: SDK, NDK, CMake
+docker build --target tools -t upy-android-tools -f tools/docker/Dockerfile .
+# every build (incremental)
+docker build --target build --build-arg BUILD_TYPE=debug -t upy-android -f tools/docker/Dockerfile .
 id=$(docker create upy-android)
 docker cp "$id":/output/upy-debug.apk ~/Downloads/
 docker rm "$id"
@@ -54,11 +57,16 @@ docker rm "$id"
 
 ### Local build
 
+Linux only; other platforms use Docker. Needs git, python3, make, gcc, curl, unzip, network on the first build.
+
 ```bash
+cd upy-android
 export JAVA_HOME=/path/to/jdk-21
 ./gradlew assembleDebug
 # -> app/build/outputs/apk/debug/app-debug.apk
 ```
+
+The build fetches MicroPython, OpenMV, ulab and LiteRT at the versions pinned in `upstream.properties`, and regenerates the native sources when their inputs change.
 
 ### Install / run
 

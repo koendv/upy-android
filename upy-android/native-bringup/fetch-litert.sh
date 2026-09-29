@@ -5,7 +5,7 @@
 set -e
 cd "$(dirname "$0")/.."
 
-LITERT_VERSION=2.2.0
+LITERT_VERSION=$(sed -n "s/^litert.version=//p" upstream.properties)
 AAR_URL="https://dl.google.com/android/maven2/com/google/ai/edge/litert/litert/${LITERT_VERSION}/litert-${LITERT_VERSION}.aar"
 OUT_DIR=app/src/main/cpp/litert
 WORK_DIR=$(mktemp -d)
@@ -15,7 +15,7 @@ rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR/lib" "$OUT_DIR/include"
 
 echo "fetch-litert: downloading litert-${LITERT_VERSION}.aar..."
-curl -sL -o "$WORK_DIR/litert.aar" "$AAR_URL"
+curl -fsSL -o "$WORK_DIR/litert.aar" "$AAR_URL"
 
 echo "fetch-litert: extracting arm64-v8a .so files (this project is arm64-v8a only, see build.gradle.kts abiFilters)..."
 unzip -oq "$WORK_DIR/litert.aar" "jni/arm64-v8a/libLiteRt.so" "jni/arm64-v8a/libLiteRtClGlAccelerator.so" -d "$WORK_DIR/aar"

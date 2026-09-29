@@ -3,7 +3,7 @@
 # Copyright (c) 2022-2023 Damien P. George
 
 # Set the location of the top of the MicroPython repository.
-MICROPYTHON_TOP = /home/koen/src/repos/upy-android/upstream/micropython
+MICROPYTHON_TOP = $(CURDIR)/../upstream/micropython
 
 # There is only one mpconfigport.h in this project: ../app/src/main/cpp/
 # mpconfigport.h, the file the real app is actually compiled with (its

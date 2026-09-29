@@ -1,12 +1,11 @@
 #!/bin/sh
 # Generates the Haar cascades image.HaarCascade() loads from /rom/,
-# using OpenMV's own converter on OpenMV's own XML (pinned checkout).
+# using OpenMV's own converter on OpenMV's own XML (../upstream/openmv).
 # Output: vendor/rom/, copied into app assets by copyRom (build.gradle.kts).
-# Usage: ./gen-cascades.sh <openmv checkout>
 set -e
 cd "$(dirname "$0")"
 
-OPENMV=${1:?usage: gen-cascades.sh <openmv checkout>}
+OPENMV=../upstream/openmv
 OUT_DIR=vendor/rom
 
 mkdir -p "$OUT_DIR"

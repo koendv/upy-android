@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// Pinned third-party versions. Single source of truth, also read by the
+// native-bringup/ scripts.
+val upstreamProperties = java.util.Properties().apply {
+    rootProject.file("upstream.properties").inputStream().use { load(it) }
+}
+
 android {
     namespace = "eu.kdvelectronics.upyandroid"
     compileSdk = 37
@@ -140,15 +146,67 @@ val copyMlLibrary = tasks.register<Copy>("copyMlLibrary") {
     into(layout.projectDirectory.dir("src/main/assets/ml"))
 }
 
+// Native inputs, generated from upstream.properties by the
+// native-bringup/ scripts. Each task only reruns when its inputs change.
+val bringup = rootProject.file("native-bringup")
+val upstreamFile = rootProject.file("upstream.properties")
+
+// Cheap no-op once upstream/ is at the pinned commits, so it always runs.
+val fetchUpstream = tasks.register<Exec>("fetchUpstream") {
+    commandLine(bringup.resolve("fetch-upstream.sh").path)
+}
+
+val populateVendor = tasks.register<Exec>("populateVendor") {
+    dependsOn(fetchUpstream)
+    inputs.files(upstreamFile, bringup.resolve("openmv-manifest.tsv"), bringup.resolve("populate-vendor.sh"))
+    outputs.dirs(bringup.resolve("vendor/openmv"), bringup.resolve("vendor/ulab"))
+    commandLine(bringup.resolve("populate-vendor.sh").path)
+}
+
+val genCascades = tasks.register<Exec>("genCascades") {
+    dependsOn(fetchUpstream)
+    inputs.files(upstreamFile, bringup.resolve("gen-cascades.sh"))
+    outputs.dir(bringup.resolve("vendor/rom"))
+    commandLine(bringup.resolve("gen-cascades.sh").path)
+}
+
+val fetchLitert = tasks.register<Exec>("fetchLitert") {
+    inputs.files(upstreamFile, bringup.resolve("fetch-litert.sh"))
+    outputs.dir(layout.projectDirectory.dir("src/main/cpp/litert"))
+    outputs.file(layout.projectDirectory.file("src/main/jniLibs/arm64-v8a/libLiteRtClGlAccelerator.so"))
+    commandLine(bringup.resolve("fetch-litert.sh").path)
+}
+
+// The qstr scan also reads this app's own top-level native sources.
+val generateEmbed = tasks.register<Exec>("generateEmbed") {
+    dependsOn(populateVendor, fetchLitert)
+    inputs.files(upstreamFile)
+    inputs.files(fileTree(bringup.resolve("vendor/openmv")), fileTree(bringup.resolve("vendor/ulab")))
+    inputs.files(fileTree(bringup.resolve("my-overrides")), fileTree(bringup.resolve("qstr-stub")))
+    inputs.files(fileTree(bringup) { include("*.mk", "*.sh", "*.py") })
+    inputs.files(fileTree(layout.projectDirectory.dir("src/main/cpp")) { include("*.cpp", "*.h") })
+    outputs.dir(layout.projectDirectory.dir("src/main/cpp/micropython_embed"))
+    commandLine(bringup.resolve("generate-embed.sh").path)
+}
+
 // Haar cascades, seeded into the VFS's /rom/ by MainActivity's
-// seedRomIfNeeded(). Generated, not tracked: native-bringup/gen-cascades.sh.
+// seedRomIfNeeded().
 val copyRom = tasks.register<Copy>("copyRom") {
-    from(rootProject.file("native-bringup/vendor/rom"))
+    dependsOn(genCascades)
+    from(bringup.resolve("vendor/rom"))
     into(layout.projectDirectory.dir("src/main/assets/rom"))
 }
 
 tasks.named("preBuild") {
-    dependsOn(copyNotice, copyDemoScripts, copyMlLibrary, copyRom)
+    dependsOn(copyNotice, copyDemoScripts, copyMlLibrary, copyRom, generateEmbed, fetchLitert)
+}
+
+// CMake configure/build read micropython_embed/ and litert/ directly.
+tasks.matching {
+    it.name.startsWith("configureCMake") || it.name.startsWith("buildCMake") ||
+        it.name.startsWith("generateJsonModel")
+}.configureEach {
+    dependsOn(generateEmbed, fetchLitert)
 }
 
 dependencyLocking {
@@ -230,7 +288,7 @@ dependencies {
     // needs a Gradle dependency to ship. This is still the project's
     // first prebuilt-binary native dependency (see NOTICE.html) --
     // everything else vendored is compiled from source.
-    implementation("com.google.ai.edge.litert:litert-api:2.2.0")
+    implementation("com.google.ai.edge.litert:litert-api:${upstreamProperties.getProperty("litert.version")}")
     // umqtt module (umqtt_module.cpp/MqttShim.kt) -- Part 7. Chosen over
     // Eclipse Paho Android: Paho Android has zero tagged GitHub releases
     // (Maven-only publishing), 241 open issues/29 open PRs, and a dual
