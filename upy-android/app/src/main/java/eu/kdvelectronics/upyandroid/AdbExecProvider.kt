@@ -9,7 +9,9 @@ import android.os.Binder
 import android.os.Bundle
 import android.os.Process
 import android.util.Base64
+import androidx.core.content.pm.PackageInfoCompat
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
+import eu.kdvelectronics.upyandroid.model.ConnectionStatus
 
 // adb-driven one-shot MicroPython exec. Delegates the actual
 // connect/run/reset/interrupt work to ScriptExecCore, shared with the
@@ -31,10 +33,12 @@ class AdbExecProvider : ContentProvider() {
         }
 
         if (!SettingsManager(appContext).adbExecEnabled) {
-            return Bundle().apply { putString("error", "disabled") }
+            return Bundle().apply { putString("error", "disabled - enable adb exec in app settings") }
         }
 
         return when (method) {
+            "help" -> handleHelp()
+            "status" -> handleStatus()
             "run" -> handleRun(arg)
             "reset" -> {
                 ScriptExecCore.reset(appContext)
@@ -44,8 +48,27 @@ class AdbExecProvider : ContentProvider() {
                 ScriptExecCore.interrupt(appContext)
                 Bundle()
             }
-            else -> Bundle().apply { putString("error", "unknown_method") }
+            else -> Bundle().apply { putString("error", "unknown_method - try --method help") }
         }
+    }
+
+    // Static, AI-oriented description of this interface. Never touches
+    // the engine, so it answers even while a script runs.
+    private fun handleHelp(): Bundle {
+        val text = appContext.resources.openRawResource(R.raw.adb_help)
+            .bufferedReader().use { it.readText() }
+        return Bundle().apply { putString("output", text) }
+    }
+
+    // Non-blocking snapshot: no ensureConnected(), no engine call.
+    private fun handleStatus(): Bundle {
+        val info = appContext.packageManager.getPackageInfo(appContext.packageName, 0)
+        val connected = ScriptExecCore.status.value is ConnectionStatus.Connected
+        val text = "protocol: $PROTOCOL_VERSION\n" +
+            "app: ${info.versionName} (${PackageInfoCompat.getLongVersionCode(info)})\n" +
+            "engine: ${if (connected) "connected" else "disconnected"}\n" +
+            "busy: ${if (ScriptExecCore.busy) "yes" else "no"}\n"
+        return Bundle().apply { putString("output", text) }
     }
 
     // see session-state: AdbExecProvider.kt#handleRun
@@ -65,6 +88,12 @@ class AdbExecProvider : ContentProvider() {
             is ScriptExecCore.RunResult.Disconnected -> Bundle().apply { putString("error", "disconnected") }
             is ScriptExecCore.RunResult.Ok -> Bundle().apply { putString("output", result.output) }
         }
+    }
+
+    companion object {
+        // Bump on any change to methods, args or reply format. Also in
+        // res/raw/adb_help.yaml.
+        const val PROTOCOL_VERSION = 1
     }
 
     override fun query(

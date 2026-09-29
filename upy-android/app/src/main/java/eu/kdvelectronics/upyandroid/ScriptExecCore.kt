@@ -38,6 +38,9 @@ object ScriptExecCore {
     // see session-state: ScriptExecCore.kt#ScriptExecCore
     private val inFlight = AtomicInteger(0)
 
+    // Read-only view for adb-exec's status method.
+    val busy: Boolean get() = inFlight.get() > 0
+
     private val _status = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Connecting)
     val status: StateFlow<ConnectionStatus> = _status.asStateFlow()
 
