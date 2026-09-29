@@ -102,6 +102,7 @@ In micropython, the `android` module gives access to android devices:
 - proximity sensor
 - zoom
 - camera, front or back
+- location (GPS, network): `android.location.start(min_distance_m=0.5)`, then `read(timeout_ms=-1)` blocks until a new fix
 
 ## Repo Layout
 

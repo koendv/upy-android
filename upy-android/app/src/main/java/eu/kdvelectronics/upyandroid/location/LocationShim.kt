@@ -23,15 +23,31 @@ object LocationShim {
 
     private lateinit var appContext: Context
 
+    // A fix and its sequence number, swapped in as one value so a reader
+    // never pairs a fix with another fix's number.
+    private class Fix(val location: Location, val seq: Long)
+
     @Volatile
-    private var latest: Location? = null
+    private var latest: Fix? = null
+
+    // Written only by the listener, on the main looper.
+    private var seq = 0L
 
     // Snapshot for readProvider(), set by readFix(): the two calls must
     // describe the same fix.
     @Volatile
     private var lastRead: Location? = null
 
-    private val listener = LocationListener { location -> latest = location }
+    // Wakes a read(timeout_ms) waiting in location_jni_bridge.cpp. Only
+    // native C state is touched there, never MicroPython.
+    private val listener = LocationListener { location ->
+        seq++
+        latest = Fix(location, seq)
+        nativeOnFix(seq)
+    }
+
+    @JvmStatic
+    private external fun nativeOnFix(seq: Long)
 
     // Called from EngineService.onCreate().
     fun init(context: Context) {
@@ -80,17 +96,22 @@ object LocationShim {
     }
 
     // [latitude, longitude, altitude_m, accuracy_m, speed_mps, bearing_deg,
-    // time_ms], NaN where Android has no value; null without a fix.
+    // time_ms, seq], NaN where Android has no value; null without a fix.
     // lastKnown: Android's last known fix instead of this session's latest.
+    // Appends the fix's sequence number (0 for lastKnown), for read()'s
+    // "new since the last read" check.
     @SuppressLint("MissingPermission")
     @JvmStatic
     fun readFix(lastKnown: Boolean): DoubleArray? {
+        var fixSeq = 0L
         val location = if (lastKnown) {
             if (!hasPermission()) return null
             val lm = manager()
             lm.allProviders.mapNotNull { lm.getLastKnownLocation(it) }.maxByOrNull { it.time }
         } else {
-            latest
+            val fix = latest
+            fixSeq = fix?.seq ?: 0L
+            fix?.location
         }
         lastRead = location
         location ?: return null
@@ -102,6 +123,7 @@ object LocationShim {
             if (location.hasSpeed()) location.speed.toDouble() else Double.NaN,
             if (location.hasBearing()) location.bearing.toDouble() else Double.NaN,
             location.time.toDouble(),
+            fixSeq.toDouble(),
         )
     }
 

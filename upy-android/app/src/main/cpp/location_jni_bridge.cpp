@@ -5,7 +5,10 @@
 
 #include <jni.h>
 
+#include <atomic>
 #include <cstring>
+#include <ctime>
+#include <semaphore.h>
 
 namespace {
 
@@ -17,6 +20,11 @@ jmethodID g_mid_stop = nullptr;
 jmethodID g_mid_read_fix = nullptr;
 jmethodID g_mid_read_provider = nullptr;
 
+// Set by nativeOnFix() on Android's main looper: newest fix's sequence
+// number, and a wake-up for location_bridge_wait().
+std::atomic<long long> g_fix_seq{0};
+sem_t g_fix_sem;
+
 JNIEnv *current_env() {
     JNIEnv *env = nullptr;
     g_jvm->GetEnv((void **) &env, JNI_VERSION_1_6);
@@ -25,9 +33,33 @@ JNIEnv *current_env() {
 
 }  // namespace
 
+extern "C" JNIEXPORT void JNICALL
+Java_eu_kdvelectronics_upyandroid_location_LocationShim_nativeOnFix(JNIEnv *, jclass, jlong seq) {
+    g_fix_seq.store(seq, std::memory_order_release);
+    sem_post(&g_fix_sem);
+}
+
+extern "C" long long location_bridge_seq(void) {
+    return g_fix_seq.load(std::memory_order_acquire);
+}
+
+extern "C" void location_bridge_wait(long wait_ms) {
+    struct timespec deadline;
+    clock_gettime(CLOCK_REALTIME, &deadline);
+    deadline.tv_nsec += wait_ms * 1000000L;
+    deadline.tv_sec += deadline.tv_nsec / 1000000000L;
+    deadline.tv_nsec %= 1000000000L;
+    sem_timedwait(&g_fix_sem, &deadline);
+}
+
+extern "C" void location_interrupt_wait(void) {
+    sem_post(&g_fix_sem);
+}
+
 extern "C" void location_bridge_init_impl(void *jni_env) {
     JNIEnv *env = (JNIEnv *) jni_env;
     env->GetJavaVM(&g_jvm);
+    sem_init(&g_fix_sem, 0, 0);
 
     jclass local_class = env->FindClass("eu/kdvelectronics/upyandroid/location/LocationShim");
     g_shim_class = (jclass) env->NewGlobalRef(local_class);
@@ -67,7 +99,7 @@ extern "C" bool location_bridge_read(bool last_known, double *fix, char *provide
     if (arr == nullptr) {
         return false;
     }
-    env->GetDoubleArrayRegion(arr, 0, 7, fix);
+    env->GetDoubleArrayRegion(arr, 0, 8, fix);
     env->DeleteLocalRef(arr);
 
     provider[0] = '\0';

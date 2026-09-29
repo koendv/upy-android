@@ -5,7 +5,10 @@
 //                                             begin updates (GPS, network);
 //                                             no new fix until moved
 //                                             min_distance_m
-//   android.location.read()                   latest fix or None
+//   android.location.read(timeout_ms=0)       fix new since the last read(),
+//                                             waiting up to timeout_ms
+//                                             (-1: until one arrives);
+//                                             None if there is none
 //   android.location.last()                   Android's last known fix or None
 //   android.location.stop()                   end updates (also done by reset)
 //
@@ -19,6 +22,7 @@ extern "C" {
 
 #include <cmath>
 #include <cstring>
+#include <ctime>
 
 #include "location_jni_bridge.h"
 #include "location_module.h"
@@ -37,11 +41,21 @@ mp_obj_t float_or_none(double value) {
     return std::isnan(value) ? mp_const_none : mp_obj_new_float(value);
 }
 
+// Sequence number of the fix read() last returned.
+long long g_read_seq = 0;
+
 mp_obj_t read_fix(bool last_known) {
-    double fix[7];
+    double fix[8];
     char provider[32];
     if (!location_bridge_read(last_known, fix, provider, sizeof(provider))) {
         return mp_const_none;
+    }
+    if (!last_known) {
+        long long seq = (long long) fix[7];
+        if (seq == g_read_seq) {
+            return mp_const_none;   // already returned by an earlier read()
+        }
+        g_read_seq = seq;
     }
     mp_obj_t items[8] = {
         mp_obj_new_float(fix[0]),
@@ -89,10 +103,44 @@ mp_obj_t location_stop() {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(location_stop_obj, location_stop);
 
-mp_obj_t location_read() {
-    return read_fix(false);
+long now_ms() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long) ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
 }
-static MP_DEFINE_CONST_FUN_OBJ_0(location_read_obj, location_read);
+
+// Waits in 5 ms steps, like camera_module.cpp's wait_for_frame(), so
+// Interrupt stays responsive; a new fix wakes it at once. Only an atomic
+// sequence number is checked while waiting; the fix itself is fetched
+// over JNI once it changed.
+mp_obj_t location_read(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_timeout_ms };
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_timeout_ms, MP_ARG_INT, {.u_int = 0}},
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    mp_int_t timeout_ms = args[ARG_timeout_ms].u_int;
+
+    long start = now_ms();
+    while (true) {
+        long long seq = location_bridge_seq();
+        if (seq != g_read_seq) {
+            mp_obj_t fix = read_fix(false);
+            if (fix != mp_const_none) {
+                return fix;
+            }
+            // No fix to fetch (stopped since): don't fetch again for it.
+            g_read_seq = seq;
+        }
+        if (timeout_ms >= 0 && now_ms() - start >= timeout_ms) {
+            return mp_const_none;
+        }
+        location_bridge_wait(5);
+        mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
+    }
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(location_read_obj, 0, location_read);
 
 mp_obj_t location_last() {
     return read_fix(true);

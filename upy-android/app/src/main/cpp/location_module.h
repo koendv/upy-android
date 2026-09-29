@@ -8,6 +8,10 @@ extern "C" {
 
 void location_bridge_init(void *jni_env);
 
+// Wakes a waiting read(timeout_ms). Safe from any thread, like
+// camera_interrupt_active_wait().
+void location_interrupt_wait(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -147,6 +147,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInterrupt(JNIEnv *, jobject) {
     // leaving it to time out on its own 500ms deadline. Safe from any
     // thread, same contract as this function's own.
     camera_interrupt_active_wait();
+    location_interrupt_wait();
 }
 
 // Must be called on the worker thread, like nativeExec.
