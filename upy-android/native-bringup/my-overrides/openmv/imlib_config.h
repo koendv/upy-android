@@ -78,5 +78,26 @@
 #define IMLIB_ENABLE_HOG
 // find_datamatrices(): dmtx.c (libdmtx, BSD-2-Clause), self-contained.
 #define IMLIB_ENABLE_DATAMATRICES
+// lens_corr(): imlib.c. get_similarity(): stats.c (SSIM).
+#define IMLIB_ENABLE_LENS_CORR
+#define IMLIB_ENABLE_GET_SIMILARITY
+// gaussian(), laplacian(), median(), mean(), mode(), midpoint(),
+// bilateral(), morph(): filter.c (MIT), already vendored.
+#define IMLIB_ENABLE_GAUSSIAN
+#define IMLIB_ENABLE_LAPLACIAN
+#define IMLIB_ENABLE_MEDIAN
+#define IMLIB_ENABLE_MEAN
+#define IMLIB_ENABLE_MODE
+#define IMLIB_ENABLE_MIDPOINT
+#define IMLIB_ENABLE_BILATERAL
+#define IMLIB_ENABLE_MORPH
+// flood_fill(): draw.c.
+#define IMLIB_ENABLE_FLOOD_FILL
+// PNG load/save: png.c plus lodepng.c (zlib license), already vendored.
+#define IMLIB_ENABLE_PNG_DECODER
+#define IMLIB_ENABLE_PNG_ENCODER
+// RGB565 to LAB by table lookup (lab_tab.c, ~96 KB) instead of math.
+// Not IMLIB_ENABLE_GAMMA_LUT: only used by the Bayer debayer path.
+#define IMLIB_ENABLE_LAB_LUT
 
 #endif
