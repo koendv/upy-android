@@ -15,6 +15,9 @@
          this (mediastore/fileprovider/litert/tf/rt are all purely
          on-device). -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- android.location; asked on first use by a script. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
     <application
         android:label="upy"
@@ -25,10 +28,21 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Share target: files or text shared from other apps are
+                 saved in the VFS root, see MainActivity.saveShared().
+                 singleTask: a share reuses the running upy instead of
+                 starting a second one in the sending app's task. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
             </intent-filter>
         </activity>
 

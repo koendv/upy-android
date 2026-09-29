@@ -1,5 +1,6 @@
 common/array.c	array.c
 common/array.h	array.h
+lib/imlib/apriltag.c	apriltag.c
 lib/imlib/bayer.c	bayer.c
 lib/imlib/binary.c	binary.c
 lib/imlib/blob.c	blob.c
@@ -7,6 +8,7 @@ lib/imlib/bmp.c	bmp.c
 lib/imlib/clahe.c	clahe.c
 lib/imlib/collections.c	collections.c
 lib/imlib/collections.h	collections.h
+lib/imlib/dmtx.c	dmtx.c
 lib/imlib/draw.c	draw.c
 lib/imlib/edge.c	edge.c
 lib/imlib/edl.c	edl.c
@@ -23,6 +25,9 @@ lib/imlib/font.c	font.c
 lib/imlib/font.h	font.h
 lib/imlib/fsort.c	fsort.c
 lib/imlib/fsort.h	fsort.h
+lib/imlib/haar.c	haar.c
+lib/imlib/hog.c	hog.c
+lib/imlib/hough.c	hough.c
 lib/imlib/imlib.c	imlib.c
 lib/imlib/imlib.h	imlib.h
 lib/imlib/integral.c	integral.c
@@ -30,6 +35,7 @@ lib/imlib/integral_mw.c	integral_mw.c
 lib/imlib/jpegd.c	jpegd.c
 lib/imlib/jpege.c	jpege.c
 lib/imlib/lab_tab.c	lab_tab.c
+lib/imlib/lbp.c	lbp.c
 lib/imlib/line.c	line.c
 lib/imlib/lodepng.c	lodepng.c
 lib/imlib/lodepng.h	lodepng.h
@@ -43,6 +49,7 @@ common/omv_profiler.h	omv_profiler.h
 lib/imlib/gif.c	gif.c
 lib/imlib/mjpeg.c	mjpeg.c
 lib/imlib/orb.c	orb.c
+lib/imlib/phasecorrelation.c	phasecorrelation.c
 lib/imlib/png.c	png.c
 lib/imlib/point.c	point.c
 lib/imlib/ppm.c	ppm.c
@@ -66,6 +73,7 @@ lib/imlib/qrcode.c	qrcode.c
 lib/imlib/qsort.c	qsort.c
 lib/imlib/rainbow_tab.c	rainbow_tab.c
 lib/imlib/rectangle.c	rectangle.c
+lib/imlib/rotation_corr.c	rotation_corr.c
 lib/imlib/simd.h	simd.h
 lib/imlib/sincos_tab.c	sincos_tab.c
 lib/imlib/stats.c	stats.c

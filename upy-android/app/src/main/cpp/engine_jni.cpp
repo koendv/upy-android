@@ -16,6 +16,7 @@ extern "C" {
 #include "camera_module.h"
 #include "display_module.h"
 #include "fileprovider_module.h"
+#include "location_module.h"
 #include "imu_module.h"
 #include "litert_module.h"
 #include "mediastore_module.h"
@@ -98,6 +99,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint s
         litert_bridge_init(env);
         mediastore_bridge_init(env, applicationContext);
         fileprovider_bridge_init(env);
+        location_bridge_init(env);
         mqtt_bridge_init(env);
     }
     const char *root_path_chars = env->GetStringUTFChars(rootPath, nullptr);
@@ -145,6 +147,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInterrupt(JNIEnv *, jobject) {
     // leaving it to time out on its own 500ms deadline. Safe from any
     // thread, same contract as this function's own.
     camera_interrupt_active_wait();
+    location_interrupt_wait();
 }
 
 // Must be called on the worker thread, like nativeExec.

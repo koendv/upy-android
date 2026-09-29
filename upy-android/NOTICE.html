@@ -14,12 +14,27 @@
     </li>
     <li>Copyright: 2013-2026 Damien P. George and contributors</li>
     <li>License: MIT</li>
+    <li>Includes re1.5 (Russ Cox, Paul Sokolovsky): BSD 3-Clause</li>
   </ul>
   <h3>OpenMV imlib / py_image</h3>
-  <p>License: MIT, except zbar.c below (LGPL).</p>
+  <p>License: MIT, except zbar.c (LGPL, below); fast.c (Edward Rosten), orb.c (Willow Garage) and qsort.c (University of California): BSD 3-Clause; lodepng.c (Lode Vandevenne): zlib. Full texts: Settings &gt; About &gt; Licenses.</p>
   <ul>
     <li>Source: <a href="https://github.com/openmv/openmv">https://github.com/openmv/openmv</a>
     </li>
+  </ul>
+  <h3>AprilTag (find_apriltags, find_rects)</h3>
+  <ul>
+    <li>Source: <a href="https://github.com/openmv/apriltag">https://github.com/openmv/apriltag</a> (OpenMV's fork of <a href="https://github.com/AprilRobotics/apriltag">https://github.com/AprilRobotics/apriltag</a>)
+    </li>
+    <li>Copyright: 2013-2016 The Regents of The University of Michigan</li>
+    <li>License: BSD 2-Clause</li>
+  </ul>
+  <h3>libdmtx (find_datamatrices)</h3>
+  <ul>
+    <li>Source: <a href="https://github.com/dmtx/libdmtx">https://github.com/dmtx/libdmtx</a> (as OpenMV's dmtx.c)
+    </li>
+    <li>Copyright: 2005-2016 Mike Laughton, Vadim A. Misbakh-Soloviov and others</li>
+    <li>License: BSD 2-Clause</li>
   </ul>
   <h3>zbar (barcode/QR decoding)</h3>
   <ul>
@@ -41,7 +56,16 @@
     </li>
     <li>License: Apache License 2.0</li>
   </ul>
-  <p>libLiteRt.so is a prebuilt binary dependency (resolved via Gradle from Google's own Maven repository), not compiled from source by this project. C headers are fetched separately from a pinned LiteRT source tag, since the published binary ships none.</p>
+  <p>libLiteRt.so and libLiteRtClGlAccelerator.so are prebuilt binaries (the litert AAR, resolved via Gradle from Google's own Maven repository), not compiled from source by this project. LiteRT's C API headers (litert/c/) are included in source form, copied from the matching LiteRT source tag, since the published binaries ship none.</p>
+  <h2>Haar cascades (/rom/)</h2>
+  <p>haarcascade_frontalface.cascade, haarcascade_eye.cascade: converted by OpenMV's tools/haar2c.py from the OpenCV cascades in OpenMV's lib/haar/.</p>
+  <ul>
+    <li>Source: <a href="https://github.com/opencv/opencv">https://github.com/opencv/opencv</a> (data/haarcascades/)
+    </li>
+    <li>Frontal face: Rainer Lienhart. Frontal eye: Shameem Hameed.</li>
+    <li>Copyright: 2000 Intel Corporation</li>
+    <li>License: Intel License Agreement for Open Source Computer Vision Library (BSD-style)</li>
+  </ul>
   <h2>Example / test data</h2>
   <p>add_simple.tflite, single_add_default_a8w8_recipe_quantized.tflite</p>
   <ul>

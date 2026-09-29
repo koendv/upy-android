@@ -18,6 +18,7 @@ No USB/hardware board required.
 
 - MicroPython REPL with output streaming and interrupt
 - File explorer, text editor, REPL.
+- Share target: share a file (a `.py` from an editor, an image from a file manager) or text with upy; it is saved in `/` (text as `shared.py`, an existing name becomes `name_1.ext`), and Files opens on it
 - Camera and display modules (`csi`, `display`) backed by Camera2/NDK and `ANativeWindow`; camera screen in-app
 - `android` module for phone API
 - VFS rooted at app-private storage
@@ -46,7 +47,10 @@ fork, run the upy-android workflow, download the APK artifact.
 ### Docker target build
 
 ```bash
-docker build --no-cache --target build --build-arg BUILD_TYPE=debug -t upy-android -f tools/docker/Dockerfile .
+# once: SDK, NDK, CMake
+docker build --target tools -t upy-android-tools -f tools/docker/Dockerfile .
+# every build (incremental)
+docker build --target build --build-arg BUILD_TYPE=debug --build-arg GIT_COMMIT=$(git rev-parse HEAD) -t upy-android -f tools/docker/Dockerfile .
 id=$(docker create upy-android)
 docker cp "$id":/output/upy-debug.apk ~/Downloads/
 docker rm "$id"
@@ -54,11 +58,18 @@ docker rm "$id"
 
 ### Local build
 
+Linux only; other platforms use Docker. Needs git, python3, make, gcc, curl, unzip, network on the first build.
+
 ```bash
+cd upy-android
 export JAVA_HOME=/path/to/jdk-21
 ./gradlew assembleDebug
 # -> app/build/outputs/apk/debug/app-debug.apk
 ```
+
+The build fetches MicroPython, OpenMV, ulab and LiteRT at the versions pinned in `upstream.properties`, and regenerates the native sources when their inputs change.
+
+Exception: LiteRT's C API headers are committed in `upy-android/app/src/main/cpp/litert/include/`. Upgrading LiteRT is a manual step, see [`litert/README.md`](upy-android/app/src/main/cpp/litert/README.md).
 
 ### Install / run
 
@@ -77,6 +88,14 @@ Compiles. Measured ~25 FPS at resolution (320, 240) on a Xiaomi Redmi Note 15 de
 
 `csi.CSI().framesize_list()` returns a list of image resolutions the Android phone camera supports.  When setting `framesize()` use a resolution in this list.
 
+Camera controls use OpenMV's names, mapped to Camera2:
+
+- `auto_gain(False)`, `auto_exposure(False)`: lock auto-exposure. `auto_whitebal(False)`: lock white balance. Manual `gain_db`/`exposure_us`/`rgb_gain_db` values are ignored.
+- `brightness(n)`: exposure compensation, n EV. `framerate(fps)`: AE target fps range. `special_effect(csi.NEGATIVE)`, `colorbar(True)`: if the camera supports them.
+- `contrast`, `saturation`, `quality`, `gainceiling`, `auto_blc`: accepted, no effect.
+- `sleep(True)` stops streaming, `shutdown(True)` closes the camera.
+- `hmirror`, `vflip`, `transpose`, `window`: done in software while converting the frame. `framesize()` clears the window.
+
 In micropython, the `android` module gives access to android devices:
 
 - motion sensor
@@ -84,6 +103,7 @@ In micropython, the `android` module gives access to android devices:
 - proximity sensor
 - zoom
 - camera, front or back
+- location (GPS, network): `android.location.start(min_distance_m=0.5)`, then `read(timeout_ms=-1)` blocks until a new fix
 
 ## Repo Layout
 

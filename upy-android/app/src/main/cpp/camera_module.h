@@ -22,7 +22,8 @@ void camera_close_all(void);
 // own short-lived wait the way it used to.
 void camera_interrupt_active_wait(void);
 
-// Reports the csi module's currently configured capture resolution and format
+// Reports the size and format of the image snapshot() returns: the capture
+// resolution after window() and transpose()
 void camera_get_current_size(int32_t *width, int32_t *height, bool *color);
 
 #ifdef __cplusplus

@@ -58,7 +58,7 @@ def main():
     # freshly launched subprocess.
     output, error = core.run_script(src, reset_first=True)
     if error is not None:
-        if error == "disabled":
+        if error.startswith("disabled"):
             sys.stderr.write(
                 "upy-adb: adb-exec is disabled -- enable it in the app's Settings screen first\n"
             )

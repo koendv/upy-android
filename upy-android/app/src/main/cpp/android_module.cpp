@@ -18,6 +18,7 @@ extern const mp_obj_fun_builtin_fixed_t android_settings_obj;
 
 extern "C" const mp_obj_module_t mediastore_module;
 extern "C" const mp_obj_module_t fileprovider_module;
+extern "C" const mp_obj_module_t location_module;
 
 namespace {
 
@@ -65,6 +66,7 @@ const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_settings), MP_ROM_PTR(&android_settings_obj)},
     {MP_ROM_QSTR(MP_QSTR_mediastore), MP_ROM_PTR(&mediastore_module)},
     {MP_ROM_QSTR(MP_QSTR_fileprovider), MP_ROM_PTR(&fileprovider_module)},
+    {MP_ROM_QSTR(MP_QSTR_location), MP_ROM_PTR(&location_module)},
 };
 MP_DEFINE_CONST_DICT(android_module_globals, android_module_globals_table);
 

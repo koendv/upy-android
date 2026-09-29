@@ -1,8 +1,13 @@
 package eu.kdvelectronics.upyandroid
 
 import android.Manifest
+import android.content.ContentResolver
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,7 +25,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -35,6 +43,8 @@ import eu.kdvelectronics.upyandroid.managers.TerminalManager
 import eu.kdvelectronics.upyandroid.model.MicroFile
 import eu.kdvelectronics.upyandroid.ssh.SshServerManager
 import eu.kdvelectronics.upyandroid.ui.AboutScreen
+import eu.kdvelectronics.upyandroid.ui.AttributionsScreen
+import eu.kdvelectronics.upyandroid.ui.LicensesScreen
 import eu.kdvelectronics.upyandroid.ui.CameraScreen
 import eu.kdvelectronics.upyandroid.ui.EditorScreen
 import eu.kdvelectronics.upyandroid.ui.ExplorerScreen
@@ -46,6 +56,7 @@ import eu.kdvelectronics.upyandroid.ui.UpyTheme
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Four peer nav destinations, in the order they appear in the nav
 // suite. Editor is deliberately not here, it's a non-peer detail
@@ -84,12 +95,15 @@ private fun NavHostController.navigateToTab(route: String) {
 // Bumped whenever a bundled demo script's own content changes. See
 // seedDemoScriptsIfNeeded() below. Lets an app update that fixes a
 // demo script reach existing installs too, not just fresh ones.
-private const val CURRENT_DEMO_SCRIPTS_VERSION = 2
+private const val CURRENT_DEMO_SCRIPTS_VERSION = 12
 
 // Bumped whenever the bundled `ml` library package's own content
 // changes. See seedMlLibraryIfNeeded() below. Same reasoning as
 // CURRENT_DEMO_SCRIPTS_VERSION.
 private const val CURRENT_ML_LIBRARY_VERSION = 1
+
+// Bumped whenever the bundled /rom/ files change. See seedRomIfNeeded().
+private const val CURRENT_ROM_VERSION = 1
 
 @OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class, ExperimentalLayoutApi::class)
 class MainActivity : ComponentActivity() {
@@ -108,6 +122,16 @@ class MainActivity : ComponentActivity() {
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    // Prompts requested by a script (android.location.start()). The
+    // result needs no handling: the script checks the permission itself
+    // when it runs again.
+    private val scriptPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
+
+    // Name (in the VFS root) of the first file saved from a share; the
+    // Files screen opens on it, then clears this.
+    private val sharedFocus = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -123,11 +147,16 @@ class MainActivity : ComponentActivity() {
         // required by FileProviderShim.shareFile()'s startActivity().
         // Cleared in onDestroy() -- see its own comment.
         ScriptExecCore.setShareRequestListener { path, mimeType -> shareFile(this, path, mimeType) }
+        // Called on a Binder thread; the launcher must run on the main thread.
+        ScriptExecCore.setPermissionRequestListener { permissions ->
+            runOnUiThread { scriptPermissionLauncher.launch(permissions) }
+        }
         terminalManager = TerminalManager(applicationContext)
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)
         seedDemoScriptsIfNeeded()
         seedMlLibraryIfNeeded()
+        seedRomIfNeeded()
         // Lives in this (default/UI) process, not :engine. See
         // HttpServerManager.kt's own header comment. A process-wide
         // singleton (not a per-Activity instance): deliberately never
@@ -143,6 +172,9 @@ class MainActivity : ComponentActivity() {
         SshServerManager.applySettings(applicationContext, settingsManager)
         ScriptExecCore.connect(applicationContext)
         maybeRequestCameraPermission()
+        // Not on recreation (rotation, theme): the same share intent
+        // would be saved a second time.
+        if (savedInstanceState == null) receiveShare(intent)
 
         setContent {
             UpyTheme {
@@ -155,6 +187,11 @@ class MainActivity : ComponentActivity() {
                 // these variables instead.
                 var pendingFile = remember { mutableStateOf<MicroFile?>(null) }
                 var pendingPath = remember { mutableStateOf("") }
+
+                val focus = sharedFocus.value
+                LaunchedEffect(focus) {
+                    if (focus != null) navController.navigateToTab(TopLevelDestination.EXPLORER.route)
+                }
 
                 fun runAndShowTerminal(content: String) {
                     TerminalLog.append("\n>>> (running script)\n")
@@ -228,6 +265,8 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("editor")
                                 },
                                 onRun = { content -> runAndShowTerminal(content) },
+                                focus = focus,
+                                onFocusShown = { sharedFocus.value = null },
                             )
                         }
                         composable("editor") {
@@ -240,12 +279,93 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("about") {
-                            AboutScreen(onBack = { navController.popBackStack() })
+                            AboutScreen(
+                                onBack = { navController.popBackStack() },
+                                onOpenAttributions = { navController.navigate("attributions") },
+                                onOpenLicenses = { navController.navigate("licenses") },
+                            )
+                        }
+                        composable("attributions") {
+                            AttributionsScreen(onBack = { navController.popBackStack() })
+                        }
+                        composable("licenses") {
+                            LicensesScreen(onBack = { navController.popBackStack() })
                         }
                     }
                 }
             }
         }
+    }
+
+    // singleTask: a share while upy is running arrives here.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        receiveShare(intent)
+    }
+
+    // Share target (ACTION_SEND / ACTION_SEND_MULTIPLE, any type): saves
+    // each shared file, or shared text as shared.py, in the VFS root,
+    // then opens the Files screen on the first one. Runs in this UI
+    // process, so it works while the engine is busy or disconnected.
+    private fun receiveShare(intent: Intent?) {
+        intent ?: return
+        val uris: List<Uri> = when (intent.action) {
+            Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+            Intent.ACTION_SEND_MULTIPLE ->
+                IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+            else -> return
+        }
+        val text = if (uris.isEmpty()) intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() else null
+        lifecycleScope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                if (text != null) {
+                    listOf(saveShared("shared.py") { it.write(text.toByteArray()) })
+                } else {
+                    uris.filter { it.scheme == ContentResolver.SCHEME_CONTENT }.mapNotNull { uri ->
+                        try {
+                            val input = contentResolver.openInputStream(uri) ?: return@mapNotNull null
+                            input.use { saveShared(sharedName(uri)) { out -> input.copyTo(out) } }
+                        } catch (e: Exception) {
+                            null // unreadable (revoked, removed): skip it, save the rest
+                        }
+                    }
+                }
+            }
+            saved.firstOrNull()?.let { sharedFocus.value = it }
+        }
+    }
+
+    // The sender's display name without any directory part, else
+    // "shared" plus an extension from the MIME type.
+    private fun sharedName(uri: Uri): String {
+        val display = try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+        val name = display?.substringAfterLast('/')?.substringAfterLast('\\')?.trim()
+        if (!name.isNullOrEmpty() && name != "." && name != "..") return name
+        val ext = contentResolver.getType(uri)?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) } ?: "bin"
+        return "shared.$ext"
+    }
+
+    // Writes a new file in the VFS root; an existing name becomes
+    // name_1.ext, name_2.ext, ... Returns the name used.
+    private fun saveShared(name: String, write: (java.io.OutputStream) -> Unit): String {
+        val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
+        val base = name.substring(0, dot)
+        val ext = name.substring(dot)
+        var candidate = name
+        var n = 1
+        while (File(filesDir, candidate).exists()) {
+            candidate = "${base}_$n$ext"
+            n++
+        }
+        File(filesDir, candidate).outputStream().use(write)
+        return candidate
     }
 
     override fun onDestroy() {
@@ -261,6 +381,7 @@ class MainActivity : ComponentActivity() {
         // a stale Activity reference wired into the process-lifetime
         // ScriptExecCore singleton.
         ScriptExecCore.setShareRequestListener(null)
+        ScriptExecCore.setPermissionRequestListener(null)
     }
 
     // Android cannot distinguish "never asked" from "permanently
@@ -292,7 +413,25 @@ class MainActivity : ComponentActivity() {
         if (settingsManager.demoScriptsVersion >= CURRENT_DEMO_SCRIPTS_VERSION) return
 
         val examplesDir = File(filesDir, "examples").apply { mkdirs() }
-        for (name in listOf("lcd_shield.py", "find_line_segments.py")) {
+        for (name in listOf(
+            "lcd_shield.py",
+            "find_line_segments.py",
+            "face_detection.py",
+            "face_eye_detection.py",
+            "iris_detection.py",
+            "find_circles.py",
+            "find_apriltags.py",
+            "find_rects.py",
+            "find_lines.py",
+            "find_edges.py",
+            "find_lbp.py",
+            "face_tracking.py",
+            "find_hog.py",
+            "find_displacement.py",
+            "find_datamatrices.py",
+            "find_template.py",
+            "location.py",
+        )) {
             assets.open("examples/$name").use { input ->
                 File(examplesDir, name).outputStream().use { output ->
                     input.copyTo(output)
@@ -323,5 +462,25 @@ class MainActivity : ComponentActivity() {
             }
         }
         settingsManager.mlLibraryVersion = CURRENT_ML_LIBRARY_VERSION
+    }
+
+    // Seeds assets/rom/ (Haar cascades) into the VFS's /rom/, the path
+    // OpenMV scripts load them from. The version is only stamped when
+    // assets/rom/ is non-empty, so a build without generated cascades
+    // does not block a later build that has them.
+    private fun seedRomIfNeeded() {
+        if (settingsManager.romVersion >= CURRENT_ROM_VERSION) return
+
+        val names = assets.list("rom").orEmpty()
+        if (names.isEmpty()) return
+        val romDir = File(filesDir, "rom").apply { mkdirs() }
+        for (name in names) {
+            assets.open("rom/$name").use { input ->
+                File(romDir, name).outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+        }
+        settingsManager.romVersion = CURRENT_ROM_VERSION
     }
 }

@@ -3,7 +3,7 @@
 # Copyright (c) 2022-2023 Damien P. George
 
 # Set the location of the top of the MicroPython repository.
-MICROPYTHON_TOP = /home/koen/src/repos/upy-android/upstream/micropython
+MICROPYTHON_TOP = $(CURDIR)/../upstream/micropython
 
 # There is only one mpconfigport.h in this project: ../app/src/main/cpp/
 # mpconfigport.h, the file the real app is actually compiled with (its
@@ -288,6 +288,8 @@ SRC_QSTR += ../app/src/main/cpp/mediastore_module.cpp
 # it #includes <jni.h>, same exclusion reasoning as
 # mediastore_jni_bridge.cpp above.
 SRC_QSTR += ../app/src/main/cpp/fileprovider_module.cpp
+# location_module.cpp: android.location, same pattern as fileprovider.
+SRC_QSTR += ../app/src/main/cpp/location_module.cpp
 
 # mqtt_module.cpp: this project's own native module (top-level umqtt).
 # Same minimal case as mediastore_module.cpp above. mqtt_jni_bridge.cpp

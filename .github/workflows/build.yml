@@ -48,6 +48,7 @@ jobs:
         run: |
           docker build --target build \
             --build-arg BUILD_TYPE=${{ inputs.build_type || 'debug' }} \
+            --build-arg GIT_COMMIT=${{ github.sha }} \
             -t upy-android \
             -f tools/docker/Dockerfile .
 

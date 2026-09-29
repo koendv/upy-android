@@ -88,6 +88,11 @@ class SettingsManager(context: Context) {
         get() = prefs.getInt(KEY_ML_LIBRARY_VERSION, 0)
         set(value) = prefs.edit().putInt(KEY_ML_LIBRARY_VERSION, value).apply()
 
+    // Same version-stamped reasoning, for the /rom/ files. See seedRomIfNeeded().
+    var romVersion: Int
+        get() = prefs.getInt(KEY_ROM_VERSION, 0)
+        set(value) = prefs.edit().putInt(KEY_ROM_VERSION, value).apply()
+
     companion object {
         private const val PREFS_NAME = "upy_android_settings"
         private const val KEY_ASKED_CAMERA_PERMISSION = "asked_camera_permission"
@@ -104,5 +109,6 @@ class SettingsManager(context: Context) {
         private const val KEY_LITERT_PLAYSTORE_ENABLED = "litert_playstore_enabled"
         private const val KEY_DEMO_SCRIPTS_VERSION = "demo_scripts_version"
         private const val KEY_ML_LIBRARY_VERSION = "ml_library_version"
+        private const val KEY_ROM_VERSION = "rom_version"
     }
 }

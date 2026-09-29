@@ -21,6 +21,20 @@ void mp_embed_output_clear(void) {
 }
 
 const char *mp_embed_output_get(void) {
+    // Buffer full: output was (probably) cut. Overwrite the tail with
+    // "[truncated]" preceded by 1-4 dots: one dot, plus one for each
+    // byte backed up to reach a UTF-8 lead byte, so no character is
+    // split.
+    static const char marker[] = "[truncated]";
+    const size_t marker_len = sizeof(marker) - 1;
+    if (mp_embed_output_len == MP_EMBED_OUTPUT_BUF_SIZE - 1) {
+        size_t pos = mp_embed_output_len - marker_len - 1;
+        while (pos > 0 && (mp_embed_output_buf[pos] & 0xC0) == 0x80) {
+            pos--;
+        }
+        memset(mp_embed_output_buf + pos, '.', mp_embed_output_len - pos);
+        memcpy(mp_embed_output_buf + mp_embed_output_len - marker_len, marker, marker_len);
+    }
     mp_embed_output_buf[mp_embed_output_len] = '\0';
     return mp_embed_output_buf;
 }
