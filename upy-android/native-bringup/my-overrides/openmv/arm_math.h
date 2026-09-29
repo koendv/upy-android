@@ -12,6 +12,14 @@
 
 typedef float float32_t;
 
+// isnanf()/isinff() are glibc extensions; Android's Bionic libc has only
+// the standard isnan()/isinf() macros. Used by phasecorrelation.c.
+#if defined(__ANDROID__) && !defined(isnanf)
+#include <math.h>
+#define isnanf(x) isnan(x)
+#define isinff(x) isinf(x)
+#endif
+
 // __USAD8: sum of the absolute differences of the four unsigned bytes of
 // x and y. __USADA8: the same, added to acc. Used by mathop.c.
 static inline uint32_t __USAD8(uint32_t x, uint32_t y) {
