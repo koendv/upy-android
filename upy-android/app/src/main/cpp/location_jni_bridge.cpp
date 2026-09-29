@@ -33,15 +33,15 @@ extern "C" void location_bridge_init_impl(void *jni_env) {
     g_shim_class = (jclass) env->NewGlobalRef(local_class);
     env->DeleteLocalRef(local_class);
 
-    g_mid_start = env->GetStaticMethodID(g_shim_class, "start", "(J)I");
+    g_mid_start = env->GetStaticMethodID(g_shim_class, "start", "(JF)I");
     g_mid_stop = env->GetStaticMethodID(g_shim_class, "stop", "()V");
     g_mid_read_fix = env->GetStaticMethodID(g_shim_class, "readFix", "(Z)[D");
     g_mid_read_provider = env->GetStaticMethodID(g_shim_class, "readProvider", "()Ljava/lang/String;");
 }
 
-extern "C" int location_bridge_start(long long interval_ms) {
+extern "C" int location_bridge_start(long long interval_ms, float min_distance_m) {
     JNIEnv *env = current_env();
-    jint result = env->CallStaticIntMethod(g_shim_class, g_mid_start, (jlong) interval_ms);
+    jint result = env->CallStaticIntMethod(g_shim_class, g_mid_start, (jlong) interval_ms, (jfloat) min_distance_m);
     if (env->ExceptionCheck()) {
         env->ExceptionClear();
         return LOCATION_NO_PROVIDER;

@@ -13,7 +13,7 @@ extern "C" {
 
 void location_bridge_init_impl(void *jni_env);
 
-int location_bridge_start(long long interval_ms);
+int location_bridge_start(long long interval_ms, float min_distance_m);
 
 void location_bridge_stop(void);
 

@@ -1,7 +1,10 @@
 // upy-android: android.location, a thin layer over Android's
 // LocationManager (LocationShim.kt, via location_jni_bridge.cpp).
 //
-//   android.location.start(interval_ms=1000)  begin updates (GPS, network)
+//   android.location.start(interval_ms=1000, min_distance_m=0)
+//                                             begin updates (GPS, network);
+//                                             no new fix until moved
+//                                             min_distance_m
 //   android.location.read()                   latest fix or None
 //   android.location.last()                   Android's last known fix or None
 //   android.location.stop()                   end updates (also done by reset)
@@ -54,14 +57,19 @@ mp_obj_t read_fix(bool last_known) {
 }
 
 mp_obj_t location_start(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
-    enum { ARG_interval_ms };
+    enum { ARG_interval_ms, ARG_min_distance_m };
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_interval_ms, MP_ARG_INT, {.u_int = 1000}},
+        {MP_QSTR_min_distance_m, MP_ARG_OBJ, {.u_rom_obj = MP_ROM_INT(0)}},
     };
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args, pos_args, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
 
-    switch (location_bridge_start(args[ARG_interval_ms].u_int)) {
+    float min_distance_m = (float) mp_obj_get_float(args[ARG_min_distance_m].u_obj);
+    if (min_distance_m < 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("min_distance_m must be >= 0"));
+    }
+    switch (location_bridge_start(args[ARG_interval_ms].u_int, min_distance_m)) {
         case LOCATION_OK:
             break;
         case LOCATION_NO_PERMISSION:

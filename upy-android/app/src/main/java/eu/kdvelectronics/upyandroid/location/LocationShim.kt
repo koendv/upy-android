@@ -51,7 +51,7 @@ object LocationShim {
     // again once access is granted.
     @SuppressLint("MissingPermission")
     @JvmStatic
-    fun start(intervalMs: Long): Int {
+    fun start(intervalMs: Long, minDistanceM: Float): Int {
         if (!hasPermission()) {
             EngineService.requestPermissions(
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION),
@@ -66,7 +66,7 @@ object LocationShim {
         }
         lm.removeUpdates(listener)
         for (provider in providers) {
-            lm.requestLocationUpdates(provider, intervalMs, 0f, listener, Looper.getMainLooper())
+            lm.requestLocationUpdates(provider, intervalMs, minDistanceM, listener, Looper.getMainLooper())
         }
         return OK
     }
