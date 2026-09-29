@@ -22,6 +22,8 @@
 #include <string>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
+#include <cmath>
 
 extern "C" {
 #include "py/runtime.h"
@@ -73,6 +75,10 @@ constexpr int32_t kDefaultHeight = 240;
 // Default double-buffer -- see csi_framebuffers() below, mirrors real
 // OpenMV's own sensor.framebuffers(n).
 constexpr size_t kDefaultBufCount = 2;
+
+// special_effect() values, same numbers as OpenMV's OMV_CSI_SDE_*.
+constexpr int kSdeNormal = 0;
+constexpr int kSdeNegative = 1;
 
 struct CameraState {
     ACameraManager *manager;
@@ -130,6 +136,26 @@ CameraState g_cam = {
     kDefaultWidth, kDefaultHeight, PIXFORMAT_GRAYSCALE, "", -1,
     {}, false, nullptr, {0}, {0}, kDefaultBufCount, {0},
 };
+
+// Capture request controls set by csi's OpenMV-named methods (auto_gain(),
+// brightness(), ...) and android.light/zoom. Kept here, not only in
+// g_cam.request, because the request is freed on every session rebuild
+// (pixformat()/framesize()/framebuffers()); apply_controls() writes them
+// into each new request. Cleared by reset(), like OpenMV's own reset().
+struct CameraControls {
+    bool auto_gain = true;
+    bool auto_exposure = true;
+    bool auto_whitebal = true;
+    int32_t ev_index = 0;       // AE exposure compensation, in AE_COMPENSATION_STEP units
+    int32_t fps_min = 0;        // 0: no AE target fps range requested
+    int32_t fps_max = 0;
+    uint8_t effect = ACAMERA_CONTROL_EFFECT_MODE_OFF;
+    bool colorbar = false;
+    bool torch = false;
+    float zoom = 0.0f;          // 0: not set, HAL default
+};
+
+CameraControls g_ctl;
 
 typedef struct _csi_obj_t {
     mp_obj_base_t base;
@@ -214,6 +240,60 @@ void close_session_and_reader() {
         g_cam.reader = nullptr;
         g_cam.reader_window = nullptr;
     }
+}
+
+// Writes g_ctl into a capture request. Entries a HAL ignores are harmless;
+// callers that need to know whether a control exists check the camera
+// characteristics first (see csi_brightness() etc).
+void apply_controls(ACaptureRequest *req) {
+    uint8_t ae_lock = (g_ctl.auto_gain && g_ctl.auto_exposure) ? ACAMERA_CONTROL_AE_LOCK_OFF : ACAMERA_CONTROL_AE_LOCK_ON;
+    uint8_t awb_lock = g_ctl.auto_whitebal ? ACAMERA_CONTROL_AWB_LOCK_OFF : ACAMERA_CONTROL_AWB_LOCK_ON;
+    ACaptureRequest_setEntry_u8(req, ACAMERA_CONTROL_AE_LOCK, 1, &ae_lock);
+    ACaptureRequest_setEntry_u8(req, ACAMERA_CONTROL_AWB_LOCK, 1, &awb_lock);
+    ACaptureRequest_setEntry_i32(req, ACAMERA_CONTROL_AE_EXPOSURE_COMPENSATION, 1, &g_ctl.ev_index);
+    if (g_ctl.fps_max > 0) {
+        int32_t range[2] = {g_ctl.fps_min, g_ctl.fps_max};
+        ACaptureRequest_setEntry_i32(req, ACAMERA_CONTROL_AE_TARGET_FPS_RANGE, 2, range);
+    }
+    ACaptureRequest_setEntry_u8(req, ACAMERA_CONTROL_EFFECT_MODE, 1, &g_ctl.effect);
+    int32_t pattern = g_ctl.colorbar ? ACAMERA_SENSOR_TEST_PATTERN_MODE_COLOR_BARS : ACAMERA_SENSOR_TEST_PATTERN_MODE_OFF;
+    ACaptureRequest_setEntry_i32(req, ACAMERA_SENSOR_TEST_PATTERN_MODE, 1, &pattern);
+    uint8_t flash = g_ctl.torch ? ACAMERA_FLASH_MODE_TORCH : ACAMERA_FLASH_MODE_OFF;
+    ACaptureRequest_setEntry_u8(req, ACAMERA_FLASH_MODE, 1, &flash);
+    if (g_ctl.zoom > 0.0f) {
+        ACaptureRequest_setEntry_float(req, ACAMERA_CONTROL_ZOOM_RATIO, 1, &g_ctl.zoom);
+    }
+}
+
+// Pushes changed g_ctl into the running session, if any. Without a
+// session, ensure_session() applies g_ctl when it builds the next one.
+void push_controls(const char *who) {
+    if (!g_cam.session || !g_cam.request) {
+        return;
+    }
+    apply_controls(g_cam.request);
+    if (ACameraCaptureSession_setRepeatingRequest(g_cam.session, nullptr, 1, &g_cam.request, nullptr) != ACAMERA_OK) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s: failed to apply camera setting", who);
+        raise_os_error(MP_EIO, msg);
+    }
+}
+
+// Camera characteristics of the open camera; caller frees. Raises if
+// reset() hasn't run.
+ACameraMetadata *get_characteristics(const char *who) {
+    if (!g_cam.device) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s: camera not reset -- call reset() first", who);
+        raise_os_error(MP_EINVAL, msg);
+    }
+    ACameraMetadata *metadata = nullptr;
+    if (ACameraManager_getCameraCharacteristics(g_cam.manager, g_cam.camera_id.c_str(), &metadata) != ACAMERA_OK || !metadata) {
+        char msg[96];
+        snprintf(msg, sizeof(msg), "%s: failed to read camera characteristics", who);
+        raise_os_error(MP_EIO, msg);
+    }
+    return metadata;
 }
 
 // Context handed to on_image_available() via AImageReader_setImageListener
@@ -401,6 +481,7 @@ void ensure_session() {
     if (ACaptureRequest_addTarget(g_cam.request, g_cam.output_target) != ACAMERA_OK) {
         raise_os_error(MP_EIO, "camera: failed to add capture target");
     }
+    apply_controls(g_cam.request);
     if (ACameraCaptureSession_setRepeatingRequest(g_cam.session, nullptr, 1, &g_cam.request, nullptr) != ACAMERA_OK) {
         raise_os_error(MP_EIO, "camera: failed to start capture");
     }
@@ -634,6 +715,7 @@ mp_obj_t csi_reset(mp_obj_t self_in) {
     g_cam.width = kDefaultWidth;
     g_cam.height = kDefaultHeight;
     g_cam.buf_count = kDefaultBufCount;
+    g_ctl = CameraControls();
 
     g_cam.manager = ACameraManager_create();
     if (!g_cam.manager) {
@@ -664,9 +746,11 @@ mp_obj_t csi_reset(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(csi_reset_obj, csi_reset);
 
-mp_obj_t csi_pixformat(mp_obj_t self_in, mp_obj_t fmt_in) {
-    (void) self_in;
-    int fmt = mp_obj_get_int(fmt_in);
+mp_obj_t csi_pixformat(size_t n_args, const mp_obj_t *args) {
+    if (n_args == 1) {
+        return MP_OBJ_NEW_SMALL_INT(g_cam.pixfmt);
+    }
+    int fmt = mp_obj_get_int(args[1]);
     if (fmt != PIXFORMAT_GRAYSCALE && fmt != PIXFORMAT_RGB565) {
         mp_raise_ValueError(MP_ERROR_TEXT("unsupported pixformat"));
     }
@@ -676,11 +760,16 @@ mp_obj_t csi_pixformat(mp_obj_t self_in, mp_obj_t fmt_in) {
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(csi_pixformat_obj, csi_pixformat);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_pixformat_obj, 1, 2, csi_pixformat);
 
 // see session-state: camera_module.cpp#csi_framesize
-mp_obj_t csi_framesize(mp_obj_t self_in, mp_obj_t size_in) {
-    (void) self_in;
+// No-arg form returns the packed (w << 16) | h, so it compares equal to
+// the named constant (csi.QVGA etc) that was set.
+mp_obj_t csi_framesize(size_t n_args, const mp_obj_t *args) {
+    if (n_args == 1) {
+        return MP_OBJ_NEW_SMALL_INT(((mp_int_t) g_cam.width << 16) | g_cam.height);
+    }
+    mp_obj_t size_in = args[1];
     int32_t w, h;
     if (mp_obj_is_type(size_in, &mp_type_tuple)) {
         size_t len;
@@ -708,7 +797,19 @@ mp_obj_t csi_framesize(mp_obj_t self_in, mp_obj_t size_in) {
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(csi_framesize_obj, csi_framesize);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_framesize_obj, 1, 2, csi_framesize);
+
+mp_obj_t csi_width(mp_obj_t self_in) {
+    (void) self_in;
+    return MP_OBJ_NEW_SMALL_INT(g_cam.width);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(csi_width_obj, csi_width);
+
+mp_obj_t csi_height(mp_obj_t self_in) {
+    (void) self_in;
+    return MP_OBJ_NEW_SMALL_INT(g_cam.height);
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(csi_height_obj, csi_height);
 
 // Every YUV_420_888 output size this device's camera actually supports,
 // sorted smallest-first by pixel count. Exists because Android camera
@@ -830,6 +931,228 @@ mp_obj_t csi_framebuffers(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_framebuffers_obj, 1, 2, csi_framebuffers);
 
+// ---------------------------------------------------------------------------
+// Camera controls, OpenMV csi names and signatures (py_csi_ng.c), mapped to
+// Camera2 capture request entries. Controls without a Camera2 equivalent
+// are accepted and do nothing, returning False where OpenMV returns a
+// success bool. see g_ctl / apply_controls().
+
+// Manual gain/exposure/white balance values need capture-result read-back,
+// not done yet: only the auto on/off part is implemented.
+void warn_ignored(mp_obj_t value, const char *name) {
+    if (value != mp_const_none) {
+        mp_printf(&mp_plat_print, "csi: %s not supported, ignored\n", name);
+    }
+}
+
+// auto_gain(False) and auto_exposure(False) both map to AE lock: Camera2
+// has one auto-exposure loop for gain and exposure time together.
+mp_obj_t csi_auto_gain(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_enable, ARG_gain_db, ARG_gain_db_ceiling };
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_enable, MP_ARG_BOOL | MP_ARG_REQUIRED, {.u_bool = true}},
+        {MP_QSTR_gain_db, MP_ARG_OBJ | MP_ARG_KW_ONLY, {.u_rom_obj = MP_ROM_NONE}},
+        {MP_QSTR_gain_db_ceiling, MP_ARG_OBJ | MP_ARG_KW_ONLY, {.u_rom_obj = MP_ROM_NONE}},
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    warn_ignored(args[ARG_gain_db].u_obj, "gain_db");
+    warn_ignored(args[ARG_gain_db_ceiling].u_obj, "gain_db_ceiling");
+    g_ctl.auto_gain = args[ARG_enable].u_bool;
+    push_controls("auto_gain");
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(csi_auto_gain_obj, 2, csi_auto_gain);
+
+mp_obj_t csi_auto_exposure(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_enable, ARG_exposure_us };
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_enable, MP_ARG_BOOL | MP_ARG_REQUIRED, {.u_bool = true}},
+        {MP_QSTR_exposure_us, MP_ARG_INT | MP_ARG_KW_ONLY, {.u_int = -1}},
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    if (args[ARG_exposure_us].u_int >= 0) {
+        mp_printf(&mp_plat_print, "csi: exposure_us not supported, ignored\n");
+    }
+    g_ctl.auto_exposure = args[ARG_enable].u_bool;
+    push_controls("auto_exposure");
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(csi_auto_exposure_obj, 2, csi_auto_exposure);
+
+mp_obj_t csi_auto_whitebal(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_enable, ARG_rgb_gain_db };
+    static const mp_arg_t allowed_args[] = {
+        {MP_QSTR_enable, MP_ARG_BOOL | MP_ARG_REQUIRED, {.u_bool = true}},
+        {MP_QSTR_rgb_gain_db, MP_ARG_OBJ | MP_ARG_KW_ONLY, {.u_rom_obj = MP_ROM_NONE}},
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    warn_ignored(args[ARG_rgb_gain_db].u_obj, "rgb_gain_db");
+    g_ctl.auto_whitebal = args[ARG_enable].u_bool;
+    push_controls("auto_whitebal");
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(csi_auto_whitebal_obj, 2, csi_auto_whitebal);
+
+// brightness(level): exposure compensation, one level = 1 EV. False if the
+// level is outside the camera's compensation range, like OpenMV's sensors.
+mp_obj_t csi_brightness(mp_obj_t self_in, mp_obj_t level_in) {
+    (void) self_in;
+    mp_int_t level = mp_obj_get_int(level_in);
+    ACameraMetadata *metadata = get_characteristics("brightness");
+    ACameraMetadata_const_entry range = {}, step = {};
+    bool ok = ACameraMetadata_getConstEntry(metadata, ACAMERA_CONTROL_AE_COMPENSATION_RANGE, &range) == ACAMERA_OK && range.count >= 2 &&
+        ACameraMetadata_getConstEntry(metadata, ACAMERA_CONTROL_AE_COMPENSATION_STEP, &step) == ACAMERA_OK && step.count >= 1 &&
+        step.data.r[0].numerator > 0 && step.data.r[0].denominator > 0;
+    int32_t index = 0;
+    if (ok) {
+        // steps per EV = denominator / numerator (step is e.g. 1/3 EV)
+        index = (int32_t) lround((double) level * step.data.r[0].denominator / step.data.r[0].numerator);
+        ok = index >= range.data.i32[0] && index <= range.data.i32[1];
+    }
+    ACameraMetadata_free(metadata);
+    if (!ok) {
+        return mp_const_false;
+    }
+    g_ctl.ev_index = index;
+    push_controls("brightness");
+    return mp_const_true;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(csi_brightness_obj, csi_brightness);
+
+// framerate(fps): picks the camera's AE target fps range with max == fps,
+// preferring a fixed [fps, fps] range. ValueError if there is none; the
+// ranges are listed in the message. No-arg form returns the set value.
+mp_obj_t csi_framerate(size_t n_args, const mp_obj_t *args) {
+    if (n_args == 1) {
+        if (g_ctl.fps_max == 0) {
+            mp_raise_ValueError(MP_ERROR_TEXT("framerate not set"));
+        }
+        return MP_OBJ_NEW_SMALL_INT(g_ctl.fps_max);
+    }
+    mp_int_t fps = mp_obj_get_int(args[1]);
+    ACameraMetadata *metadata = get_characteristics("framerate");
+    ACameraMetadata_const_entry entry = {};
+    int32_t best_min = 0;
+    char ranges[160] = "";
+    if (ACameraMetadata_getConstEntry(metadata, ACAMERA_CONTROL_AE_AVAILABLE_TARGET_FPS_RANGES, &entry) == ACAMERA_OK) {
+        for (uint32_t i = 0; i + 1 < entry.count; i += 2) {
+            int32_t lo = entry.data.i32[i], hi = entry.data.i32[i + 1];
+            size_t used = strlen(ranges);
+            snprintf(ranges + used, sizeof(ranges) - used, " [%d,%d]", (int) lo, (int) hi);
+            if (hi == fps && lo > best_min) {
+                best_min = lo;
+            }
+        }
+    }
+    ACameraMetadata_free(metadata);
+    if (best_min == 0) {
+        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("framerate %d not supported, ranges:%s"), (int) fps, ranges);
+    }
+    g_ctl.fps_min = best_min;
+    g_ctl.fps_max = (int32_t) fps;
+    push_controls("framerate");
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_framerate_obj, 1, 2, csi_framerate);
+
+// Returns whether the camera lists u8 value `mode` in characteristic `tag`.
+bool has_u8_mode(uint32_t tag, uint8_t mode, const char *who) {
+    ACameraMetadata *metadata = get_characteristics(who);
+    ACameraMetadata_const_entry entry = {};
+    bool found = false;
+    if (ACameraMetadata_getConstEntry(metadata, tag, &entry) == ACAMERA_OK) {
+        for (uint32_t i = 0; i < entry.count; i++) {
+            found |= entry.data.u8[i] == mode;
+        }
+    }
+    ACameraMetadata_free(metadata);
+    return found;
+}
+
+// special_effect(csi.NORMAL | csi.NEGATIVE). False if the camera lacks it.
+mp_obj_t csi_special_effect(mp_obj_t self_in, mp_obj_t sde_in) {
+    (void) self_in;
+    mp_int_t sde = mp_obj_get_int(sde_in);
+    uint8_t mode;
+    if (sde == kSdeNormal) {
+        mode = ACAMERA_CONTROL_EFFECT_MODE_OFF;
+    } else if (sde == kSdeNegative) {
+        mode = ACAMERA_CONTROL_EFFECT_MODE_NEGATIVE;
+    } else {
+        return mp_const_false;
+    }
+    if (mode != ACAMERA_CONTROL_EFFECT_MODE_OFF && !has_u8_mode(ACAMERA_CONTROL_AVAILABLE_EFFECTS, mode, "special_effect")) {
+        return mp_const_false;
+    }
+    g_ctl.effect = mode;
+    push_controls("special_effect");
+    return mp_const_true;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(csi_special_effect_obj, csi_special_effect);
+
+// colorbar(True): sensor test pattern. False if the camera lacks it.
+mp_obj_t csi_colorbar(mp_obj_t self_in, mp_obj_t enable_in) {
+    (void) self_in;
+    bool enable = mp_obj_is_true(enable_in);
+    if (enable) {
+        ACameraMetadata *metadata = get_characteristics("colorbar");
+        ACameraMetadata_const_entry entry = {};
+        bool found = false;
+        if (ACameraMetadata_getConstEntry(metadata, ACAMERA_SENSOR_AVAILABLE_TEST_PATTERN_MODES, &entry) == ACAMERA_OK) {
+            for (uint32_t i = 0; i < entry.count; i++) {
+                found |= entry.data.i32[i] == ACAMERA_SENSOR_TEST_PATTERN_MODE_COLOR_BARS;
+            }
+        }
+        ACameraMetadata_free(metadata);
+        if (!found) {
+            return mp_const_false;
+        }
+    }
+    g_ctl.colorbar = enable;
+    push_controls("colorbar");
+    return mp_const_true;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(csi_colorbar_obj, csi_colorbar);
+
+// No Camera2 equivalent: accepted, not applied.
+mp_obj_t csi_unsupported_bool(mp_obj_t self_in, mp_obj_t value_in) {
+    (void) self_in;
+    (void) value_in;
+    return mp_const_false;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(csi_unsupported_bool_obj, csi_unsupported_bool);
+
+mp_obj_t csi_unsupported_none(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    (void) n_args;
+    (void) pos_args;
+    (void) kw_args;
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_KW(csi_unsupported_none_obj, 2, csi_unsupported_none);
+
+// sleep(True) stops streaming; the next snapshot() restarts it.
+mp_obj_t csi_sleep(mp_obj_t self_in, mp_obj_t enable_in) {
+    (void) self_in;
+    if (mp_obj_is_true(enable_in)) {
+        close_session_and_reader();
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(csi_sleep_obj, csi_sleep);
+
+// shutdown(True) closes the camera; reset() reopens it.
+mp_obj_t csi_shutdown(mp_obj_t self_in, mp_obj_t enable_in) {
+    (void) self_in;
+    if (mp_obj_is_true(enable_in)) {
+        camera_close_all();
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(csi_shutdown_obj, csi_shutdown);
+
 // see session-state: camera_module.cpp#camera_id_selection
 mp_obj_t csi_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum { ARG_cid };
@@ -855,6 +1178,22 @@ const mp_rom_map_elem_t csi_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_camera_list), MP_ROM_PTR(&csi_camera_list_obj)},
     {MP_ROM_QSTR(MP_QSTR_snapshot), MP_ROM_PTR(&csi_snapshot_obj)},
     {MP_ROM_QSTR(MP_QSTR_framebuffers), MP_ROM_PTR(&csi_framebuffers_obj)},
+    {MP_ROM_QSTR(MP_QSTR_width), MP_ROM_PTR(&csi_width_obj)},
+    {MP_ROM_QSTR(MP_QSTR_height), MP_ROM_PTR(&csi_height_obj)},
+    {MP_ROM_QSTR(MP_QSTR_auto_gain), MP_ROM_PTR(&csi_auto_gain_obj)},
+    {MP_ROM_QSTR(MP_QSTR_auto_exposure), MP_ROM_PTR(&csi_auto_exposure_obj)},
+    {MP_ROM_QSTR(MP_QSTR_auto_whitebal), MP_ROM_PTR(&csi_auto_whitebal_obj)},
+    {MP_ROM_QSTR(MP_QSTR_brightness), MP_ROM_PTR(&csi_brightness_obj)},
+    {MP_ROM_QSTR(MP_QSTR_framerate), MP_ROM_PTR(&csi_framerate_obj)},
+    {MP_ROM_QSTR(MP_QSTR_special_effect), MP_ROM_PTR(&csi_special_effect_obj)},
+    {MP_ROM_QSTR(MP_QSTR_colorbar), MP_ROM_PTR(&csi_colorbar_obj)},
+    {MP_ROM_QSTR(MP_QSTR_contrast), MP_ROM_PTR(&csi_unsupported_bool_obj)},
+    {MP_ROM_QSTR(MP_QSTR_saturation), MP_ROM_PTR(&csi_unsupported_bool_obj)},
+    {MP_ROM_QSTR(MP_QSTR_quality), MP_ROM_PTR(&csi_unsupported_bool_obj)},
+    {MP_ROM_QSTR(MP_QSTR_gainceiling), MP_ROM_PTR(&csi_unsupported_none_obj)},
+    {MP_ROM_QSTR(MP_QSTR_auto_blc), MP_ROM_PTR(&csi_unsupported_none_obj)},
+    {MP_ROM_QSTR(MP_QSTR_sleep), MP_ROM_PTR(&csi_sleep_obj)},
+    {MP_ROM_QSTR(MP_QSTR_shutdown), MP_ROM_PTR(&csi_shutdown_obj)},
 };
 MP_DEFINE_CONST_DICT(csi_locals_dict, csi_locals_dict_table);
 
@@ -873,9 +1212,33 @@ const mp_rom_map_elem_t csi_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_CSI), MP_ROM_PTR(&csi_type)},
     {MP_ROM_QSTR(MP_QSTR_GRAYSCALE), MP_ROM_INT(PIXFORMAT_GRAYSCALE)},
     {MP_ROM_QSTR(MP_QSTR_RGB565), MP_ROM_INT(PIXFORMAT_RGB565)},
+    // OpenMV framesize names; the camera must list the size (framesize_list()).
+    {MP_ROM_QSTR(MP_QSTR_QCIF), MP_ROM_INT(FRAMESIZE_PACK(176, 144))},
+    {MP_ROM_QSTR(MP_QSTR_CIF), MP_ROM_INT(FRAMESIZE_PACK(352, 288))},
+    {MP_ROM_QSTR(MP_QSTR_QSIF), MP_ROM_INT(FRAMESIZE_PACK(176, 120))},
+    {MP_ROM_QSTR(MP_QSTR_SIF), MP_ROM_INT(FRAMESIZE_PACK(352, 240))},
+    {MP_ROM_QSTR(MP_QSTR_QQQVGA), MP_ROM_INT(FRAMESIZE_PACK(80, 60))},
     {MP_ROM_QSTR(MP_QSTR_QQVGA), MP_ROM_INT(FRAMESIZE_PACK(160, 120))},
     {MP_ROM_QSTR(MP_QSTR_QVGA), MP_ROM_INT(FRAMESIZE_PACK(320, 240))},
     {MP_ROM_QSTR(MP_QSTR_VGA), MP_ROM_INT(FRAMESIZE_PACK(640, 480))},
+    {MP_ROM_QSTR(MP_QSTR_HQVGA), MP_ROM_INT(FRAMESIZE_PACK(240, 160))},
+    {MP_ROM_QSTR(MP_QSTR_HVGA), MP_ROM_INT(FRAMESIZE_PACK(480, 320))},
+    {MP_ROM_QSTR(MP_QSTR_WVGA), MP_ROM_INT(FRAMESIZE_PACK(720, 480))},
+    {MP_ROM_QSTR(MP_QSTR_WVGA2), MP_ROM_INT(FRAMESIZE_PACK(752, 480))},
+    {MP_ROM_QSTR(MP_QSTR_SVGA), MP_ROM_INT(FRAMESIZE_PACK(800, 600))},
+    {MP_ROM_QSTR(MP_QSTR_XGA), MP_ROM_INT(FRAMESIZE_PACK(1024, 768))},
+    {MP_ROM_QSTR(MP_QSTR_WXGA), MP_ROM_INT(FRAMESIZE_PACK(1280, 768))},
+    {MP_ROM_QSTR(MP_QSTR_SXGA), MP_ROM_INT(FRAMESIZE_PACK(1280, 1024))},
+    {MP_ROM_QSTR(MP_QSTR_SXGAM), MP_ROM_INT(FRAMESIZE_PACK(1280, 960))},
+    {MP_ROM_QSTR(MP_QSTR_UXGA), MP_ROM_INT(FRAMESIZE_PACK(1600, 1200))},
+    {MP_ROM_QSTR(MP_QSTR_HD), MP_ROM_INT(FRAMESIZE_PACK(1280, 720))},
+    {MP_ROM_QSTR(MP_QSTR_FHD), MP_ROM_INT(FRAMESIZE_PACK(1920, 1080))},
+    {MP_ROM_QSTR(MP_QSTR_QHD), MP_ROM_INT(FRAMESIZE_PACK(2560, 1440))},
+    {MP_ROM_QSTR(MP_QSTR_QXGA), MP_ROM_INT(FRAMESIZE_PACK(2048, 1536))},
+    {MP_ROM_QSTR(MP_QSTR_WQXGA), MP_ROM_INT(FRAMESIZE_PACK(2560, 1600))},
+    {MP_ROM_QSTR(MP_QSTR_WQXGA2), MP_ROM_INT(FRAMESIZE_PACK(2592, 1944))},
+    {MP_ROM_QSTR(MP_QSTR_NORMAL), MP_ROM_INT(kSdeNormal)},
+    {MP_ROM_QSTR(MP_QSTR_NEGATIVE), MP_ROM_INT(kSdeNegative)},
 };
 MP_DEFINE_CONST_DICT(csi_module_globals, csi_module_globals_table);
 
@@ -907,13 +1270,8 @@ mp_obj_t android_light_set(bool on) {
         raise_os_error(MP_ENODEV, "android.light: no flash unit on this device's camera");
     }
 
-    uint8_t mode = on ? ACAMERA_FLASH_MODE_TORCH : ACAMERA_FLASH_MODE_OFF;
-    if (ACaptureRequest_setEntry_u8(g_cam.request, ACAMERA_FLASH_MODE, 1, &mode) != ACAMERA_OK) {
-        raise_os_error(MP_EIO, "android.light: failed to set flash mode");
-    }
-    if (ACameraCaptureSession_setRepeatingRequest(g_cam.session, nullptr, 1, &g_cam.request, nullptr) != ACAMERA_OK) {
-        raise_os_error(MP_EIO, "android.light: failed to apply flash mode");
-    }
+    g_ctl.torch = on;
+    push_controls("android.light");
     return mp_const_none;
 }
 
@@ -934,13 +1292,8 @@ mp_obj_t android_zoom_set(mp_obj_t ratio_in) {
         raise_os_error(MP_EINVAL, "android.zoom: camera not reset -- call csi.CSI().reset() first");
     }
     ensure_session();
-    float ratio = mp_obj_get_float(ratio_in);
-    if (ACaptureRequest_setEntry_float(g_cam.request, ACAMERA_CONTROL_ZOOM_RATIO, 1, &ratio) != ACAMERA_OK) {
-        raise_os_error(MP_EIO, "android.zoom: failed to set zoom ratio");
-    }
-    if (ACameraCaptureSession_setRepeatingRequest(g_cam.session, nullptr, 1, &g_cam.request, nullptr) != ACAMERA_OK) {
-        raise_os_error(MP_EIO, "android.zoom: failed to apply zoom ratio");
-    }
+    g_ctl.zoom = (float) mp_obj_get_float(ratio_in);
+    push_controls("android.zoom");
     return mp_const_none;
 }
 extern MP_DEFINE_CONST_FUN_OBJ_1(android_zoom_set_obj, android_zoom_set);

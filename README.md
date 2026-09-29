@@ -87,6 +87,13 @@ Compiles. Measured ~25 FPS at resolution (320, 240) on a Xiaomi Redmi Note 15 de
 
 `csi.CSI().framesize_list()` returns a list of image resolutions the Android phone camera supports.  When setting `framesize()` use a resolution in this list.
 
+Camera controls use OpenMV's names, mapped to Camera2:
+
+- `auto_gain(False)`, `auto_exposure(False)`: lock auto-exposure. `auto_whitebal(False)`: lock white balance. Manual `gain_db`/`exposure_us`/`rgb_gain_db` values are ignored.
+- `brightness(n)`: exposure compensation, n EV. `framerate(fps)`: AE target fps range. `special_effect(csi.NEGATIVE)`, `colorbar(True)`: if the camera supports them.
+- `contrast`, `saturation`, `quality`, `gainceiling`, `auto_blc`: accepted, no effect.
+- `sleep(True)` stops streaming, `shutdown(True)` closes the camera.
+
 In micropython, the `android` module gives access to android devices:
 
 - motion sensor
