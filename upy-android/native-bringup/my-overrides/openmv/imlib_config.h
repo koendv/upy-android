@@ -69,5 +69,7 @@
 #define IMLIB_ENABLE_DESCRIPTOR
 // find_hog(): hog.c (MIT).
 #define IMLIB_ENABLE_HOG
+// find_datamatrices(): dmtx.c (libdmtx, BSD-2-Clause), self-contained.
+#define IMLIB_ENABLE_DATAMATRICES
 
 #endif

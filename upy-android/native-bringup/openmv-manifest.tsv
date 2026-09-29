@@ -8,6 +8,7 @@ lib/imlib/bmp.c	bmp.c
 lib/imlib/clahe.c	clahe.c
 lib/imlib/collections.c	collections.c
 lib/imlib/collections.h	collections.h
+lib/imlib/dmtx.c	dmtx.c
 lib/imlib/draw.c	draw.c
 lib/imlib/edge.c	edge.c
 lib/imlib/edl.c	edl.c
