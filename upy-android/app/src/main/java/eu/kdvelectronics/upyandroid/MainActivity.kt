@@ -1,8 +1,13 @@
 package eu.kdvelectronics.upyandroid
 
 import android.Manifest
+import android.content.ContentResolver
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,7 +25,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.LaunchedEffect
 import androidx.core.content.ContextCompat
+import androidx.core.content.IntentCompat
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -48,6 +56,7 @@ import eu.kdvelectronics.upyandroid.ui.UpyTheme
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // Four peer nav destinations, in the order they appear in the nav
 // suite. Editor is deliberately not here, it's a non-peer detail
@@ -119,6 +128,10 @@ class MainActivity : ComponentActivity() {
     private val scriptPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { }
 
+    // Name (in the VFS root) of the first file saved from a share; the
+    // Files screen opens on it, then clears this.
+    private val sharedFocus = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -159,6 +172,9 @@ class MainActivity : ComponentActivity() {
         SshServerManager.applySettings(applicationContext, settingsManager)
         ScriptExecCore.connect(applicationContext)
         maybeRequestCameraPermission()
+        // Not on recreation (rotation, theme): the same share intent
+        // would be saved a second time.
+        if (savedInstanceState == null) receiveShare(intent)
 
         setContent {
             UpyTheme {
@@ -171,6 +187,11 @@ class MainActivity : ComponentActivity() {
                 // these variables instead.
                 var pendingFile = remember { mutableStateOf<MicroFile?>(null) }
                 var pendingPath = remember { mutableStateOf("") }
+
+                val focus = sharedFocus.value
+                LaunchedEffect(focus) {
+                    if (focus != null) navController.navigateToTab(TopLevelDestination.EXPLORER.route)
+                }
 
                 fun runAndShowTerminal(content: String) {
                     TerminalLog.append("\n>>> (running script)\n")
@@ -244,6 +265,8 @@ class MainActivity : ComponentActivity() {
                                     navController.navigate("editor")
                                 },
                                 onRun = { content -> runAndShowTerminal(content) },
+                                focus = focus,
+                                onFocusShown = { sharedFocus.value = null },
                             )
                         }
                         composable("editor") {
@@ -272,6 +295,77 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // singleTask: a share while upy is running arrives here.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        receiveShare(intent)
+    }
+
+    // Share target (ACTION_SEND / ACTION_SEND_MULTIPLE, any type): saves
+    // each shared file, or shared text as shared.py, in the VFS root,
+    // then opens the Files screen on the first one. Runs in this UI
+    // process, so it works while the engine is busy or disconnected.
+    private fun receiveShare(intent: Intent?) {
+        intent ?: return
+        val uris: List<Uri> = when (intent.action) {
+            Intent.ACTION_SEND -> listOfNotNull(IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java))
+            Intent.ACTION_SEND_MULTIPLE ->
+                IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+            else -> return
+        }
+        val text = if (uris.isEmpty()) intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString() else null
+        lifecycleScope.launch {
+            val saved = withContext(Dispatchers.IO) {
+                if (text != null) {
+                    listOf(saveShared("shared.py") { it.write(text.toByteArray()) })
+                } else {
+                    uris.filter { it.scheme == ContentResolver.SCHEME_CONTENT }.mapNotNull { uri ->
+                        try {
+                            val input = contentResolver.openInputStream(uri) ?: return@mapNotNull null
+                            input.use { saveShared(sharedName(uri)) { out -> input.copyTo(out) } }
+                        } catch (e: Exception) {
+                            null // unreadable (revoked, removed): skip it, save the rest
+                        }
+                    }
+                }
+            }
+            saved.firstOrNull()?.let { sharedFocus.value = it }
+        }
+    }
+
+    // The sender's display name without any directory part, else
+    // "shared" plus an extension from the MIME type.
+    private fun sharedName(uri: Uri): String {
+        val display = try {
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        } catch (e: Exception) {
+            null
+        }
+        val name = display?.substringAfterLast('/')?.substringAfterLast('\\')?.trim()
+        if (!name.isNullOrEmpty() && name != "." && name != "..") return name
+        val ext = contentResolver.getType(uri)?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) } ?: "bin"
+        return "shared.$ext"
+    }
+
+    // Writes a new file in the VFS root; an existing name becomes
+    // name_1.ext, name_2.ext, ... Returns the name used.
+    private fun saveShared(name: String, write: (java.io.OutputStream) -> Unit): String {
+        val dot = name.lastIndexOf('.').takeIf { it > 0 } ?: name.length
+        val base = name.substring(0, dot)
+        val ext = name.substring(dot)
+        var candidate = name
+        var n = 1
+        while (File(filesDir, candidate).exists()) {
+            candidate = "${base}_$n$ext"
+            n++
+        }
+        File(filesDir, candidate).outputStream().use(write)
+        return candidate
     }
 
     override fun onDestroy() {

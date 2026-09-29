@@ -18,6 +18,7 @@ No USB/hardware board required.
 
 - MicroPython REPL with output streaming and interrupt
 - File explorer, text editor, REPL.
+- Share target: share a file (a `.py` from an editor, an image from a file manager) or text with upy; it is saved in `/` (text as `shared.py`, an existing name becomes `name_1.ext`), and Files opens on it
 - Camera and display modules (`csi`, `display`) backed by Camera2/NDK and `ANativeWindow`; camera screen in-app
 - `android` module for phone API
 - VFS rooted at app-private storage

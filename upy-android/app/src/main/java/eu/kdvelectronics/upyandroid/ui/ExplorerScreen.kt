@@ -58,6 +58,8 @@ fun ExplorerScreen(
     filesManager: FilesManager,
     onEdit: (MicroFile?, path: String) -> Unit,
     onRun: (content: String) -> Unit,
+    focus: String? = null,
+    onFocusShown: () -> Unit = {},
 ) {
     val coroutineScope = rememberCoroutineScope()
     var path by remember { mutableStateOf("") }
@@ -78,6 +80,18 @@ fun ExplorerScreen(
     }
 
     LaunchedEffect(path) { refresh() }
+
+    // A file just shared into upy (name in the VFS root): show the root
+    // and open that file's options, as if it had been tapped.
+    LaunchedEffect(focus) {
+        if (focus != null) {
+            path = ""
+            refresh()
+            selected = MicroFile(name = focus, path = "", isDirectory = false)
+            showOptions = true
+            onFocusShown()
+        }
+    }
 
     // Peer nav-suite tab: no onBack to fall through to at the VFS root
     // any more. up() is a no-op there (tab switching is the only way to
