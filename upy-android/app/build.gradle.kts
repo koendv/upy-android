@@ -128,6 +128,7 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
         rootProject.file("examples/face_detection/face_detection.py"),
         rootProject.file("examples/face_eye_detection/face_eye_detection.py"),
         rootProject.file("examples/iris_detection/iris_detection.py"),
+        rootProject.file("examples/find_circles/find_circles.py"),
     )
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }

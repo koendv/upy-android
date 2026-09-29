@@ -24,6 +24,7 @@ lib/imlib/font.h	font.h
 lib/imlib/fsort.c	fsort.c
 lib/imlib/fsort.h	fsort.h
 lib/imlib/haar.c	haar.c
+lib/imlib/hough.c	hough.c
 lib/imlib/imlib.c	imlib.c
 lib/imlib/imlib.h	imlib.h
 lib/imlib/integral.c	integral.c
