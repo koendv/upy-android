@@ -58,5 +58,16 @@
 // dilate(), open(), close(), top_hat(), black_hat(): binary.c and edge.c
 // (MIT), already vendored.
 #define IMLIB_ENABLE_BINARY_OPS
+// find_displacement(), logpolar(), linpolar(): phasecorrelation.c (MIT),
+// uses the already vendored fft.c.
+#define IMLIB_ENABLE_FIND_DISPLACEMENT
+#define IMLIB_ENABLE_LOGPOLAR
+#define IMLIB_ENABLE_LINPOLAR
+// find_lbp(): lbp.c (MIT). image.match_descriptor()/load_descriptor()/
+// save_descriptor() for LBP and ORB keypoints: py_image_descriptor.c.
+#define IMLIB_ENABLE_FIND_LBP
+#define IMLIB_ENABLE_DESCRIPTOR
+// find_hog(): hog.c (MIT).
+#define IMLIB_ENABLE_HOG
 
 #endif

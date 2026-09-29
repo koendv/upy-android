@@ -137,6 +137,10 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
         rootProject.file("examples/find_rects/find_rects.py"),
         rootProject.file("examples/find_lines/find_lines.py"),
         rootProject.file("examples/find_edges/find_edges.py"),
+        rootProject.file("examples/find_lbp/find_lbp.py"),
+        rootProject.file("examples/face_tracking/face_tracking.py"),
+        rootProject.file("examples/find_hog/find_hog.py"),
+        rootProject.file("examples/find_displacement/find_displacement.py"),
     )
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }
