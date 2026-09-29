@@ -60,5 +60,10 @@ cp my-overrides/ulab/ulab_config.h micropython_embed/ulab/ulab_config.h
 rm -rf micropython_embed/openmv
 cp -r vendor/openmv micropython_embed/openmv
 cp -r my-overrides/openmv/. micropython_embed/openmv/
+# AprilTag library (lib/apriltag submodule of OpenMV), used by OpenMV's
+# imlib apriltag.c for find_apriltags()/find_rects(). Config header:
+# my-overrides/openmv/apriltag_config.h.
+rm -rf micropython_embed/apriltag
+cp -r vendor/apriltag micropython_embed/apriltag
 
 echo "overrides reapplied"

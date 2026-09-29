@@ -129,6 +129,8 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
         rootProject.file("examples/face_eye_detection/face_eye_detection.py"),
         rootProject.file("examples/iris_detection/iris_detection.py"),
         rootProject.file("examples/find_circles/find_circles.py"),
+        rootProject.file("examples/find_apriltags/find_apriltags.py"),
+        rootProject.file("examples/find_rects/find_rects.py"),
     )
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }
@@ -160,7 +162,7 @@ val fetchUpstream = tasks.register<Exec>("fetchUpstream") {
 val populateVendor = tasks.register<Exec>("populateVendor") {
     dependsOn(fetchUpstream)
     inputs.files(upstreamFile, bringup.resolve("openmv-manifest.tsv"), bringup.resolve("populate-vendor.sh"))
-    outputs.dirs(bringup.resolve("vendor/openmv"), bringup.resolve("vendor/ulab"))
+    outputs.dirs(bringup.resolve("vendor/openmv"), bringup.resolve("vendor/ulab"), bringup.resolve("vendor/apriltag"))
     commandLine(bringup.resolve("populate-vendor.sh").path)
 }
 
@@ -215,6 +217,7 @@ val generateEmbed = tasks.register<Exec>("generateEmbed") {
     dependsOn(populateVendor)
     inputs.files(upstreamFile)
     inputs.files(fileTree(bringup.resolve("vendor/openmv")), fileTree(bringup.resolve("vendor/ulab")))
+    inputs.files(fileTree(bringup.resolve("vendor/apriltag")))
     inputs.files(fileTree(bringup.resolve("my-overrides")), fileTree(bringup.resolve("qstr-stub")))
     inputs.files(fileTree(bringup) { include("*.mk", "*.sh", "*.py") })
     inputs.files(fileTree(layout.projectDirectory.dir("src/main/cpp")) { include("*.cpp", "*.h") })

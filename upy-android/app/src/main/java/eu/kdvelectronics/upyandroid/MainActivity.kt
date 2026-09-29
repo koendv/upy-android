@@ -84,7 +84,7 @@ private fun NavHostController.navigateToTab(route: String) {
 // Bumped whenever a bundled demo script's own content changes. See
 // seedDemoScriptsIfNeeded() below. Lets an app update that fixes a
 // demo script reach existing installs too, not just fresh ones.
-private const val CURRENT_DEMO_SCRIPTS_VERSION = 4
+private const val CURRENT_DEMO_SCRIPTS_VERSION = 5
 
 // Bumped whenever the bundled `ml` library package's own content
 // changes. See seedMlLibraryIfNeeded() below. Same reasoning as
@@ -303,6 +303,8 @@ class MainActivity : ComponentActivity() {
             "face_eye_detection.py",
             "iris_detection.py",
             "find_circles.py",
+            "find_apriltags.py",
+            "find_rects.py",
         )) {
             assets.open("examples/$name").use { input ->
                 File(examplesDir, name).outputStream().use { output ->

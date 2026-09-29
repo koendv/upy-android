@@ -1,5 +1,6 @@
 common/array.c	array.c
 common/array.h	array.h
+lib/imlib/apriltag.c	apriltag.c
 lib/imlib/bayer.c	bayer.c
 lib/imlib/binary.c	binary.c
 lib/imlib/blob.c	blob.c

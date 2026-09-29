@@ -19,6 +19,10 @@ file(GLOB_RECURSE MPY_ULAB_SOURCES micropython_embed/ulab/*.c)
 # OpenMV imlib/py_image is flat, so a plain non-recursive glob is enough.
 file(GLOB MPY_OPENMV_SOURCES micropython_embed/openmv/*.c)
 
+# AprilTag library (OpenMV's lib/apriltag submodule). Only the sources its
+# own apriltag.mk lists are copied in, see native-bringup/populate-vendor.sh.
+file(GLOB MPY_APRILTAG_SOURCES micropython_embed/apriltag/*.c micropython_embed/apriltag/common/*.c)
+
 # micropython android port only, not vendored OpenMV source.
 add_library(upy_engine SHARED
     engine_jni.cpp
@@ -41,6 +45,7 @@ add_library(upy_engine SHARED
     ${MPY_EXTMOD_SOURCES}
     ${MPY_ULAB_SOURCES}
     ${MPY_OPENMV_SOURCES}
+    ${MPY_APRILTAG_SOURCES}
 )
 
 target_include_directories(upy_engine PRIVATE
@@ -50,6 +55,8 @@ target_include_directories(upy_engine PRIVATE
     micropython_embed/ulab
     micropython_embed/openmv
     micropython_embed/openmv/ulab-shim
+    micropython_embed/apriltag
+    micropython_embed/apriltag/common
     litert/include
 )
 
@@ -97,4 +104,12 @@ target_link_libraries(upy_engine log m camera2ndk mediandk android litert)
 # jni/ folder. Generated fresh per build under app/.cxx/, not committed.
 target_link_options(upy_engine PRIVATE
     -Wl,-Map=${CMAKE_CURRENT_BINARY_DIR}/upy_engine.map
+)
+
+# Same per-file flags as OpenMV's lib/apriltag/apriltag.mk: its config hook
+# (my-overrides/openmv/apriltag_config.h) and its upstream-warning suppressions.
+set_source_files_properties(${MPY_APRILTAG_SOURCES}
+    PROPERTIES
+    COMPILE_DEFINITIONS "APRILTAG_HAVE_CONFIG"
+    COMPILE_OPTIONS "-Wno-unused-variable;-Wno-unused-but-set-variable;-Wno-sign-compare;-Wno-missing-braces;-Wno-unused-function;-Wno-format;-Wno-double-promotion"
 )

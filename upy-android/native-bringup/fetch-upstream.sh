@@ -1,5 +1,5 @@
 #!/bin/sh
-# Fetches micropython, openmv and ulab at the commits pinned in
+# Fetches micropython, openmv, apriltag and ulab at the commits pinned in
 # ../upstream.properties into ../upstream/<name>. Shallow, one commit each.
 # No-op for a checkout already at its pinned commit.
 set -e
@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.."
 
 prop() { sed -n "s/^$1=//p" upstream.properties; }
 
-for name in micropython openmv ulab; do
+for name in micropython openmv apriltag ulab; do
     url=$(prop "$name.url")
     sha=$(prop "$name.sha")
     dir=upstream/$name

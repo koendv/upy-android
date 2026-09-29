@@ -40,5 +40,15 @@
 #define IMLIB_ENABLE_FEATURES
 // find_circles(): hough.c (MIT), self-contained.
 #define IMLIB_ENABLE_FIND_CIRCLES
+// find_apriltags(), find_rects(): imlib apriltag.c (MIT) plus the AprilTag
+// library (BSD-2-Clause, vendor/apriltag/). Config: apriltag_config.h.
+// Families as on OpenMV's RT1060/AE3 boards; HIGH_RES for phone resolutions.
+#define IMLIB_ENABLE_FIND_RECTS
+#define IMLIB_ENABLE_APRILTAGS
+#define IMLIB_ENABLE_APRILTAGS_TAG16H5
+#define IMLIB_ENABLE_APRILTAGS_TAG25H9
+#define IMLIB_ENABLE_APRILTAGS_TAG36H10
+#define IMLIB_ENABLE_APRILTAGS_TAG36H11
+#define IMLIB_ENABLE_HIGH_RES_APRILTAGS
 
 #endif
