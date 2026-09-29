@@ -16,10 +16,12 @@
 #include <semaphore.h>
 #include <time.h>
 #include <errno.h>
+#include <atomic>
 #include <vector>
 #include <algorithm>
 #include <string>
 #include <cstdlib>
+#include <cstring>
 
 extern "C" {
 #include "py/runtime.h"
@@ -28,6 +30,7 @@ extern "C" {
 #include "py/mperrno.h"
 #include "imlib.h"
 #include "py_image.h"
+#include "framebuffer.h"
 }
 
 #define LOG_TAG "upy-camera"
@@ -38,9 +41,27 @@ namespace {
 // Same 5ms interrupt-check granularity mp_hal_delay_ms() uses, reused so
 // interrupt responsiveness stays uniform across every blocking call.
 constexpr long kWaitChunkMs = 5;
-// Generous enough to absorb Camera2's well-documented first-frame 3A
-// convergence latency.
+// Per-frame stuck-camera timeout inside csi_snapshot_warmup()'s frames=
+// wait, and the steady-state drain-one-frame wait inside csi_snapshot()
+// itself (see wait_for_frame()) -- both cases where a frame is expected
+// imminently (the camera's already warm and streaming), so a fast
+// timeout is correct and desirable there.
 constexpr long kSnapshotTimeoutMs = 500;
+// Generous budget for the FIRST frame specifically -- only reached once
+// per session, right after reset()/a pixformat()/framesize()/
+// framebuffers() rebuild, before on_image_available() has fired even
+// once (see wait_for_frame()). Confirmed on-device this needs more than
+// kSnapshotTimeoutMs=500 covers: closing an actively-streaming session
+// and immediately reopening (e.g. reset() called back-to-back, or right
+// after a long snapshot loop) can genuinely take Camera2's HAL longer
+// than 500ms to produce a first frame on real hardware -- this is a
+// real, measured hardware/HAL characteristic, not a protocol bug (the
+// old design had the exact same 500ms budget for every single
+// snapshot() call, just less likely to be visibly hit since a warm
+// camera almost always beat it; this design concentrates that one
+// slower case into a single, rare, one-time wait per session, so a
+// larger budget here costs nothing in the steady state).
+constexpr long kFirstFrameTimeoutMs = 3000;
 
 // QVGA. Real OpenMV boards default to PIXFORMAT_INVALID/no framesize,
 // requiring both to be set explicitly before snapshot(); this port
@@ -48,6 +69,10 @@ constexpr long kSnapshotTimeoutMs = 500;
 // real image rather than an error.
 constexpr int32_t kDefaultWidth = 320;
 constexpr int32_t kDefaultHeight = 240;
+
+// Default double-buffer -- see csi_framebuffers() below, mirrors real
+// OpenMV's own sensor.framebuffers(n).
+constexpr size_t kDefaultBufCount = 2;
 
 struct CameraState {
     ACameraManager *manager;
@@ -69,15 +94,41 @@ struct CameraState {
     std::string camera_id;
     // -1 means "unspecified". see session-state: camera_module.cpp#camera_id_selection
     int32_t requested_cid;
-    // Set only while a snapshot() call is actively waiting for a frame.
-    // camera_interrupt_active_wait() (any thread) posts into this if
-    // non-null.
+    // Persistent for the whole process, not per-snapshot()-call: the
+    // image-available callback (an Android-internal thread, permanently
+    // registered -- see ensure_session()/on_image_available() below)
+    // posts here on every successfully-written frame. wait_for_frame()
+    // and csi_snapshot_warmup() block on it; camera_interrupt_active_wait()
+    // (any thread) posts into it too, to unblock an interruptible wait.
+    // Lazily sem_init'd once (persistent_frame_sem_ready), never
+    // sem_destroy'd -- process lifetime, like g_cam itself.
+    sem_t persistent_frame_sem;
+    bool persistent_frame_sem_ready;
     sem_t *active_wait_sem;
+    // Bumped on every close_session_and_reader() call; on_image_available()
+    // discards a callback whose FrameContext generation doesn't match the
+    // current one -- a straggler from an already-torn-down reader. See
+    // close_session_and_reader()'s own comment for the full teardown
+    // ordering this depends on.
+    std::atomic<uint64_t> generation;
+    // Incremented at on_image_available() entry, decremented at exit
+    // (every path). close_session_and_reader() spins on this being 0
+    // before freeing/reassigning anything the callback could still be
+    // touching -- the generation check alone is a race without this.
+    std::atomic<int> callback_in_flight;
+    // Configured buffer count for the real, ported OpenMV framebuffer_t
+    // (FB_MAINFB_ID) -- see csi_framebuffers() below. 1/2/3, matching
+    // real OpenMV's own single/double/triple buffering.
+    size_t buf_count;
+    // Incremented once per successfully-written frame (on_image_available()
+    // only) -- csi_snapshot_warmup()'s frames=N wait reads this.
+    std::atomic<unsigned long> frame_seq;
 };
 
 CameraState g_cam = {
     nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-    kDefaultWidth, kDefaultHeight, PIXFORMAT_GRAYSCALE, "", -1, nullptr,
+    kDefaultWidth, kDefaultHeight, PIXFORMAT_GRAYSCALE, "", -1,
+    {}, false, nullptr, {0}, {0}, kDefaultBufCount, {0},
 };
 
 typedef struct _csi_obj_t {
@@ -90,13 +141,6 @@ void raise_os_error(int errno_, const char *msg) {
         mp_obj_new_str(msg, strlen(msg)),
     };
     nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
-}
-
-// AImageReader's onImageAvailable fires on an internal Android thread,
-// not the worker thread.
-void on_image_available(void *context, AImageReader *reader) {
-    (void) reader;
-    sem_post(static_cast<sem_t *>(context));
 }
 
 void on_device_disconnected(void *context, ACameraDevice *device) {
@@ -114,10 +158,35 @@ void on_device_error(void *context, ACameraDevice *device, int error) {
 // Tears down the session/reader/request layer only. The device stays
 // open. Idempotent, safe to call when nothing is configured yet. Used
 // both by camera_close_all() and by ensure_session() before rebuilding
-// after a pixformat()/framesize() change.
+// after a pixformat()/framesize()/framebuffers() change.
+//
+// GENERATION/IN-FLIGHT TEARDOWN ORDERING -- this is the actual fix for a
+// real race (a straggler on_image_available() callback touching a
+// buffer that's about to be freed/reallocated by the next
+// framebuffer_resize() call), not just a detail. Must happen in exactly
+// this order: (1) stop the repeating request so no NEW capture starts,
+// (2) unregister the image listener so no NEW callback can even begin,
+// (3) bump the generation so a callback already past step (2) but not
+// yet started self-discards on entry, (4) spin until no callback is
+// mid-execution (the generation check alone is a race without this --
+// a straggler that already passed the check can still be freed out from
+// under mid-memcpy). Only after (4) is it safe to know nothing will
+// touch the framebuffer or reader concurrently. see session-state.
 void close_session_and_reader() {
     if (g_cam.session) {
         ACameraCaptureSession_stopRepeating(g_cam.session);
+    }
+    if (g_cam.reader) {
+        AImageReader_setImageListener(g_cam.reader, nullptr);
+    }
+    g_cam.generation.fetch_add(1, std::memory_order_acq_rel);
+    while (g_cam.callback_in_flight.load(std::memory_order_acquire) != 0) {
+        // Busy-spin, no sleep: the callback body is short (one memcpy'd
+        // frame), expected sub-microsecond. Not reached at all unless a
+        // callback was genuinely in flight at the moment of teardown.
+    }
+
+    if (g_cam.session) {
         ACameraCaptureSession_close(g_cam.session);
         g_cam.session = nullptr;
     }
@@ -147,16 +216,141 @@ void close_session_and_reader() {
     }
 }
 
-// (Re)builds the session/reader/request layer for the CURRENT
-// width/height/pixfmt. Called lazily from csi_snapshot() rather than
-// eagerly from pixformat()/framesize(). A script may call both setters
-// before ever capturing a frame, so rebuilding on every setter call
-// would do wasted/duplicate work.
+// Context handed to on_image_available() via AImageReader_setImageListener
+// -- deliberately leaked (never delete'd) so its own lifetime question
+// never has to be answered; the generation check is what makes a stale
+// one harmless. AImageReader_ImageListener itself is copied BY VALUE
+// into the reader (NDK contract), so only this context pointer, not the
+// listener struct, needs to outlive the registration call.
+struct FrameContext {
+    uint64_t generation;
+    int32_t width;
+    int32_t height;
+};
+
+// Fires on an internal Android thread, NOT the mp-engine-worker thread
+// that runs MicroPython bytecode (confirmed: AImageReader's own
+// documented threading contract). This is why this function may NEVER
+// call m_malloc, raise_os_error()/nlr_raise, mp_handle_pending, or any
+// other MicroPython-runtime function -- those are not safe to call
+// concurrently with the worker thread's own use of the GC heap / NLR
+// machinery. Only plain C memory (malloc/free, memcpy) and the ported
+// framebuffer_t/queue_t (lock-free, safe by construction) may be touched
+// here. see session-state.
+void on_image_available(void *context, AImageReader *reader) {
+    auto *ctx = static_cast<FrameContext *>(context);
+    g_cam.callback_in_flight.fetch_add(1, std::memory_order_acq_rel);
+    struct Guard {
+        ~Guard() { g_cam.callback_in_flight.fetch_sub(1, std::memory_order_acq_rel); }
+    } guard;
+
+    if (ctx->generation != g_cam.generation.load(std::memory_order_acquire)) {
+        return; // stale reader -- see close_session_and_reader()'s own comment
+    }
+
+    AImage *image = nullptr;
+    // acquireLatestImage, not acquireNextImage: drops any backlog rather
+    // than serially processing stale frames, matching the "movie camera,
+    // latest frame wins" model this whole redesign is built around.
+    if (AImageReader_acquireLatestImage(reader, &image) != AMEDIA_OK || image == nullptr) {
+        // Rate-limited: this can fire at sensor fps under sustained
+        // backpressure/hardware trouble. Leave the previous, still-valid
+        // frame in the framebuffer untouched; the next callback retries.
+        static int fail_count = 0;
+        if (fail_count == 0 || (fail_count % 30) == 0) {
+            LOGW("camera: failed to acquire frame in callback (count=%d)", fail_count + 1);
+        }
+        fail_count++;
+        return;
+    }
+
+    framebuffer_t *fb = framebuffer_get(FB_MAINFB_ID);
+    // PEEK: get a slot to write into without popping it yet.
+    // framebuffer_release()'s own FB_FLAG_FREE|FB_FLAG_CHECK_LAST call
+    // below does the actual pop -- acquiring without PEEK here first
+    // would pop it twice (once here, once inside release()), silently
+    // dropping the frame instead of moving it to the used queue. see
+    // session-state.
+    vbuffer_t *buf = framebuffer_acquire(fb, FB_FLAG_FREE | FB_FLAG_PEEK);
+    if (buf == nullptr) {
+        // No free slot (shouldn't happen with CHECK_LAST release below,
+        // but if it ever does, drop this frame rather than block or crash).
+        AImage_delete(image);
+        return;
+    }
+
+    uint8_t *y_data = nullptr, *u_data = nullptr, *v_data = nullptr;
+    int y_len = 0, u_len = 0, v_len = 0;
+    int32_t y_row_stride = 0, u_row_stride = 0, v_row_stride = 0;
+    int32_t u_pixel_stride = 0, v_pixel_stride = 0;
+    AImage_getPlaneData(image, 0, &y_data, &y_len);
+    AImage_getPlaneRowStride(image, 0, &y_row_stride);
+    AImage_getPlaneData(image, 1, &u_data, &u_len);
+    AImage_getPlaneRowStride(image, 1, &u_row_stride);
+    AImage_getPlanePixelStride(image, 1, &u_pixel_stride);
+    AImage_getPlaneData(image, 2, &v_data, &v_len);
+    AImage_getPlaneRowStride(image, 2, &v_row_stride);
+    AImage_getPlanePixelStride(image, 2, &v_pixel_stride);
+
+    // Tightly packed I420 (Y, then U, then V, pixel stride 1 throughout)
+    // -- matches the size camera_module.cpp's ensure_session() passed to
+    // framebuffer_resize(). csi_snapshot()'s convert_to_grayscale/
+    // convert_to_rgb565 assume this exact layout.
+    int32_t w = ctx->width, h = ctx->height;
+    int32_t uv_w = (w + 1) / 2, uv_h = (h + 1) / 2;
+    size_t y_size = (size_t) w * h;
+    size_t uv_size = (size_t) uv_w * uv_h;
+    uint8_t *dst_y = buf->data;
+    uint8_t *dst_u = buf->data + y_size;
+    uint8_t *dst_v = dst_u + uv_size;
+    for (int32_t row = 0; row < h; row++) {
+        memcpy(dst_y + (size_t) row * w, y_data + (size_t) row * y_row_stride, w);
+    }
+    for (int32_t row = 0; row < uv_h; row++) {
+        const uint8_t *u_row_ptr = u_data + (size_t) row * u_row_stride;
+        const uint8_t *v_row_ptr = v_data + (size_t) row * v_row_stride;
+        uint8_t *dst_u_row = dst_u + (size_t) row * uv_w;
+        uint8_t *dst_v_row = dst_v + (size_t) row * uv_w;
+        for (int32_t col = 0; col < uv_w; col++) {
+            dst_u_row[col] = u_row_ptr[col * u_pixel_stride];
+            dst_v_row[col] = v_row_ptr[col * v_pixel_stride];
+        }
+    }
+    AImage_delete(image);
+
+    // NOW pop free -> push used (or overwrite-in-place if the consumer
+    // is behind -- CHECK_LAST's double/triple-buffer fallback).
+    framebuffer_release(fb, FB_FLAG_FREE | FB_FLAG_CHECK_LAST);
+    g_cam.frame_seq.fetch_add(1, std::memory_order_relaxed);
+    if (g_cam.active_wait_sem) {
+        sem_post(g_cam.active_wait_sem);
+    }
+}
+
+// (Re)builds the session/reader/request/framebuffer layer for the
+// CURRENT width/height/pixfmt/buf_count. Called lazily from
+// csi_snapshot() rather than eagerly from pixformat()/framesize()/
+// framebuffers(). A script may call several setters before ever
+// capturing a frame, so rebuilding on every setter call would do
+// wasted/duplicate work.
 void ensure_session() {
     if (g_cam.session) {
         return;
     }
     close_session_and_reader();
+
+    if (!g_cam.persistent_frame_sem_ready) {
+        sem_init(&g_cam.persistent_frame_sem, 0, 0);
+        g_cam.persistent_frame_sem_ready = true;
+        g_cam.active_wait_sem = &g_cam.persistent_frame_sem;
+        // framebuffer_init() must run exactly once, before the first-ever
+        // framebuffer_resize() call below -- it's what sets fb->dynamic
+        // (so resize() actually allocates instead of silently treating a
+        // zero-initialized raw_size as "buffer too small, fail"). Lazily
+        // guarded here alongside the semaphore init since both are
+        // real, one-time, process-lifetime setup, not per-session state.
+        framebuffer_init(framebuffer_get(FB_MAINFB_ID), NULL, 0, true, true);
+    }
 
     if (AImageReader_new(g_cam.width, g_cam.height, AIMAGE_FORMAT_YUV_420_888, 2, &g_cam.reader) != AMEDIA_OK) {
         raise_os_error(MP_EIO, "camera: failed to create image reader");
@@ -164,6 +358,26 @@ void ensure_session() {
     if (AImageReader_getWindow(g_cam.reader, &g_cam.reader_window) != AMEDIA_OK) {
         raise_os_error(MP_EIO, "camera: failed to get reader window");
     }
+
+    // Tightly-packed I420 frame size -- see on_image_available()'s own
+    // comment for the exact layout this must match.
+    int32_t uv_w = (g_cam.width + 1) / 2, uv_h = (g_cam.height + 1) / 2;
+    size_t frame_size = (size_t) g_cam.width * g_cam.height + 2 * (size_t) uv_w * uv_h;
+    framebuffer_t *fb = framebuffer_get(FB_MAINFB_ID);
+    if (framebuffer_resize(fb, g_cam.buf_count, frame_size) != 0) {
+        raise_os_error(MP_EIO, "camera: failed to allocate framebuffer");
+    }
+
+    // Permanent registration, not transient (the old design registered a
+    // stack-local listener only while a single snapshot() call was
+    // waiting -- the actual bug this whole redesign exists to fix). See
+    // FrameContext's own comment for the leaked-pointer reasoning.
+    auto *ctx = new FrameContext{g_cam.generation.load(std::memory_order_acquire), g_cam.width, g_cam.height};
+    AImageReader_ImageListener listener = {ctx, on_image_available};
+    if (AImageReader_setImageListener(g_cam.reader, &listener) != AMEDIA_OK) {
+        raise_os_error(MP_EIO, "camera: failed to register frame listener");
+    }
+
     if (ACaptureSessionOutputContainer_create(&g_cam.output_container) != ACAMERA_OK) {
         raise_os_error(MP_EIO, "camera: failed to create output container");
     }
@@ -192,50 +406,39 @@ void ensure_session() {
     }
 }
 
-// Y plane is always full resolution, pixel stride 1. A strided
-// row-by-row copy, no per-pixel math needed.
-void convert_to_grayscale(AImage *image, image_t *out) {
-    uint8_t *y_data = nullptr;
-    int y_len = 0;
-    int32_t y_row_stride = 0;
-    AImage_getPlaneData(image, 0, &y_data, &y_len);
-    AImage_getPlaneRowStride(image, 0, &y_row_stride);
-
-    for (int32_t row = 0; row < out->h; row++) {
-        memcpy(out->data + (size_t) row * out->w, y_data + (size_t) row * y_row_stride, out->w);
-    }
+// Both operate on the tightly-packed I420 buffer on_image_available()
+// writes (see its own comment) -- plain offset arithmetic, no AImage/
+// plane-stride handling needed here anymore (that's all done once, in
+// the callback, not once per snapshot() call).
+void convert_to_grayscale_packed(const uint8_t *src, image_t *out) {
+    memcpy(out->data, src, (size_t) out->w * out->h);
 }
 
 // see session-state: camera_module.cpp#convert_to_rgb565
-void convert_to_rgb565(AImage *image, image_t *out) {
-    uint8_t *y_data = nullptr, *u_data = nullptr, *v_data = nullptr;
-    int y_len = 0, u_len = 0, v_len = 0;
-    int32_t y_row_stride = 0, u_row_stride = 0, v_row_stride = 0;
-    int32_t u_pixel_stride = 0, v_pixel_stride = 0;
-    AImage_getPlaneData(image, 0, &y_data, &y_len);
-    AImage_getPlaneRowStride(image, 0, &y_row_stride);
-    AImage_getPlaneData(image, 1, &u_data, &u_len);
-    AImage_getPlaneRowStride(image, 1, &u_row_stride);
-    AImage_getPlanePixelStride(image, 1, &u_pixel_stride);
-    AImage_getPlaneData(image, 2, &v_data, &v_len);
-    AImage_getPlaneRowStride(image, 2, &v_row_stride);
-    AImage_getPlanePixelStride(image, 2, &v_pixel_stride);
+void convert_to_rgb565_packed(const uint8_t *src, image_t *out) {
+    int32_t w = out->w, h = out->h;
+    int32_t uv_w = (w + 1) / 2, uv_h = (h + 1) / 2;
+    size_t y_size = (size_t) w * h;
+    size_t uv_size = (size_t) uv_w * uv_h;
+    const uint8_t *y_data = src;
+    const uint8_t *u_data = src + y_size;
+    const uint8_t *v_data = u_data + uv_size;
 
     uint16_t *dst = (uint16_t *) out->data;
-    for (int32_t row = 0; row < out->h; row++) {
+    for (int32_t row = 0; row < h; row++) {
         int32_t uv_row = row / 2;
-        uint8_t *y_row_ptr = y_data + (size_t) row * y_row_stride;
-        uint8_t *u_row_ptr = u_data + (size_t) uv_row * u_row_stride;
-        uint8_t *v_row_ptr = v_data + (size_t) uv_row * v_row_stride;
-        uint16_t *dst_row = dst + (size_t) row * out->w;
+        const uint8_t *y_row_ptr = y_data + (size_t) row * w;
+        const uint8_t *u_row_ptr = u_data + (size_t) uv_row * uv_w;
+        const uint8_t *v_row_ptr = v_data + (size_t) uv_row * uv_w;
+        uint16_t *dst_row = dst + (size_t) row * w;
 
-        for (int32_t col = 0; col < out->w; col++) {
+        for (int32_t col = 0; col < w; col++) {
             int y = y_row_ptr[col];
-            int u = (int) u_row_ptr[(col / 2) * u_pixel_stride] - 128;
-            int v = (int) v_row_ptr[(col / 2) * v_pixel_stride] - 128;
+            int u = (int) u_row_ptr[col / 2] - 128;
+            int v = (int) v_row_ptr[col / 2] - 128;
 
             // BT.601: R = Y + 1.402*Cr, B = Y + 1.772*Cb, G = Y - 0.344*Cb - 0.714*Cr.
-            // u=Cb (plane 1), v=Cr (plane 2).
+            // u=Cb, v=Cr.
             // see session-state: camera_module.cpp#convert_to_rgb565
             int ry = (179 * v) >> 7;
             int gy = ((44 * u) + (91 * v)) >> 7;
@@ -264,7 +467,11 @@ void image_alloc_tf_aligned(image_t *img, size_t size) {
     }
 }
 
-mp_obj_t convert_image(AImage *image) {
+// packed_yuv must point at a tightly-packed I420 buffer at g_cam.width x
+// g_cam.height (i.e. a framebuffer vbuffer_t's own ->data) -- called from
+// csi_snapshot() only, on the worker thread, so m_malloc here is safe
+// (see on_image_available()'s own comment for why that's NOT true there).
+mp_obj_t convert_image(const uint8_t *packed_yuv) {
     image_t img = {0};
     img.w = g_cam.width;
     img.h = g_cam.height;
@@ -272,60 +479,11 @@ mp_obj_t convert_image(AImage *image) {
     image_alloc_tf_aligned(&img, image_size(&img));
 
     if (g_cam.pixfmt == PIXFORMAT_RGB565) {
-        convert_to_rgb565(image, &img);
+        convert_to_rgb565_packed(packed_yuv, &img);
     } else {
-        convert_to_grayscale(image, &img);
+        convert_to_grayscale_packed(packed_yuv, &img);
     }
     return py_image_from_struct(&img);
-}
-
-// see session-state: camera_module.cpp#wait_and_acquire_frame
-AImage *wait_and_acquire_frame() {
-    sem_t frame_sem;
-    sem_init(&frame_sem, 0, 0);
-    AImageReader_ImageListener listener = {&frame_sem, on_image_available};
-    AImageReader_setImageListener(g_cam.reader, &listener);
-    g_cam.active_wait_sem = &frame_sem;
-
-    AImage *image = nullptr;
-    nlr_buf_t nlr;
-    if (nlr_push(&nlr) == 0) {
-        bool got_frame = false;
-        for (long waited = 0; waited < kSnapshotTimeoutMs; waited += kWaitChunkMs) {
-            struct timespec deadline;
-            clock_gettime(CLOCK_REALTIME, &deadline);
-            deadline.tv_nsec += kWaitChunkMs * 1000000L;
-            if (deadline.tv_nsec >= 1000000000L) {
-                deadline.tv_sec += 1;
-                deadline.tv_nsec -= 1000000000L;
-            }
-            if (sem_timedwait(&frame_sem, &deadline) == 0) {
-                got_frame = true;
-                break;
-            }
-            // Raises (nlr_jump into the `else` branch below) if the user
-            // tapped Interrupt during the wait.
-            mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
-        }
-
-        if (!got_frame) {
-            raise_os_error(MP_ETIMEDOUT, "camera snapshot timed out");
-        }
-        if (AImageReader_acquireNextImage(g_cam.reader, &image) != AMEDIA_OK || image == nullptr) {
-            raise_os_error(MP_EIO, "camera: failed to acquire frame");
-        }
-        nlr_pop();
-    } else {
-        AImageReader_setImageListener(g_cam.reader, nullptr);
-        g_cam.active_wait_sem = nullptr;
-        sem_destroy(&frame_sem);
-        nlr_jump(nlr.ret_val);
-    }
-
-    AImageReader_setImageListener(g_cam.reader, nullptr);
-    g_cam.active_wait_sem = nullptr;
-    sem_destroy(&frame_sem);
-    return image;
 }
 
 long now_ms() {
@@ -334,20 +492,102 @@ long now_ms() {
     return (long) ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
 }
 
+// Blocks (interruptibly) until the framebuffer has at least one captured
+// frame -- only reachable right after reset() or a pixformat()/
+// framesize()/framebuffers() rebuild, before on_image_available() has
+// fired even once. Every subsequent csi_snapshot() call in the session
+// takes the fast path below and returns immediately. Reuses the exact
+// interruptible-wait shape this file already had (5ms-chunked
+// sem_timedwait + mp_handle_pending for Interrupt responsiveness), just
+// checking framebuffer_readable() instead of a raw per-call semaphore.
+void wait_for_frame() {
+    framebuffer_t *fb = framebuffer_get(FB_MAINFB_ID);
+    if (framebuffer_readable(fb)) {
+        return;
+    }
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        bool got = false;
+        for (long waited = 0; waited < kFirstFrameTimeoutMs; waited += kWaitChunkMs) {
+            struct timespec deadline;
+            clock_gettime(CLOCK_REALTIME, &deadline);
+            deadline.tv_nsec += kWaitChunkMs * 1000000L;
+            if (deadline.tv_nsec >= 1000000000L) {
+                deadline.tv_sec += 1;
+                deadline.tv_nsec -= 1000000000L;
+            }
+            sem_timedwait(g_cam.active_wait_sem, &deadline);
+            if (framebuffer_readable(fb)) {
+                got = true;
+                break;
+            }
+            // Raises (nlr_jump into the `else` branch below) if the user
+            // tapped Interrupt during the wait.
+            mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
+        }
+        if (!got) {
+            raise_os_error(MP_ETIMEDOUT, "camera snapshot timed out");
+        }
+        nlr_pop();
+    } else {
+        nlr_jump(nlr.ret_val);
+    }
+}
+
 // see session-state: camera_module.cpp#csi_snapshot_warmup
+//
+// No longer actively pulls/deletes frames itself -- draining is now
+// unconditional and continuous regardless of whether warmup or
+// snapshot() is running (that's the whole point of this redesign).
+// frames=N waits for g_cam.frame_seq to advance by N, with the
+// stuck-camera timeout reset on every observed frame (so a genuinely
+// wedged camera still raises ETIMEDOUT, matching this file's original
+// per-frame-timeout behavior, rather than a single dead-air timeout for
+// the whole batch). time= alone is a plain interruptible sleep with no
+// reader interaction at all -- a wedged camera can no longer surface
+// EIO/ETIMEDOUT during a pure time= wait, since there's nothing left to
+// fail; the real signal moves to the next snapshot() call.
 void csi_snapshot_warmup(mp_int_t time_limit_ms, mp_int_t frames_limit) {
     long start = now_ms();
-    int n = 0;
-    while (true) {
-        if (time_limit_ms >= 0 && (now_ms() - start) >= time_limit_ms) {
-            break;
+    long last_progress = now_ms();
+    unsigned long start_seq = g_cam.frame_seq.load(std::memory_order_relaxed);
+
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) == 0) {
+        while (true) {
+            if (time_limit_ms >= 0 && (now_ms() - start) >= time_limit_ms) {
+                break;
+            }
+            if (frames_limit >= 0 &&
+                (long) (g_cam.frame_seq.load(std::memory_order_relaxed) - start_seq) >= frames_limit) {
+                break;
+            }
+
+            unsigned long seq_before = g_cam.frame_seq.load(std::memory_order_relaxed);
+            struct timespec deadline;
+            clock_gettime(CLOCK_REALTIME, &deadline);
+            deadline.tv_nsec += kWaitChunkMs * 1000000L;
+            if (deadline.tv_nsec >= 1000000000L) {
+                deadline.tv_sec += 1;
+                deadline.tv_nsec -= 1000000000L;
+            }
+            sem_timedwait(g_cam.active_wait_sem, &deadline);
+
+            if (g_cam.frame_seq.load(std::memory_order_relaxed) != seq_before) {
+                last_progress = now_ms();
+            } else if (frames_limit >= 0 && (now_ms() - last_progress) >= kSnapshotTimeoutMs) {
+                // Only enforced when frames_limit is actually in play --
+                // a pure time= sleep must never fail just because no
+                // frame arrived during it, see this function's own
+                // comment above.
+                raise_os_error(MP_ETIMEDOUT, "camera snapshot timed out");
+            }
+            mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
         }
-        if (frames_limit >= 0 && n >= frames_limit) {
-            break;
-        }
-        AImage *image = wait_and_acquire_frame();
-        AImage_delete(image);
-        n++;
+        nlr_pop();
+    } else {
+        nlr_jump(nlr.ret_val);
     }
 }
 
@@ -370,9 +610,18 @@ mp_obj_t csi_snapshot(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args
         return mp_const_none;
     }
 
-    AImage *image = wait_and_acquire_frame();
-    mp_obj_t result = convert_image(image);
-    AImage_delete(image);
+    // Drain-one-frame: blocks (interruptibly) up to one sensor frame
+    // interval if the producer hasn't finished a new frame since the
+    // last snapshot() call -- correct and expected, not a bug, see
+    // wait_for_frame()'s own comment. A wedged camera surfaces as
+    // ETIMEDOUT here on its own; no separate staleness detection needed.
+    wait_for_frame();
+
+    framebuffer_t *fb = framebuffer_get(FB_MAINFB_ID);
+    vbuffer_t *buf = framebuffer_acquire(fb, FB_FLAG_USED | FB_FLAG_PEEK);
+    mp_obj_t result = convert_image(buf->data);
+    // NOW pop used -> free, freeing this slot for the producer again.
+    framebuffer_release(fb, FB_FLAG_USED);
     return result;
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(csi_snapshot_obj, 1, csi_snapshot);
@@ -384,6 +633,7 @@ mp_obj_t csi_reset(mp_obj_t self_in) {
     g_cam.pixfmt = PIXFORMAT_GRAYSCALE;
     g_cam.width = kDefaultWidth;
     g_cam.height = kDefaultHeight;
+    g_cam.buf_count = kDefaultBufCount;
 
     g_cam.manager = ACameraManager_create();
     if (!g_cam.manager) {
@@ -556,6 +806,30 @@ mp_obj_t csi_camera_list(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(csi_camera_list_obj, csi_camera_list);
 
+// Mirrors real OpenMV's sensor.framebuffers(n) (py_csi_ng.c) exactly:
+// no-arg form returns the current count, one-arg form validates >= 1
+// and, if actually changing, forces a lazy rebuild (same
+// close-then-rebuild-on-next-snapshot() path pixformat()/framesize()
+// already use) so the new count takes effect via the same safe
+// stop/unregister/bump-generation/spin teardown sequence, not a
+// concurrent framebuffer_resize() while frames could still be arriving.
+mp_obj_t csi_framebuffers(size_t n_args, const mp_obj_t *args) {
+    (void) args[0];
+    if (n_args == 1) {
+        return mp_obj_new_int((mp_int_t) g_cam.buf_count);
+    }
+    mp_int_t num = mp_obj_get_int(args[1]);
+    if (num < 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("framebuffers count must be >= 1"));
+    }
+    if ((size_t) num != g_cam.buf_count) {
+        g_cam.buf_count = (size_t) num;
+        close_session_and_reader(); // rebuilt lazily by the next snapshot()
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_framebuffers_obj, 1, 2, csi_framebuffers);
+
 // see session-state: camera_module.cpp#camera_id_selection
 mp_obj_t csi_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
     enum { ARG_cid };
@@ -580,6 +854,7 @@ const mp_rom_map_elem_t csi_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_framesize_list), MP_ROM_PTR(&csi_framesize_list_obj)},
     {MP_ROM_QSTR(MP_QSTR_camera_list), MP_ROM_PTR(&csi_camera_list_obj)},
     {MP_ROM_QSTR(MP_QSTR_snapshot), MP_ROM_PTR(&csi_snapshot_obj)},
+    {MP_ROM_QSTR(MP_QSTR_framebuffers), MP_ROM_PTR(&csi_framebuffers_obj)},
 };
 MP_DEFINE_CONST_DICT(csi_locals_dict, csi_locals_dict_table);
 

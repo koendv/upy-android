@@ -18,6 +18,18 @@ void *uma_realloc(void *ptr, size_t size, uint32_t flags) {
     return realloc(ptr, size);
 }
 
+// Added for framebuffer_resize() (see session-state: camera framebuffer
+// decoupling plan) -- align is ignored, matching every other uma_* shim
+// here: glibc/Bionic malloc already returns at least 16-byte-aligned
+// blocks, and nothing on Android manually invalidates dcache lines the
+// way framebuffer.c's own __DCACHE_PRESENT-gated code would on a Cortex-M
+// board (that macro is never defined here), so stricter alignment buys
+// nothing on this platform.
+void *uma_malign(size_t size, size_t align, uint32_t flags) {
+    (void) align; (void) flags;
+    return malloc(size);
+}
+
 void uma_free(void *ptr) {
     free(ptr);
 }

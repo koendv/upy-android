@@ -50,6 +50,13 @@ cp my-overrides/ulab/ulab_config.h micropython_embed/ulab/ulab_config.h
 # expects. py_gif.c is a patched override of a same-named vendor file
 # (see its own header comment for why), not a from-scratch replacement
 # like board_config.h. The cp -r below intentionally lets py_gif.c win.
+# framebuffer.h/.c and queue.h/.c and mutex.h/.c (added for the camera
+# decoupling redesign, see session-state) are in the same category as
+# board_config.h/arm_math.h -- vendor/openmv/ never had them at all
+# (they come from OpenMV's lib/imlib/ and common/ trees, not the
+# imlib/py_image scope this project's vendor fetch actually pulls), so
+# they're not "patches," just project-owned files placed alongside the
+# vendor tree.
 rm -rf micropython_embed/openmv
 cp -r vendor/openmv micropython_embed/openmv
 cp -r my-overrides/openmv/. micropython_embed/openmv/

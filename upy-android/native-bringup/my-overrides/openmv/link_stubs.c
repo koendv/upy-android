@@ -1,66 +1,26 @@
 // upy-android OpenMV support layer. Link-satisfying stub bodies for
-// framebuffer.h and omv_csi.h. Each one aborts loudly if actually
-// called. This project's own Camera2/NDK-based architecture replaces
-// OpenMV's own hardware-framebuffer/sensor-capture pipeline entirely
-// (see framebuffer.h/omv_csi.h), so nothing in this port should ever
-// reach these. Hitting one means that assumption needs revisiting, not
-// that the stub needs quiet fallback behavior that would hide the
-// surprise.
+// omv_csi.h. Each one aborts loudly if actually called. This project's
+// own Camera2/NDK-based architecture replaces OpenMV's own sensor-
+// capture driver entirely (see omv_csi.h), so nothing in this port
+// should ever reach these. Hitting one means that assumption needs
+// revisiting, not that the stub needs quiet fallback behavior that
+// would hide the surprise.
+//
+// framebuffer.h/.c's own stubs used to live here too, under the same
+// "assumed unreachable" reasoning -- that assumption was wrong (real,
+// legitimate callers in py_helper.c/py_image.c reach them) and has been
+// reversed: framebuffer.c is now a real, trimmed port (see its own
+// header comment), used by camera_module.cpp to decouple continuous
+// camera capture from on-demand snapshot() reads. See session-state.
 #include <stdio.h>
 #include <stdlib.h>
-#include "framebuffer.h"
 #include "omv_csi.h"
 
 static void omv_unimplemented_stub(const char *fn) {
     fprintf(stderr, "[upy-android openmv] UNIMPLEMENTED stub called: %s "
-            "-- framebuffer/csi path was assumed unreachable from our "
+            "-- csi path was assumed unreachable from our "
             "Camera2-based port, but just got reached\n", fn);
     abort();
-}
-
-framebuffer_t *framebuffer_get(size_t id) {
-    (void) id;
-    omv_unimplemented_stub("framebuffer_get");
-    return NULL;
-}
-
-vbuffer_t *framebuffer_acquire(framebuffer_t *fb, uint32_t flags) {
-    (void) fb; (void) flags;
-    omv_unimplemented_stub("framebuffer_acquire");
-    return NULL;
-}
-
-vbuffer_t *framebuffer_release(framebuffer_t *fb, uint32_t flags) {
-    (void) fb; (void) flags;
-    omv_unimplemented_stub("framebuffer_release");
-    return NULL;
-}
-
-void framebuffer_to_image(framebuffer_t *fb, image_t *img) {
-    (void) fb; (void) img;
-    omv_unimplemented_stub("framebuffer_to_image");
-}
-
-void framebuffer_from_image(framebuffer_t *fb, image_t *img) {
-    (void) fb; (void) img;
-    omv_unimplemented_stub("framebuffer_from_image");
-}
-
-void framebuffer_update_preview(image_t *src) {
-    (void) src;
-    omv_unimplemented_stub("framebuffer_update_preview");
-}
-
-int framebuffer_resize(framebuffer_t *fb, size_t count, size_t frame_size) {
-    (void) fb; (void) count; (void) frame_size;
-    omv_unimplemented_stub("framebuffer_resize");
-    return 0;
-}
-
-size_t framebuffer_get_buffer_size(framebuffer_t *fb) {
-    (void) fb;
-    omv_unimplemented_stub("framebuffer_get_buffer_size");
-    return 0;
 }
 
 omv_csi_t *omv_csi_get(int id) {
