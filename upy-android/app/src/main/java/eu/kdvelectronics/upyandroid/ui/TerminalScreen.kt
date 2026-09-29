@@ -1,14 +1,21 @@
 package eu.kdvelectronics.upyandroid.ui
 
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -18,6 +25,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -27,6 +35,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,10 +43,21 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
 import eu.kdvelectronics.upyandroid.MainViewModel
 import eu.kdvelectronics.upyandroid.TerminalLog
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
@@ -47,6 +67,94 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import my.nanihadesuka.compose.LazyColumnScrollbar
 import my.nanihadesuka.compose.ScrollbarSettings
+
+// Hand-rolled, not LazyColumnScrollbar's own RowScrollbar: that
+// library's gesture handling swallows drags meant for a CHILD's own
+// horizontalScroll. No fade animation, always visible when scrollable.
+// Visual thickness (4dp) vs touch target (32dp) deliberately differ --
+// a small hit target is a real usability problem. see session-state.
+@Composable
+private fun HorizontalScrollbar(state: ScrollState, modifier: Modifier = Modifier) {
+    if (state.maxValue <= 0) return
+    val visualHeight = 4.dp
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(32.dp)
+            .pointerInput(state) {
+                detectDragGestures { change, dragAmount ->
+                    change.consume()
+                    val trackWidth = size.width.toFloat()
+                    val contentWidth = trackWidth + state.maxValue
+                    val thumbWidth = (trackWidth * (trackWidth / contentWidth))
+                        .coerceAtLeast(24.dp.toPx())
+                        .coerceAtMost(trackWidth)
+                    // Scaled by actual thumb travel range, not 1:1 with
+                    // the finger, or the thumb lags for narrow content.
+                    val trackRange = (trackWidth - thumbWidth).coerceAtLeast(1f)
+                    state.dispatchRawDelta(dragAmount.x * state.maxValue / trackRange)
+                }
+            }
+            .drawWithContent {
+                drawContent()
+                val trackWidth = size.width
+                val contentWidth = trackWidth + state.maxValue
+                val thumbWidth = (trackWidth * (trackWidth / contentWidth))
+                    .coerceAtLeast(24.dp.toPx())
+                    .coerceAtMost(trackWidth)
+                val thumbOffsetX = (trackWidth - thumbWidth) * (state.value.toFloat() / state.maxValue)
+                val visualHeightPx = visualHeight.toPx()
+                drawRoundRect(
+                    color = Color.Gray,
+                    topLeft = Offset(thumbOffsetX, (size.height - visualHeightPx) / 2),
+                    size = Size(thumbWidth, visualHeightPx),
+                    cornerRadius = CornerRadius(visualHeightPx / 2, visualHeightPx / 2)
+                )
+            }
+    )
+}
+
+// LazyColumnScrollbar's own gesture handling swallows drags meant for
+// content nested inside it. Claims clearly-horizontal drags at this
+// PARENT, outside LazyColumnScrollbar, via PointerEventPass.Initial
+// (runs before the library's own Main-pass handling ever sees the
+// event); anything not claimed passes through untouched. see session-state.
+private fun Modifier.interceptHorizontalDrag(state: ScrollState): Modifier = this.pointerInput(state) {
+    awaitEachGesture {
+        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+        var overSlop = false
+        var horizontal = false
+        var accumX = 0f
+        var accumY = 0f
+        // Tracked manually: change.positionChange() returns 0.0 after
+        // the first call under repeated Initial-pass querying.
+        var lastX = down.position.x
+        var lastY = down.position.y
+        while (true) {
+            val event = awaitPointerEvent(pass = PointerEventPass.Initial)
+            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+            if (!change.pressed) break
+            val dx = change.position.x - lastX
+            val dy = change.position.y - lastY
+            lastX = change.position.x
+            lastY = change.position.y
+            if (!overSlop) {
+                accumX += dx
+                accumY += dy
+                if (abs(accumX) > viewConfiguration.touchSlop || abs(accumY) > viewConfiguration.touchSlop) {
+                    overSlop = true
+                    horizontal = abs(accumX) > abs(accumY)
+                }
+            }
+            if (overSlop && horizontal) {
+                change.consume()
+                // Content-drag sign, opposite of the thumb-drag above:
+                // moving left reveals content further right.
+                state.dispatchRawDelta(-dx)
+            }
+        }
+    }
+}
 
 // Files/Camera/Settings navigation moved to the top-level nav suite
 // (MainActivity's own NavigationSuiteScaffold). This screen only owns
@@ -70,6 +178,28 @@ fun TerminalScreen(
     // long line scrolls sideways like a real terminal, matching Arduino
     // IDE's own Serial Monitor (itemSize-fixed + whiteSpace: nowrap).
     val horizontalScrollState = rememberScrollState()
+    val textMeasurer = rememberTextMeasurer()
+    val rowTextStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
+    // Monospace: fixed advance x length: never measure() per row, that's
+    // on the per-print hot path. see session-state.
+    val glyphAdvancePx = remember(rowTextStyle) {
+        textMeasurer.measure("0".repeat(40), rowTextStyle).size.width / 40f
+    }
+    // Every row shares this SAME width, not its own intrinsic width --
+    // otherwise each row's layout independently overwrites the shared
+    // state's maxValue, so short rows never move when dragging a long
+    // one. Bounded to visible rows only (LazyColumn never measures
+    // off-screen items).
+    val maxVisibleLineWidthPx by remember {
+        derivedStateOf {
+            val maxChars = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { info ->
+                // getOrNull, not []: after clear() or front-eviction,
+                // layoutInfo's indices can briefly exceed lines.size.
+                lines.getOrNull(info.index)?.text?.length ?: 0
+            } ?: 0
+            (maxChars * glyphAdvancePx).toInt()
+        }
+    }
     // Explicit toggle, default on, not implicit at-bottom detection --
     // matches Arduino IDE's own monitorModel.autoscroll. see session-state.
     var autoscroll by remember { mutableStateOf(true) }
@@ -153,40 +283,48 @@ fun TerminalScreen(
                 .imePadding()
                 .padding(8.dp)
         ) {
-            // LazyColumnScrollbar's own gesture handling swallows drags
-            // meant for each row's individual Modifier.horizontalScroll
-            // below -- confirmed by A/B testing on-device (a bare
-            // LazyColumn with no scrollbar wrapper scrolls long lines
-            // correctly; wrapped in LazyColumnScrollbar, horizontal
-            // drags do nothing at all, even with the default Thumb-only
-            // selectionMode). Known, not fixed -- see session-state.
-            // The vertical scrollbar this wrapper provides is the
-            // measured, decided-on feature (spike-tested, then the
-            // actual jank fix); a long unwrapped line being unreadable
-            // beyond the viewport is a real, currently-accepted
-            // regression versus the old wrapping Text, not a silent one.
-            LazyColumnScrollbar(
-                state = listState,
-                settings = ScrollbarSettings.Default,
-                modifier = Modifier.weight(1f).fillMaxWidth(),
+            // interceptHorizontalDrag on this OUTER Box, not inside
+            // LazyColumnScrollbar's own content -- see that function's
+            // own comment for why the wrapping/pass order matters.
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .interceptHorizontalDrag(horizontalScrollState),
             ) {
-                LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
-                    items(lines) { line ->
-                        // Fixed-height, non-wrapping rows -- matches
-                        // Arduino IDE's own itemSize={18}/whiteSpace:
-                        // nowrap choice, sidestepping LazyColumnScrollbar's
-                        // own open issue #40 (non-uniform item sizes) by
-                        // construction rather than gambling on it.
-                        Text(
-                            text = line.text,
-                            fontFamily = FontFamily.Monospace,
-                            softWrap = false,
-                            maxLines = 1,
-                            modifier = Modifier.horizontalScroll(horizontalScrollState),
-                        )
+                LazyColumnScrollbar(
+                    state = listState,
+                    settings = ScrollbarSettings.Default,
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
+                        items(lines) { line ->
+                            // Fixed-height, non-wrapping rows -- matches
+                            // Arduino IDE's own itemSize={18}/whiteSpace:
+                            // nowrap choice, sidestepping LazyColumnScrollbar's
+                            // own open issue #40 (non-uniform item sizes) by
+                            // construction rather than gambling on it.
+                            Text(
+                                text = line.text,
+                                fontFamily = FontFamily.Monospace,
+                                softWrap = false,
+                                maxLines = 1,
+                                // horizontalScroll FIRST (outer), width()
+                                // SECOND (inner): width() then constrains
+                                // what horizontalScroll's own child (this
+                                // Text) reports, not the viewport -- so
+                                // every row reports the SAME size
+                                // regardless of its own string length,
+                                // see maxVisibleLineWidthPx's own comment.
+                                modifier = Modifier
+                                    .horizontalScroll(horizontalScrollState)
+                                    .width(with(LocalDensity.current) { maxVisibleLineWidthPx.toDp() }),
+                            )
+                        }
                     }
                 }
             }
+            HorizontalScrollbar(state = horizontalScrollState, modifier = Modifier.padding(top = 2.dp))
 
             if (status !is ConnectionStatus.Connected) {
                 TextButton(onClick = onReconnect) {
