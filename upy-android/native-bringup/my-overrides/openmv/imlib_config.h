@@ -36,5 +36,7 @@
 // find_line_segments(): edl.c (LSD, MIT), self-contained, no companion
 // flag or dependency.
 #define IMLIB_ENABLE_FIND_LINE_SEGMENTS
+// find_features(), image.HaarCascade(): haar.c (MIT). Cascades in /rom/, see gen-cascades.sh.
+#define IMLIB_ENABLE_FEATURES
 
 #endif

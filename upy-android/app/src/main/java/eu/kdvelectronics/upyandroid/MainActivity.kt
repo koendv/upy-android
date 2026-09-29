@@ -84,12 +84,15 @@ private fun NavHostController.navigateToTab(route: String) {
 // Bumped whenever a bundled demo script's own content changes. See
 // seedDemoScriptsIfNeeded() below. Lets an app update that fixes a
 // demo script reach existing installs too, not just fresh ones.
-private const val CURRENT_DEMO_SCRIPTS_VERSION = 2
+private const val CURRENT_DEMO_SCRIPTS_VERSION = 3
 
 // Bumped whenever the bundled `ml` library package's own content
 // changes. See seedMlLibraryIfNeeded() below. Same reasoning as
 // CURRENT_DEMO_SCRIPTS_VERSION.
 private const val CURRENT_ML_LIBRARY_VERSION = 1
+
+// Bumped whenever the bundled /rom/ files change. See seedRomIfNeeded().
+private const val CURRENT_ROM_VERSION = 1
 
 @OptIn(ExperimentalMaterial3AdaptiveNavigationSuiteApi::class, ExperimentalLayoutApi::class)
 class MainActivity : ComponentActivity() {
@@ -128,6 +131,7 @@ class MainActivity : ComponentActivity() {
         settingsManager = SettingsManager(this)
         seedDemoScriptsIfNeeded()
         seedMlLibraryIfNeeded()
+        seedRomIfNeeded()
         // Lives in this (default/UI) process, not :engine. See
         // HttpServerManager.kt's own header comment. A process-wide
         // singleton (not a per-Activity instance): deliberately never
@@ -292,7 +296,13 @@ class MainActivity : ComponentActivity() {
         if (settingsManager.demoScriptsVersion >= CURRENT_DEMO_SCRIPTS_VERSION) return
 
         val examplesDir = File(filesDir, "examples").apply { mkdirs() }
-        for (name in listOf("lcd_shield.py", "find_line_segments.py")) {
+        for (name in listOf(
+            "lcd_shield.py",
+            "find_line_segments.py",
+            "face_detection.py",
+            "face_eye_detection.py",
+            "iris_detection.py",
+        )) {
             assets.open("examples/$name").use { input ->
                 File(examplesDir, name).outputStream().use { output ->
                     input.copyTo(output)
@@ -323,5 +333,25 @@ class MainActivity : ComponentActivity() {
             }
         }
         settingsManager.mlLibraryVersion = CURRENT_ML_LIBRARY_VERSION
+    }
+
+    // Seeds assets/rom/ (Haar cascades) into the VFS's /rom/, the path
+    // OpenMV scripts load them from. The version is only stamped when
+    // assets/rom/ is non-empty, so a build without generated cascades
+    // does not block a later build that has them.
+    private fun seedRomIfNeeded() {
+        if (settingsManager.romVersion >= CURRENT_ROM_VERSION) return
+
+        val names = assets.list("rom").orEmpty()
+        if (names.isEmpty()) return
+        val romDir = File(filesDir, "rom").apply { mkdirs() }
+        for (name in names) {
+            assets.open("rom/$name").use { input ->
+                File(romDir, name).outputStream().use { output ->
+                    input.copyTo(output)
+                }
+            }
+        }
+        settingsManager.romVersion = CURRENT_ROM_VERSION
     }
 }

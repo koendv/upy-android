@@ -26,8 +26,7 @@ import image
 csi0 = csi.CSI()
 csi0.reset()
 csi0.pixformat(csi.RGB565)
-# Smallest resolution this Android camera actually supports
-csi0.framesize(min(csi0.framesize_list(), key=lambda s: s[0] * s[1]))
+csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
 
 # Initialize the lcd screen.
 lcd = display.SPIDisplay(vflip=True, hmirror=True)

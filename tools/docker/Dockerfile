@@ -152,6 +152,7 @@ RUN mkdir -p vendor/openmv \
 # same way the real dev workflow does: the AAR's .so from dl.google.com
 # plus a sparse-cloned header set from the matching upstream tag.
 RUN ./fetch-litert.sh
+RUN ./gen-cascades.sh /home/devuser/openmv
 
 # Populate vendor/ulab/ wholesale. Confirmed byte-identical to the
 # pinned ulab clone's code/ directory, minus two build-integration files

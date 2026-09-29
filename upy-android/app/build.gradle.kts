@@ -119,6 +119,9 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
     from(
         rootProject.file("examples/lcd_shield/lcd_shield.py"),
         rootProject.file("examples/find_line_segments/find_line_segments.py"),
+        rootProject.file("examples/face_detection/face_detection.py"),
+        rootProject.file("examples/face_eye_detection/face_eye_detection.py"),
+        rootProject.file("examples/iris_detection/iris_detection.py"),
     )
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }
@@ -137,8 +140,15 @@ val copyMlLibrary = tasks.register<Copy>("copyMlLibrary") {
     into(layout.projectDirectory.dir("src/main/assets/ml"))
 }
 
+// Haar cascades, seeded into the VFS's /rom/ by MainActivity's
+// seedRomIfNeeded(). Generated, not tracked: native-bringup/gen-cascades.sh.
+val copyRom = tasks.register<Copy>("copyRom") {
+    from(rootProject.file("native-bringup/vendor/rom"))
+    into(layout.projectDirectory.dir("src/main/assets/rom"))
+}
+
 tasks.named("preBuild") {
-    dependsOn(copyNotice, copyDemoScripts, copyMlLibrary)
+    dependsOn(copyNotice, copyDemoScripts, copyMlLibrary, copyRom)
 }
 
 dependencyLocking {
