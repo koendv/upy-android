@@ -1,7 +1,14 @@
 // upy-android OpenMV support layer. Android replacement for OpenMV's
 // common/umalloc.c. See session-state: umalloc_android.c#uma_malloc
 #include <stdlib.h>
+#include "py/runtime.h"
 #include "umalloc.h"
+
+// Same as OpenMV's common/umalloc.c. Called by imlib code (e.g. hough.c)
+// when an allocation it cannot do without fails.
+NORETURN void uma_fail(void) {
+    mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("Out of memory"));
+}
 
 void *uma_malloc(size_t size, uint32_t flags) {
     (void) flags;

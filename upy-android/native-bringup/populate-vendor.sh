@@ -24,3 +24,7 @@ cp "$UPSTREAM"/apriltag/common/*.h vendor/apriltag/common/
 for src in $(sed -n '/^APRILTAG_SRC_C *+=/,/^$/p' "$UPSTREAM/apriltag/apriltag.mk" | grep -o '[A-Za-z0-9_/]*\.c'); do
     cp "$UPSTREAM/apriltag/$src" "vendor/apriltag/$src"
 done
+# Not in apriltag.mk: image_u8.c references pnm_create_from_file().
+# OpenMV's firmware link drops that unused function; this app's link
+# (no --gc-sections) needs the definition.
+cp "$UPSTREAM/apriltag/common/pnm.c" vendor/apriltag/common/
