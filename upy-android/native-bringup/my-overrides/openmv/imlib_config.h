@@ -50,5 +50,13 @@
 #define IMLIB_ENABLE_APRILTAGS_TAG36H10
 #define IMLIB_ENABLE_APRILTAGS_TAG36H11
 #define IMLIB_ENABLE_HIGH_RES_APRILTAGS
+// find_lines(): hough.c (MIT), already vendored for find_circles().
+#define IMLIB_ENABLE_FIND_LINES
+// find_template(): template.c (MIT), already vendored.
+#define IMLIB_FIND_TEMPLATE
+// find_edges() plus binary(), invert(), and()/or()/xor()/..., erode(),
+// dilate(), open(), close(), top_hat(), black_hat(): binary.c and edge.c
+// (MIT), already vendored.
+#define IMLIB_ENABLE_BINARY_OPS
 
 #endif
