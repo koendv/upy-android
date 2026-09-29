@@ -73,6 +73,7 @@ lib/imlib/qrcode.c	qrcode.c
 lib/imlib/qsort.c	qsort.c
 lib/imlib/rainbow_tab.c	rainbow_tab.c
 lib/imlib/rectangle.c	rectangle.c
+lib/imlib/rotation_corr.c	rotation_corr.c
 lib/imlib/simd.h	simd.h
 lib/imlib/sincos_tab.c	sincos_tab.c
 lib/imlib/stats.c	stats.c

@@ -58,11 +58,18 @@
 // dilate(), open(), close(), top_hat(), black_hat(): binary.c and edge.c
 // (MIT), already vendored.
 #define IMLIB_ENABLE_BINARY_OPS
+// add(), sub(), difference(), blend(), min(), max(), negate(), replace(),
+// ...: mathop.c (MIT), already vendored. Also needed by top_hat() and
+// black_hat() above (imlib_difference_line_op).
+#define IMLIB_ENABLE_MATH_OPS
 // find_displacement(), logpolar(), linpolar(): phasecorrelation.c (MIT),
 // uses the already vendored fft.c.
 #define IMLIB_ENABLE_FIND_DISPLACEMENT
 #define IMLIB_ENABLE_LOGPOLAR
 #define IMLIB_ENABLE_LINPOLAR
+// rotation_corr(): rotation_corr.c (MIT), uses the AprilTag library's
+// matd/homography. Also needed by find_displacement() with logpolar=True.
+#define IMLIB_ENABLE_ROTATION_CORR
 // find_lbp(): lbp.c (MIT). image.match_descriptor()/load_descriptor()/
 // save_descriptor() for LBP and ORB keypoints: py_image_descriptor.c.
 #define IMLIB_ENABLE_FIND_LBP
