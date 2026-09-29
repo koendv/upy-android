@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
@@ -5,7 +7,7 @@ plugins {
 
 // Pinned third-party versions. Single source of truth, also read by the
 // native-bringup/ scripts.
-val upstreamProperties = java.util.Properties().apply {
+val upstreamProperties = Properties().apply {
     rootProject.file("upstream.properties").inputStream().use { load(it) }
 }
 
