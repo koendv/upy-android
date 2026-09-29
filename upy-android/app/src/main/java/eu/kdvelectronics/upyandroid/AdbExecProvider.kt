@@ -73,6 +73,9 @@ class AdbExecProvider : ContentProvider() {
 
     // see session-state: AdbExecProvider.kt#handleRun
     private fun handleRun(arg: String?): Bundle {
+        if (arg.isNullOrEmpty()) {
+            return Bundle().apply { putString("error", "missing_arg - run needs --arg <base64 script>") }
+        }
         val decoded = try {
             String(Base64.decode(arg, Base64.DEFAULT), Charsets.UTF_8)
         } catch (e: IllegalArgumentException) {

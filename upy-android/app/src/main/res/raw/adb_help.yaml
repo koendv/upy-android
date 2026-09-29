@@ -17,6 +17,7 @@ errors:
   busy: another script running, possibly from app UI
   disconnected: engine not connected
   disabled: adb exec disabled in app settings
+  missing_arg: run without --arg
   bad_base64: arg not valid base64
   unknown_method: see methods
 state:
