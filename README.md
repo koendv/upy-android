@@ -93,6 +93,7 @@ Camera controls use OpenMV's names, mapped to Camera2:
 - `brightness(n)`: exposure compensation, n EV. `framerate(fps)`: AE target fps range. `special_effect(csi.NEGATIVE)`, `colorbar(True)`: if the camera supports them.
 - `contrast`, `saturation`, `quality`, `gainceiling`, `auto_blc`: accepted, no effect.
 - `sleep(True)` stops streaming, `shutdown(True)` closes the camera.
+- `hmirror`, `vflip`, `transpose`, `window`: done in software while converting the frame. `framesize()` clears the window.
 
 In micropython, the `android` module gives access to android devices:
 

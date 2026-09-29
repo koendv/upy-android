@@ -157,6 +157,30 @@ struct CameraControls {
 
 CameraControls g_ctl;
 
+// Software geometry, applied while converting a frame in csi_snapshot():
+// Camera2 has no mirror/flip controls, and its crop region zooms back to
+// the output size where OpenMV's window() shrinks the output. Order as on
+// OpenMV: hmirror/vflip act on the whole frame, window() crops that
+// (coordinates as seen after mirror/flip), transpose() swaps the result's
+// axes. Cleared by reset(); framesize() clears the window.
+struct CameraGeometry {
+    bool hmirror = false;
+    bool vflip = false;
+    bool transpose = false;
+    int32_t win_x = 0, win_y = 0;
+    int32_t win_w = 0, win_h = 0;   // 0: no window, whole frame
+};
+
+CameraGeometry g_geo;
+
+// Size of the image snapshot() returns.
+void output_size(int32_t *w, int32_t *h) {
+    int32_t ww = g_geo.win_w ? g_geo.win_w : g_cam.width;
+    int32_t wh = g_geo.win_w ? g_geo.win_h : g_cam.height;
+    *w = g_geo.transpose ? wh : ww;
+    *h = g_geo.transpose ? ww : wh;
+}
+
 typedef struct _csi_obj_t {
     mp_obj_base_t base;
 } csi_obj_t;
@@ -495,6 +519,19 @@ void convert_to_grayscale_packed(const uint8_t *src, image_t *out) {
     memcpy(out->data, src, (size_t) out->w * out->h);
 }
 
+// BT.601: R = Y + 1.402*Cr, B = Y + 1.772*Cb, G = Y - 0.344*Cb - 0.714*Cr.
+// u=Cb, v=Cr, both already minus 128.
+// see session-state: camera_module.cpp#convert_to_rgb565
+inline uint16_t yuv_to_rgb565(int y, int u, int v) {
+    int ry = (179 * v) >> 7;
+    int gy = ((44 * u) + (91 * v)) >> 7;
+    int by = (227 * u) >> 7;
+    int r = __USAT(y + ry, 8);
+    int g = __USAT(y - gy, 8);
+    int b = __USAT(y + by, 8);
+    return COLOR_R8_G8_B8_TO_RGB565(r, g, b);
+}
+
 // see session-state: camera_module.cpp#convert_to_rgb565
 void convert_to_rgb565_packed(const uint8_t *src, image_t *out) {
     int32_t w = out->w, h = out->h;
@@ -517,18 +554,44 @@ void convert_to_rgb565_packed(const uint8_t *src, image_t *out) {
             int y = y_row_ptr[col];
             int u = (int) u_row_ptr[col / 2] - 128;
             int v = (int) v_row_ptr[col / 2] - 128;
+            dst_row[col] = yuv_to_rgb565(y, u, v);
+        }
+    }
+}
 
-            // BT.601: R = Y + 1.402*Cr, B = Y + 1.772*Cb, G = Y - 0.344*Cb - 0.714*Cr.
-            // u=Cb, v=Cr.
-            // see session-state: camera_module.cpp#convert_to_rgb565
-            int ry = (179 * v) >> 7;
-            int gy = ((44 * u) + (91 * v)) >> 7;
-            int by = (227 * u) >> 7;
+// Slow path of convert_image(): any of hmirror/vflip/transpose/window set.
+// Walks the output image; each output row is a straight line through the
+// source frame, so only a start point and a per-pixel step are computed.
+void convert_with_geometry(const uint8_t *src, image_t *out) {
+    int32_t W = g_cam.width, H = g_cam.height;
+    int32_t uv_w = (W + 1) / 2, uv_h = (H + 1) / 2;
+    const uint8_t *y_data = src;
+    const uint8_t *u_data = src + (size_t) W * H;
+    const uint8_t *v_data = u_data + (size_t) uv_w * uv_h;
+    bool rgb = out->pixfmt == PIXFORMAT_RGB565;
 
-            int r = __USAT(y + ry, 8);
-            int g = __USAT(y - gy, 8);
-            int b = __USAT(y + by, 8);
-            dst_row[col] = COLOR_R8_G8_B8_TO_RGB565(r, g, b);
+    // Step through the windowed (pre-transpose) image per output pixel.
+    int32_t dnx = g_geo.transpose ? 0 : 1;
+    int32_t dny = g_geo.transpose ? 1 : 0;
+    int32_t dsx = g_geo.hmirror ? -dnx : dnx;
+    int32_t dsy = g_geo.vflip ? -dny : dny;
+
+    for (int32_t oy = 0; oy < out->h; oy++) {
+        int32_t fx = g_geo.win_x + (g_geo.transpose ? oy : 0);
+        int32_t fy = g_geo.win_y + (g_geo.transpose ? 0 : oy);
+        int32_t sx = g_geo.hmirror ? W - 1 - fx : fx;
+        int32_t sy = g_geo.vflip ? H - 1 - fy : fy;
+        if (rgb) {
+            uint16_t *dst = (uint16_t *) out->data + (size_t) oy * out->w;
+            for (int32_t ox = 0; ox < out->w; ox++, sx += dsx, sy += dsy) {
+                size_t uv = (size_t) (sy / 2) * uv_w + sx / 2;
+                dst[ox] = yuv_to_rgb565(y_data[(size_t) sy * W + sx], (int) u_data[uv] - 128, (int) v_data[uv] - 128);
+            }
+        } else {
+            uint8_t *dst = out->data + (size_t) oy * out->w;
+            for (int32_t ox = 0; ox < out->w; ox++, sx += dsx, sy += dsy) {
+                dst[ox] = y_data[(size_t) sy * W + sx];
+            }
         }
     }
 }
@@ -554,12 +617,13 @@ void image_alloc_tf_aligned(image_t *img, size_t size) {
 // (see on_image_available()'s own comment for why that's NOT true there).
 mp_obj_t convert_image(const uint8_t *packed_yuv) {
     image_t img = {0};
-    img.w = g_cam.width;
-    img.h = g_cam.height;
+    output_size(&img.w, &img.h);
     img.pixfmt = g_cam.pixfmt;
     image_alloc_tf_aligned(&img, image_size(&img));
 
-    if (g_cam.pixfmt == PIXFORMAT_RGB565) {
+    if (g_geo.hmirror || g_geo.vflip || g_geo.transpose || g_geo.win_w) {
+        convert_with_geometry(packed_yuv, &img);
+    } else if (g_cam.pixfmt == PIXFORMAT_RGB565) {
         convert_to_rgb565_packed(packed_yuv, &img);
     } else {
         convert_to_grayscale_packed(packed_yuv, &img);
@@ -716,6 +780,7 @@ mp_obj_t csi_reset(mp_obj_t self_in) {
     g_cam.height = kDefaultHeight;
     g_cam.buf_count = kDefaultBufCount;
     g_ctl = CameraControls();
+    g_geo = CameraGeometry();
 
     g_cam.manager = ACameraManager_create();
     if (!g_cam.manager) {
@@ -790,6 +855,7 @@ mp_obj_t csi_framesize(size_t n_args, const mp_obj_t *args) {
     if (w <= 0 || h <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("invalid framesize"));
     }
+    g_geo.win_w = g_geo.win_h = g_geo.win_x = g_geo.win_y = 0;
     if (w != g_cam.width || h != g_cam.height) {
         g_cam.width = w;
         g_cam.height = h;
@@ -1117,6 +1183,82 @@ mp_obj_t csi_colorbar(mp_obj_t self_in, mp_obj_t enable_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(csi_colorbar_obj, csi_colorbar);
 
+// hmirror()/vflip()/transpose(): no-arg form returns the setting. Applied
+// in software, see g_geo.
+mp_obj_t geometry_flag(bool *flag, size_t n_args, const mp_obj_t *args) {
+    if (n_args == 1) {
+        return mp_obj_new_bool(*flag);
+    }
+    *flag = mp_obj_is_true(args[1]);
+    return mp_const_none;
+}
+
+mp_obj_t csi_hmirror(size_t n_args, const mp_obj_t *args) {
+    return geometry_flag(&g_geo.hmirror, n_args, args);
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_hmirror_obj, 1, 2, csi_hmirror);
+
+mp_obj_t csi_vflip(size_t n_args, const mp_obj_t *args) {
+    return geometry_flag(&g_geo.vflip, n_args, args);
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_vflip_obj, 1, 2, csi_vflip);
+
+mp_obj_t csi_transpose(size_t n_args, const mp_obj_t *args) {
+    return geometry_flag(&g_geo.transpose, n_args, args);
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_transpose_obj, 1, 2, csi_transpose);
+
+// window((w, h)) centered, or window((x, y, w, h)); clipped to the frame,
+// like OpenMV. No-arg form returns (x, y, w, h).
+mp_obj_t csi_window(size_t n_args, const mp_obj_t *args) {
+    int32_t W = g_cam.width, H = g_cam.height;
+    if (n_args == 1) {
+        mp_obj_t t[4];
+        if (g_geo.win_w) {
+            t[0] = MP_OBJ_NEW_SMALL_INT(g_geo.win_x);
+            t[1] = MP_OBJ_NEW_SMALL_INT(g_geo.win_y);
+            t[2] = MP_OBJ_NEW_SMALL_INT(g_geo.win_w);
+            t[3] = MP_OBJ_NEW_SMALL_INT(g_geo.win_h);
+        } else {
+            t[0] = t[1] = MP_OBJ_NEW_SMALL_INT(0);
+            t[2] = MP_OBJ_NEW_SMALL_INT(W);
+            t[3] = MP_OBJ_NEW_SMALL_INT(H);
+        }
+        return mp_obj_new_tuple(4, t);
+    }
+    size_t len;
+    mp_obj_t *items;
+    mp_obj_get_array(args[1], &len, &items);
+    int32_t x, y, w, h;
+    if (len == 2) {
+        w = mp_obj_get_int(items[0]);
+        h = mp_obj_get_int(items[1]);
+        x = W / 2 - w / 2;
+        y = H / 2 - h / 2;
+    } else if (len == 4) {
+        x = mp_obj_get_int(items[0]);
+        y = mp_obj_get_int(items[1]);
+        w = mp_obj_get_int(items[2]);
+        h = mp_obj_get_int(items[3]);
+    } else {
+        mp_raise_ValueError(MP_ERROR_TEXT("Expected (w, h) or (x, y, w, h) tuple/list."));
+    }
+    if (w < 1 || h < 1) {
+        mp_raise_ValueError(MP_ERROR_TEXT("Invalid ROI dimensions!"));
+    }
+    int32_t x0 = std::max(x, (int32_t) 0), y0 = std::max(y, (int32_t) 0);
+    int32_t x1 = std::min(x + w, W), y1 = std::min(y + h, H);
+    if (x1 <= x0 || y1 <= y0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("ROI does not overlap on the image!"));
+    }
+    g_geo.win_x = x0;
+    g_geo.win_y = y0;
+    g_geo.win_w = x1 - x0;
+    g_geo.win_h = y1 - y0;
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_window_obj, 1, 2, csi_window);
+
 // No Camera2 equivalent: accepted, not applied.
 mp_obj_t csi_unsupported_bool(mp_obj_t self_in, mp_obj_t value_in) {
     (void) self_in;
@@ -1194,6 +1336,10 @@ const mp_rom_map_elem_t csi_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_auto_blc), MP_ROM_PTR(&csi_unsupported_none_obj)},
     {MP_ROM_QSTR(MP_QSTR_sleep), MP_ROM_PTR(&csi_sleep_obj)},
     {MP_ROM_QSTR(MP_QSTR_shutdown), MP_ROM_PTR(&csi_shutdown_obj)},
+    {MP_ROM_QSTR(MP_QSTR_hmirror), MP_ROM_PTR(&csi_hmirror_obj)},
+    {MP_ROM_QSTR(MP_QSTR_vflip), MP_ROM_PTR(&csi_vflip_obj)},
+    {MP_ROM_QSTR(MP_QSTR_transpose), MP_ROM_PTR(&csi_transpose_obj)},
+    {MP_ROM_QSTR(MP_QSTR_window), MP_ROM_PTR(&csi_window_obj)},
 };
 MP_DEFINE_CONST_DICT(csi_locals_dict, csi_locals_dict_table);
 
@@ -1351,7 +1497,6 @@ extern "C" void camera_interrupt_active_wait(void) {
 }
 
 extern "C" void camera_get_current_size(int32_t *width, int32_t *height, bool *color) {
-    *width = g_cam.width;
-    *height = g_cam.height;
+    output_size(width, height);
     *color = (g_cam.pixfmt == PIXFORMAT_RGB565);
 }
