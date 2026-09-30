@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
@@ -42,6 +43,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import eu.kdvelectronics.upyandroid.fileprovider.openWith
 import eu.kdvelectronics.upyandroid.fileprovider.shareFile
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.model.MicroFile
@@ -218,6 +220,10 @@ fun ExplorerScreen(
                         showOptions = false
                         path = file.fullPath
                     })
+                    if (file?.isFile == true) OptionRow(Icons.Filled.OpenInNew, "Open with", onClick = {
+                        showOptions = false
+                        openWith(context, file.fullPath, shareMimeType(file.name))
+                    })
                     if (file?.isFile == true) OptionRow(Icons.Filled.Share, "Share", onClick = {
                         showOptions = false
                         shareFile(context, file.fullPath, shareMimeType(file.name))
@@ -339,7 +345,7 @@ private fun OptionRow(icon: ImageVector, label: String, onClick: () -> Unit) {
     }
 }
 
-// MIME type for sharing a file: Android's table by extension; .py as
+// MIME type for sharing or opening a file: Android's table by extension; .py as
 // text/plain so editors and messengers accept it; else a plain binary.
 private fun shareMimeType(name: String): String {
     val ext = name.substringAfterLast('.', "").lowercase()
