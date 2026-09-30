@@ -12,13 +12,9 @@ on:
           - release
         default: debug
       release:
-        description: 'Publish a GitHub release from this build'
+        description: 'Publish a GitHub release from this build (tag v<version> from upy-android/version.properties)'
         type: boolean
         default: false
-      release_name:
-        description: 'Release title/tag (optional, defaults to <build_type>-build-<run number>)'
-        type: string
-        default: ''
 
 name: upy-android
 
@@ -74,6 +70,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: checkout (for version.properties)
+        uses: actions/checkout@v7
 
       - name: download apk
         uses: actions/download-artifact@v8
@@ -81,13 +79,17 @@ jobs:
           name: upy-android_apk
           path: artifacts
 
+      # Tag from upy-android/version.properties, the app's single version
+      # source: v<version> for a release build, v<version>-debug-<run>
+      # for a debug build (debug builds of one version stay distinct).
       - name: set release vars
         id: vars
         run: |
+          version=$(sed -n 's/^version=//p' upy-android/version.properties | tr -d '[:space:]')
+          if [ "$BUILD_TYPE" = release ]; then title="v$version"; else title="v$version-debug-$GITHUB_RUN_NUMBER"; fi
           echo "short_sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
-          echo "title=${RELEASE_NAME:-${BUILD_TYPE}-build-$GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "title=$title" >> "$GITHUB_OUTPUT"
         env:
-          RELEASE_NAME: ${{ inputs.release_name }}
           BUILD_TYPE: ${{ inputs.build_type || 'debug' }}
 
       - name: release

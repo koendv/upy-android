@@ -15,6 +15,20 @@ val upstreamProperties = Properties().apply {
     rootProject.file("upstream.properties").inputStream().use { load(it) }
 }
 
+// App version, from version.properties (see there). versionCode is
+// derived from it, major*10000 + minor*100 + patch, so every build of
+// the same version has the same code and a newer version a higher one.
+val appVersion: String = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}.getProperty("version").trim()
+val appVersionCode: Int = run {
+    val parts = appVersion.split(".").map { it.toIntOrNull() }
+    require(parts.size in 2..3 && parts.all { it != null && it in 0..99 }) {
+        "version.properties: version must be major.minor[.patch], each 0-99, got '$appVersion'"
+    }
+    parts[0]!! * 10000 + parts[1]!! * 100 + (parts.getOrNull(2) ?: 0)
+}
+
 android {
     namespace = "eu.kdvelectronics.upyandroid"
     compileSdk = 37
@@ -30,8 +44,8 @@ android {
         // churning it back down without a real reason to.
         minSdk = 27
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = appVersionCode
+        versionName = appVersion
 
         ndk {
             // arm64-v8a only, per project architecture decision.
