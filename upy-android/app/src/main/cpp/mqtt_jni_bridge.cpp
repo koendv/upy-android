@@ -20,6 +20,7 @@ jmethodID g_mid_connect = nullptr;
 jmethodID g_mid_disconnect = nullptr;
 jmethodID g_mid_publish = nullptr;
 jmethodID g_mid_subscribe = nullptr;
+jmethodID g_mid_unsubscribe = nullptr;
 jmethodID g_mid_poll = nullptr;
 jmethodID g_mid_is_connected = nullptr;
 
@@ -73,15 +74,17 @@ extern "C" void mqtt_bridge_init_impl(void *jni_env) {
     g_message_payload_field = env->GetFieldID(g_message_class, "payload", "[B");
 
     g_mid_create = env->GetStaticMethodID(g_shim_class, "create",
-        "(Ljava/lang/String;Ljava/lang/String;I)Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;");
+        "(Ljava/lang/String;Ljava/lang/String;IZ)Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;");
     g_mid_connect = env->GetStaticMethodID(g_shim_class, "connect",
-        "(Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;Ljava/lang/String;[BZI)Z");
+        "(Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;Ljava/lang/String;[BZILjava/lang/String;[BIZJ)Z");
     g_mid_disconnect = env->GetStaticMethodID(g_shim_class, "disconnect",
         "(Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;)V");
     g_mid_publish = env->GetStaticMethodID(g_shim_class, "publish",
         "(Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;Ljava/lang/String;[BIZ)V");
     g_mid_subscribe = env->GetStaticMethodID(g_shim_class, "subscribe",
         "(Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;Ljava/lang/String;I)V");
+    g_mid_unsubscribe = env->GetStaticMethodID(g_shim_class, "unsubscribe",
+        "(Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;Ljava/lang/String;)V");
     g_mid_poll = env->GetStaticMethodID(g_shim_class, "poll",
         "(Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;J)"
         "Leu/kdvelectronics/upyandroid/mqtt/MqttMessage;");
@@ -89,13 +92,13 @@ extern "C" void mqtt_bridge_init_impl(void *jni_env) {
         "(Leu/kdvelectronics/upyandroid/mqtt/MqttConnection;)Z");
 }
 
-extern "C" bool mqtt_bridge_create(const char *client_id, const char *host, int port,
+extern "C" bool mqtt_bridge_create(const char *client_id, const char *host, int port, bool ssl,
                                     void **out_global_ref, char **out_err) {
     JNIEnv *env = current_env();
     jstring jclient_id = env->NewStringUTF(client_id);
     jstring jhost = env->NewStringUTF(host);
 
-    jobject local = env->CallStaticObjectMethod(g_shim_class, g_mid_create, jclient_id, jhost, port);
+    jobject local = env->CallStaticObjectMethod(g_shim_class, g_mid_create, jclient_id, jhost, port, (jboolean) ssl);
 
     env->DeleteLocalRef(jclient_id);
     env->DeleteLocalRef(jhost);
@@ -112,6 +115,8 @@ extern "C" bool mqtt_bridge_create(const char *client_id, const char *host, int 
 extern "C" bool mqtt_bridge_connect(void *global_ref, const char *username,
                                      const uint8_t *password, size_t password_len,
                                      bool clean_session, int keepalive_seconds,
+                                     const char *will_topic, const uint8_t *will_msg, size_t will_msg_len,
+                                     int will_qos, bool will_retain, long timeout_ms,
                                      bool *out_session_present, char **out_err) {
     JNIEnv *env = current_env();
 
@@ -122,14 +127,28 @@ extern "C" bool mqtt_bridge_connect(void *global_ref, const char *username,
         env->SetByteArrayRegion(jpassword, 0, (jsize) password_len, (const jbyte *) password);
     }
 
+    jstring jwill_topic = will_topic ? env->NewStringUTF(will_topic) : nullptr;
+    jbyteArray jwill_msg = nullptr;
+    if (will_topic) {
+        jwill_msg = env->NewByteArray((jsize) will_msg_len);
+        env->SetByteArrayRegion(jwill_msg, 0, (jsize) will_msg_len, (const jbyte *) will_msg);
+    }
+
     jboolean session_present = env->CallStaticBooleanMethod(g_shim_class, g_mid_connect,
-        (jobject) global_ref, jusername, jpassword, (jboolean) clean_session, keepalive_seconds);
+        (jobject) global_ref, jusername, jpassword, (jboolean) clean_session, keepalive_seconds,
+        jwill_topic, jwill_msg, will_qos, (jboolean) will_retain, (jlong) timeout_ms);
 
     if (jusername) {
         env->DeleteLocalRef(jusername);
     }
     if (jpassword) {
         env->DeleteLocalRef(jpassword);
+    }
+    if (jwill_topic) {
+        env->DeleteLocalRef(jwill_topic);
+    }
+    if (jwill_msg) {
+        env->DeleteLocalRef(jwill_msg);
     }
 
     if (env->ExceptionCheck()) {
@@ -176,6 +195,21 @@ extern "C" bool mqtt_bridge_subscribe(void *global_ref, const char *topic, int q
     jstring jtopic = env->NewStringUTF(topic);
 
     env->CallStaticVoidMethod(g_shim_class, g_mid_subscribe, (jobject) global_ref, jtopic, qos);
+
+    env->DeleteLocalRef(jtopic);
+
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    return true;
+}
+
+extern "C" bool mqtt_bridge_unsubscribe(void *global_ref, const char *topic, char **out_err) {
+    JNIEnv *env = current_env();
+    jstring jtopic = env->NewStringUTF(topic);
+
+    env->CallStaticVoidMethod(g_shim_class, g_mid_unsubscribe, (jobject) global_ref, jtopic);
 
     env->DeleteLocalRef(jtopic);
 

@@ -144,6 +144,7 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
         rootProject.file("examples/find_datamatrices/find_datamatrices.py"),
         rootProject.file("examples/find_template/find_template.py"),
         rootProject.file("examples/location/location.py"),
+        rootProject.file("examples/mqtt_tls/mqtt_tls.py"),
     )
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }

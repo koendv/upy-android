@@ -16,12 +16,21 @@
 // incoming message, blocking or not" primitive umqtt.simple's own
 // wait_msg()/check_msg() need. ALL (not SUBSCRIBED) matches
 // umqtt.simple's own single-callback-for-every-incoming-PUBLISH model.
+//
+// API follows micropython-lib umqtt.simple 1.8.1, with ssl=True only
+// (system CA certificates; no ssl_params, no client certificates).
+// TODO: revisit mqtt when the MicroPython Android port has socket +
+// ssl: micropython-lib's own umqtt.simple would then run unmodified
+// and this HiveMQ shim could go.
 package eu.kdvelectronics.upyandroid.mqtt
 
 import com.hivemq.client.mqtt.MqttClient
 import com.hivemq.client.mqtt.MqttGlobalPublishFilter
 import com.hivemq.client.mqtt.datatypes.MqttQos
 import com.hivemq.client.mqtt.mqtt3.Mqtt3BlockingClient
+import com.hivemq.client.mqtt.mqtt3.message.auth.Mqtt3SimpleAuth
+import com.hivemq.client.mqtt.mqtt3.message.connect.Mqtt3Connect
+import com.hivemq.client.mqtt.mqtt3.message.publish.Mqtt3Publish
 import java.util.concurrent.TimeUnit
 
 class MqttConnection(val client: Mqtt3BlockingClient) {
@@ -38,33 +47,62 @@ class MqttMessage(val topic: String, val payload: ByteArray)
 fun qosFromCode(code: Int): MqttQos =
     MqttQos.fromCode(code) ?: throw IllegalArgumentException("invalid qos: $code (must be 0, 1, or 2)")
 
-fun create(clientId: String, host: String, port: Int): MqttConnection {
-    val client = MqttClient.builder()
+// ssl: TLS with Android's trusted CA certificates and hostname
+// verification (umqtt.simple's ssl=True).
+fun create(clientId: String, host: String, port: Int, ssl: Boolean): MqttConnection {
+    var builder = MqttClient.builder()
         .useMqttVersion3()
         .identifier(clientId)
         .serverHost(host)
         .serverPort(port)
-        .buildBlocking()
-    return MqttConnection(client)
+    if (ssl) {
+        builder = builder.sslWithDefaultConfig()
+    }
+    return MqttConnection(builder.buildBlocking())
 }
 
 // Returns session_present. username == null means a fully anonymous
 // connection (real umqtt.simple supports this too); password is only
 // ever applied when username is non-null, matching MQTT 3.1.1's own
 // requirement that a password implies a username.
+// willTopic != null: last will (umqtt.simple's set_last_will()).
+// timeoutMs > 0: give up after that long (connect(timeout=...)), else
+// wait as long as HiveMQ does.
 fun connect(conn: MqttConnection, username: String?, password: ByteArray?,
-            cleanSession: Boolean, keepAliveSeconds: Int): Boolean {
-    val builder = conn.client.connectWith()
+            cleanSession: Boolean, keepAliveSeconds: Int,
+            willTopic: String?, willPayload: ByteArray?, willQos: Int, willRetain: Boolean,
+            timeoutMs: Long): Boolean {
+    var builder = Mqtt3Connect.builder()
         .cleanSession(cleanSession)
         .keepAlive(keepAliveSeconds)
-    val ack = if (username != null) {
-        var auth = builder.simpleAuth().username(username)
-        if (password != null) {
-            auth = auth.password(password)
+    if (username != null) {
+        val auth = Mqtt3SimpleAuth.builder().username(username)
+        builder = builder.simpleAuth(if (password != null) auth.password(password).build() else auth.build())
+    }
+    if (willTopic != null) {
+        builder = builder.willPublish(
+            Mqtt3Publish.builder()
+                .topic(willTopic)
+                .payload(willPayload ?: ByteArray(0))
+                .qos(qosFromCode(willQos))
+                .retain(willRetain)
+                .build()
+        )
+    }
+    val message = builder.build()
+    val ack = if (timeoutMs > 0) {
+        val future = conn.client.toAsync().connect(message)
+        try {
+            future.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (e: java.util.concurrent.TimeoutException) {
+            future.cancel(true)
+            conn.client.toAsync().disconnect()
+            throw e
+        } catch (e: java.util.concurrent.ExecutionException) {
+            throw e.cause ?: e
         }
-        auth.applySimpleAuth().send()
     } else {
-        builder.send()
+        conn.client.connect(message)
     }
     // Opened once per connection, right after connect. Closed again
     // in disconnect(). Must exist before check_msg()/wait_msg() can
@@ -92,6 +130,12 @@ fun subscribe(conn: MqttConnection, topic: String, qos: Int) {
     conn.client.subscribeWith()
         .topicFilter(topic)
         .qos(qosFromCode(qos))
+        .send()
+}
+
+fun unsubscribe(conn: MqttConnection, topic: String) {
+    conn.client.unsubscribeWith()
+        .topicFilter(topic)
         .send()
 }
 
