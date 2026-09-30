@@ -1,6 +1,7 @@
 package eu.kdvelectronics.upyandroid.ui
 
 import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -38,7 +40,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import eu.kdvelectronics.upyandroid.fileprovider.shareFile
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.model.MicroFile
 import kotlinx.coroutines.Dispatchers
@@ -214,6 +218,10 @@ fun ExplorerScreen(
                         showOptions = false
                         path = file.fullPath
                     })
+                    if (file?.isFile == true) OptionRow(Icons.Filled.Share, "Share", onClick = {
+                        showOptions = false
+                        shareFile(context, file.fullPath, shareMimeType(file.name))
+                    })
                     OptionRow(SymbolIcon.DRIVE_FILE_RENAME_OUTLINE, "Rename", onClick = {
                         showOptions = false
                         showRename = true
@@ -314,6 +322,29 @@ private fun OptionRow(icon: Int, label: String, onClick: () -> Unit) {
             Text(label)
         }
     }
+}
+
+// Same row with a Material icon, for symbols missing from the subsetted
+// icon font (Share).
+@Composable
+private fun OptionRow(icon: ImageVector, label: String, onClick: () -> Unit) {
+    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 12.dp))
+            Text(label)
+        }
+    }
+}
+
+// MIME type for sharing a file: Android's table by extension; .py as
+// text/plain so editors and messengers accept it; else a plain binary.
+private fun shareMimeType(name: String): String {
+    val ext = name.substringAfterLast('.', "").lowercase()
+    if (ext == "py") return "text/plain"
+    return MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext) ?: "application/octet-stream"
 }
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
