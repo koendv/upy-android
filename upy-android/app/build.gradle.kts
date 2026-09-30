@@ -116,7 +116,7 @@ android {
 // accurate and it can't silently drift out of sync with what actually
 // ships.
 val copyNotice = tasks.register<Copy>("copyNotice") {
-    from(rootProject.file("NOTICE.html"), rootProject.file("LICENSES.txt"))
+    from(rootProject.file("NOTICE.html"))
     into(layout.projectDirectory.dir("src/main/assets"))
 }
 
@@ -220,14 +220,32 @@ val extractLitert = tasks.register<Copy>("extractLitert") {
     into(layout.projectDirectory.dir("src/main/cpp/litert/lib"))
 }
 
-// LiteRT's third-party notices, shown after LICENSES.txt in Settings >
-// About > Licenses. Taken from the AAR, so they match the shipped version.
+// LiteRT's third-party notices, from the AAR, so they match the shipped
+// version. Input to genLicenses below.
+val litertNoticesDir = layout.buildDirectory.dir("litert-notices")
 val extractLitertNotices = tasks.register<Copy>("extractLitertNotices") {
     from({ zipTree(litertNative.singleFile) }) {
         include("THIRD_PARTY_NOTICE.txt")
-        rename { "litert_third_party_notices.txt" }
     }
-    into(layout.projectDirectory.dir("src/main/assets"))
+    into(litertNoticesDir)
+}
+
+// Settings > About > Licenses: LICENSES.txt plus LiteRT's notices as one
+// HTML page, with LiteRT's ~116 copies of the Apache 2.0 text replaced by
+// links to one copy. See native-bringup/gen-licenses.py.
+val genLicenses = tasks.register<Exec>("genLicenses") {
+    dependsOn(extractLitertNotices)
+    val licenses = rootProject.file("LICENSES.txt")
+    val notice = litertNoticesDir.map { it.file("THIRD_PARTY_NOTICE.txt") }
+    val out = layout.projectDirectory.file("src/main/assets/licenses.html")
+    inputs.files(licenses, bringup.resolve("gen-licenses.py"), notice)
+    outputs.file(out)
+    commandLine("python3", bringup.resolve("gen-licenses.py").path, licenses.path,
+        notice.get().asFile.path, out.asFile.path)
+    // Replaced by licenses.html; left over in older local checkouts.
+    val stale = listOf("LICENSES.txt", "litert_third_party_notices.txt")
+        .map { layout.projectDirectory.file("src/main/assets/$it").asFile }
+    doFirst { stale.forEach { it.delete() } }
 }
 
 val stageLitertDelegate = tasks.register<Copy>("stageLitertDelegate") {
@@ -296,7 +314,7 @@ val generateBuildInfo = tasks.register("generateBuildInfo") {
 tasks.named("preBuild") {
     dependsOn(
         copyNotice, copyDemoScripts, copyMlLibrary, copyRom, generateEmbed, extractLitert, stageLitertDelegate,
-        extractLitertNotices, generateBuildInfo,
+        genLicenses, generateBuildInfo,
     )
 }
 
