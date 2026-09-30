@@ -25,15 +25,19 @@ void mqtt_bridge_init_impl(void *jni_env);
 // caller (mqtt_module.cpp) must free(), same contract as
 // litert_jni_bridge.h's own functions.
 
-bool mqtt_bridge_create(const char *client_id, const char *host, int port,
+// ssl: TLS with Android's trusted CA certificates.
+bool mqtt_bridge_create(const char *client_id, const char *host, int port, bool ssl,
                          void **out_global_ref, char **out_err);
 
 // username/password may both be null (anonymous connect, real
 // umqtt.simple supports this too); password is only ever applied when
-// username is non-null. *out_session_present is set only on success.
+// username is non-null. will_topic null: no last will. timeout_ms <= 0:
+// no connect timeout. *out_session_present is set only on success.
 bool mqtt_bridge_connect(void *global_ref, const char *username,
                           const uint8_t *password, size_t password_len,
                           bool clean_session, int keepalive_seconds,
+                          const char *will_topic, const uint8_t *will_msg, size_t will_msg_len,
+                          int will_qos, bool will_retain, long timeout_ms,
                           bool *out_session_present, char **out_err);
 
 bool mqtt_bridge_disconnect(void *global_ref, char **out_err);
@@ -43,6 +47,8 @@ bool mqtt_bridge_publish(void *global_ref, const char *topic,
                           int qos, bool retain, char **out_err);
 
 bool mqtt_bridge_subscribe(void *global_ref, const char *topic, int qos, char **out_err);
+
+bool mqtt_bridge_unsubscribe(void *global_ref, const char *topic, char **out_err);
 
 // timeout_ms < 0 blocks indefinitely (a single HiveMQ receive() call,
 // mqtt_module.cpp's own wait_msg() calls this in a chunked loop, never

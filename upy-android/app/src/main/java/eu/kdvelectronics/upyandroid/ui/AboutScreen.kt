@@ -1,10 +1,14 @@
 package eu.kdvelectronics.upyandroid.ui
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.text.Html
 import android.text.method.LinkMovementMethod
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.TextView
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -13,8 +17,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,9 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.Properties
 
@@ -179,23 +179,15 @@ fun AttributionsScreen(onBack: () -> Unit) {
     }
 }
 
-// Settings > About > Licenses: full license texts (LICENSES.txt), then
-// LiteRT's third-party notices from its AAR. About 2 MB of text, so shown
-// line by line in a LazyColumn rather than as one Text.
+// Settings > About > Licenses: licenses.html, generated at build time
+// from LICENSES.txt and LiteRT's third-party notices by
+// native-bringup/gen-licenses.py. A WebView, not Html.fromHtml(): the
+// page is ~800 KB and uses collapsible <details> sections. Links to other
+// sites open in the browser.
+@SuppressLint("SetJavaScriptEnabled")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LicensesScreen(onBack: () -> Unit) {
-    val context = LocalContext.current
-    val lines = remember {
-        listOf("LICENSES.txt", "litert_third_party_notices.txt").flatMap { name ->
-            try {
-                context.assets.open(name).bufferedReader().use { it.readLines() } + ""
-            } catch (e: java.io.IOException) {
-                listOf("$name could not be loaded: $e", "")
-            }
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -206,15 +198,25 @@ fun LicensesScreen(onBack: () -> Unit) {
             )
         },
     ) { padding: PaddingValues ->
-        LazyColumn(
+        AndroidView(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp),
-        ) {
-            items(lines) { line ->
-                Text(line, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
-            }
-        }
+                .padding(padding),
+            factory = { ctx ->
+                WebView(ctx).apply {
+                    // Only for the page's own script, which opens a
+                    // collapsed section when a link points into it.
+                    settings.javaScriptEnabled = true
+                    webViewClient = object : WebViewClient() {
+                        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                            if (request.url.scheme == "file") return false
+                            openUrl(ctx, request.url.toString())
+                            return true
+                        }
+                    }
+                    loadUrl("file:///android_asset/licenses.html")
+                }
+            },
+        )
     }
 }

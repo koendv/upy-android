@@ -167,16 +167,17 @@ struct CameraGeometry {
     bool hmirror = false;
     bool vflip = false;
     bool transpose = false;
+    bool windowed = false;          // false: whole frame, win_* all 0
     int32_t win_x = 0, win_y = 0;
-    int32_t win_w = 0, win_h = 0;   // 0: no window, whole frame
+    int32_t win_w = 0, win_h = 0;
 };
 
 CameraGeometry g_geo;
 
 // Size of the image snapshot() returns.
 void output_size(int32_t *w, int32_t *h) {
-    int32_t ww = g_geo.win_w ? g_geo.win_w : g_cam.width;
-    int32_t wh = g_geo.win_w ? g_geo.win_h : g_cam.height;
+    int32_t ww = g_geo.windowed ? g_geo.win_w : g_cam.width;
+    int32_t wh = g_geo.windowed ? g_geo.win_h : g_cam.height;
     *w = g_geo.transpose ? wh : ww;
     *h = g_geo.transpose ? ww : wh;
 }
@@ -621,7 +622,7 @@ mp_obj_t convert_image(const uint8_t *packed_yuv) {
     img.pixfmt = g_cam.pixfmt;
     image_alloc_tf_aligned(&img, image_size(&img));
 
-    if (g_geo.hmirror || g_geo.vflip || g_geo.transpose || g_geo.win_w) {
+    if (g_geo.hmirror || g_geo.vflip || g_geo.transpose || g_geo.windowed) {
         convert_with_geometry(packed_yuv, &img);
     } else if (g_cam.pixfmt == PIXFORMAT_RGB565) {
         convert_to_rgb565_packed(packed_yuv, &img);
@@ -855,6 +856,7 @@ mp_obj_t csi_framesize(size_t n_args, const mp_obj_t *args) {
     if (w <= 0 || h <= 0) {
         mp_raise_ValueError(MP_ERROR_TEXT("invalid framesize"));
     }
+    g_geo.windowed = false;
     g_geo.win_w = g_geo.win_h = g_geo.win_x = g_geo.win_y = 0;
     if (w != g_cam.width || h != g_cam.height) {
         g_cam.width = w;
@@ -1214,7 +1216,7 @@ mp_obj_t csi_window(size_t n_args, const mp_obj_t *args) {
     int32_t W = g_cam.width, H = g_cam.height;
     if (n_args == 1) {
         mp_obj_t t[4];
-        if (g_geo.win_w) {
+        if (g_geo.windowed) {
             t[0] = MP_OBJ_NEW_SMALL_INT(g_geo.win_x);
             t[1] = MP_OBJ_NEW_SMALL_INT(g_geo.win_y);
             t[2] = MP_OBJ_NEW_SMALL_INT(g_geo.win_w);
@@ -1251,6 +1253,7 @@ mp_obj_t csi_window(size_t n_args, const mp_obj_t *args) {
     if (x1 <= x0 || y1 <= y0) {
         mp_raise_ValueError(MP_ERROR_TEXT("ROI does not overlap on the image!"));
     }
+    g_geo.windowed = true;
     g_geo.win_x = x0;
     g_geo.win_y = y0;
     g_geo.win_w = x1 - x0;

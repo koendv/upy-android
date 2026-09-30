@@ -33,3 +33,16 @@ fun shareFile(context: Context, path: String, mimeType: String) {
     // which MainActivity's own registration below provides.
     context.startActivity(Intent.createChooser(intent, null))
 }
+
+// Files > Open with: ACTION_VIEW with read and write permission, so an
+// editor can save its changes straight back into the VFS file. Editors
+// register for opening files (VIEW), rarely for shares (SEND).
+fun openWith(context: Context, path: String, mimeType: String) {
+    val file = File(context.filesDir, path)
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, null))
+}

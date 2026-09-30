@@ -15,6 +15,20 @@ val upstreamProperties = Properties().apply {
     rootProject.file("upstream.properties").inputStream().use { load(it) }
 }
 
+// App version, from version.properties (see there). versionCode is
+// derived from it, major*10000 + minor*100 + patch, so every build of
+// the same version has the same code and a newer version a higher one.
+val appVersion: String = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}.getProperty("version").trim()
+val appVersionCode: Int = run {
+    val parts = appVersion.split(".").map { it.toIntOrNull() }
+    require(parts.size in 2..3 && parts.all { it != null && it in 0..99 }) {
+        "version.properties: version must be major.minor[.patch], each 0-99, got '$appVersion'"
+    }
+    parts[0]!! * 10000 + parts[1]!! * 100 + (parts.getOrNull(2) ?: 0)
+}
+
 android {
     namespace = "eu.kdvelectronics.upyandroid"
     compileSdk = 37
@@ -30,8 +44,8 @@ android {
         // churning it back down without a real reason to.
         minSdk = 27
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = appVersionCode
+        versionName = appVersion
 
         ndk {
             // arm64-v8a only, per project architecture decision.
@@ -116,7 +130,7 @@ android {
 // accurate and it can't silently drift out of sync with what actually
 // ships.
 val copyNotice = tasks.register<Copy>("copyNotice") {
-    from(rootProject.file("NOTICE.html"), rootProject.file("LICENSES.txt"))
+    from(rootProject.file("NOTICE.html"))
     into(layout.projectDirectory.dir("src/main/assets"))
 }
 
@@ -144,6 +158,7 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
         rootProject.file("examples/find_datamatrices/find_datamatrices.py"),
         rootProject.file("examples/find_template/find_template.py"),
         rootProject.file("examples/location/location.py"),
+        rootProject.file("examples/mqtt_tls/mqtt_tls.py"),
     )
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }
@@ -219,14 +234,32 @@ val extractLitert = tasks.register<Copy>("extractLitert") {
     into(layout.projectDirectory.dir("src/main/cpp/litert/lib"))
 }
 
-// LiteRT's third-party notices, shown after LICENSES.txt in Settings >
-// About > Licenses. Taken from the AAR, so they match the shipped version.
+// LiteRT's third-party notices, from the AAR, so they match the shipped
+// version. Input to genLicenses below.
+val litertNoticesDir = layout.buildDirectory.dir("litert-notices")
 val extractLitertNotices = tasks.register<Copy>("extractLitertNotices") {
     from({ zipTree(litertNative.singleFile) }) {
         include("THIRD_PARTY_NOTICE.txt")
-        rename { "litert_third_party_notices.txt" }
     }
-    into(layout.projectDirectory.dir("src/main/assets"))
+    into(litertNoticesDir)
+}
+
+// Settings > About > Licenses: LICENSES.txt plus LiteRT's notices as one
+// HTML page, with LiteRT's ~116 copies of the Apache 2.0 text replaced by
+// links to one copy. See native-bringup/gen-licenses.py.
+val genLicenses = tasks.register<Exec>("genLicenses") {
+    dependsOn(extractLitertNotices)
+    val licenses = rootProject.file("LICENSES.txt")
+    val notice = litertNoticesDir.map { it.file("THIRD_PARTY_NOTICE.txt") }
+    val out = layout.projectDirectory.file("src/main/assets/licenses.html")
+    inputs.files(licenses, bringup.resolve("gen-licenses.py"), notice)
+    outputs.file(out)
+    commandLine("python3", bringup.resolve("gen-licenses.py").path, licenses.path,
+        notice.get().asFile.path, out.asFile.path)
+    // Replaced by licenses.html; left over in older local checkouts.
+    val stale = listOf("LICENSES.txt", "litert_third_party_notices.txt")
+        .map { layout.projectDirectory.file("src/main/assets/$it").asFile }
+    doFirst { stale.forEach { it.delete() } }
 }
 
 val stageLitertDelegate = tasks.register<Copy>("stageLitertDelegate") {
@@ -295,7 +328,7 @@ val generateBuildInfo = tasks.register("generateBuildInfo") {
 tasks.named("preBuild") {
     dependsOn(
         copyNotice, copyDemoScripts, copyMlLibrary, copyRom, generateEmbed, extractLitert, stageLitertDelegate,
-        extractLitertNotices, generateBuildInfo,
+        genLicenses, generateBuildInfo,
     )
 }
 
