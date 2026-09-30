@@ -80,6 +80,16 @@ adb shell am start -n eu.kdvelectronics.upyandroid/.MainActivity
 
 CAMERA permission is requested on first launch. Camera permission errors surface as OSError(errno.EACCES, ...) if denied.
 
+### Version
+
+The version is set in one place, [`upy-android/version.properties`](upy-android/version.properties):
+
+    version=0.4
+
+To bump it, edit that line and commit. The version shows in Settings > About and in Android's app info. Android's versionCode is derived from it (major·10000 + minor·100 + patch, so 0.4 → 400), so a newer version always installs over an older one.
+
+To publish a release: Actions > upy-android > Run workflow, tick "release". The release is tagged `v<version>` for a release build, `v<version>-debug-<run>` for a debug build.
+
 ## OpenMV
 
 Compiles. Measured ~25 FPS at resolution (320, 240) on a Xiaomi Redmi Note 15 device running [`lcd_shield.py`](https://github.com/openmv/openmv/blob/master/scripts/examples/50-OpenMV-Boards/60-Shields/60-LCD-Shield/lcd_shield.py)
