@@ -265,6 +265,15 @@ SRC_QSTR += ../app/src/main/cpp/android_module.cpp
 CFLAGS += -I../app/src/main/cpp/litert/include
 SRC_QSTR += ../app/src/main/cpp/litert_module.cpp
 
+# tflite_module.cpp: same category as litert_module.cpp just above --
+# plain, portable C99 headers (tflite/c/c_api.h and its own #include
+# closure), no NDK/Android-only headers, safe to add to this shared
+# host-gcc-preprocessed CFLAGS list directly. See tflite/README.md for
+# why these headers come from the LiteRT source tree, not upstream
+# TensorFlow.
+CFLAGS += -I../app/src/main/cpp/tflite/include
+SRC_QSTR += ../app/src/main/cpp/tflite_module.cpp
+
 # settings_module.cpp: this project's own native module
 # (android.settings). Same minimal case as android_module.cpp above
 # (no new qstr-stub headers, only py/runtime.h/py/obj.h and

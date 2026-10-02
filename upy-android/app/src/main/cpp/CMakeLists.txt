@@ -33,6 +33,7 @@ add_library(upy_engine SHARED
     settings_module.cpp
     litert_module.cpp
     litert_jni_bridge.cpp
+    tflite_module.cpp
     mediastore_module.cpp
     mediastore_jni_bridge.cpp
     fileprovider_module.cpp
@@ -60,6 +61,7 @@ target_include_directories(upy_engine PRIVATE
     micropython_embed/apriltag
     micropython_embed/apriltag/common
     litert/include
+    tflite/include
 )
 
 # Both must be command-line defines, not #defines in the header itself:
@@ -89,6 +91,18 @@ set_source_files_properties(micropython_embed/openmv/py_crc.c
 # extracted from the litert AAR by build.gradle.kts's extractLitert
 # task), not something this project compiles. Headers: litert/include/,
 # committed, see litert/README.md.
+#
+# tflite_module.cpp links this SAME .so (via upy_engine's link line
+# below), not a second TFLite build: libLiteRt.so already exports the
+# classic TfLite* C API (confirmed via nm) alongside LiteRT's own
+# LiteRt* API, since LiteRT is built from its own copy of the TFLite
+# source. One copy of TFLite in the process, not two colliding in the
+# dynamic symbol table -- see tflite/README.md and session-state for
+# why this matters. tflite_module.cpp and litert_module.cpp/
+# LiteRtShim.kt remain independent source files (zero cross-links
+# between the two modules' own code); they just happen to share this
+# one upstream native library, the same way two modules might both use
+# libc.
 add_library(litert SHARED IMPORTED)
 set_target_properties(litert PROPERTIES
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/litert/lib/libLiteRt.so
