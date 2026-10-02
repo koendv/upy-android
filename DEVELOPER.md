@@ -23,9 +23,9 @@ AI prompt:
 >`adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help`
 > and follow what it says.
 
-Each of our own modules (`csi`, `display`, `android` and its submodules) has a `help()` function, e.g. `import csi; print(csi.help())`, so an AI driving the phone this way can learn the API without repo access. When you add, remove, or change a method's signature/behavior, update that module's `help()` text in the same commit -- it's hand-written prose next to the `locals_dict`/globals table, not generated, so nothing else keeps it in sync.
+Each of the upy-specific modules (`csi`, `display`, `android` and its submodules) has a `help()` function, e.g. `import csi; print(csi.help())`, so an AI driving the phone this way can learn the API without repo access. When adding, removing, or changing a method's signature/behavior, update that module's `help()` text in the same commit.
 
-`/examples` on the device has sample scripts (e.g. `find_apriltags.py`, `face_detection.py`) covering the vendored OpenMV modules (`image`, `gif`, `mjpeg`, ...) that don't have a `help()` -- those mirror documented upstream OpenMV behavior, so a working example is the reference, not hand-written prose here. List them with `os.listdir("/examples")` over the same adb `run` method.
+`/examples` on the device has reference scripts (e.g. `find_apriltags.py`, `face_detection.py`) covering the OpenMV modules (`image`, `gif`, `mjpeg`, ...) that don't have a `help()`.
 
 ## ml machine learning
 
