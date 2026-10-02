@@ -5,6 +5,15 @@
 // competing copies of TFLite in one process. Zero cross-links with
 // litert_module.cpp/LiteRtShim.kt: independent source, independent
 // Python-facing API, each with its own registry/teardown below.
+//
+// I/O is plain array.array, not ulab.ndarray: a prior version used
+// ndarray directly, but that tied tflite's dtype coverage to ulab's
+// five dtypes (no int32/int64/bool) for no real benefit on this
+// hardware -- ulab's zero-copy angle matters on MCUs, not here, where
+// copying is already cheap and TfLite's own C API is raw bytes either
+// way. array.array is a MicroPython builtin (no new dependency) whose
+// typecodes cover the real TfLiteType range directly. See
+// session-state for the fuller reasoning.
 // see session-state: tflite_module.cpp#module_design
 
 #include <cstdlib>
@@ -13,19 +22,12 @@
 extern "C" {
 #include "py/runtime.h"
 #include "py/obj.h"
+#include "py/objarray.h"
+#include "py/binary.h"
 #include "py/mperrno.h"
-// ndarray.h has no extern "C" guards of its own (ulab is a plain-C
-// library); wrapped here so ndarray_new_dense_ndarray() etc. resolve to
-// ndarray.c's actual (unmangled) C symbols at link time, not C++-mangled
-// names nothing defines. Confirmed the hard way: this project's first
-// .cpp to include ndarray.h directly, originally unwrapped, failed at
-// link with "undefined symbol: ndarray_new_dense_ndarray(...)".
-#include "ndarray.h"
 }
 
 #include "tflite/c/c_api.h"
-
-extern "C" const mp_obj_type_t ulab_ndarray_type;
 
 namespace {
 
@@ -68,33 +70,59 @@ void registry_remove(TfLiteModel *model, TfLiteInterpreter *interp) {
     }
 }
 
-// v1 dtype set: no quantization abstraction, no implicit conversion --
-// a tensor's dtype must exactly match the ndarray's dtype, byte for
-// byte. int32/int64/bool are deferred (ulab has no matching dtype yet,
-// see session-state).
+// No quantization abstraction, no implicit conversion -- a tensor's
+// dtype must exactly match the array's typecode, byte for byte (see
+// session-state). Covers the real, practical TfLiteType range; bool is
+// represented as plain 0/1 uint8 bytes (array.array has no bool
+// typecode of its own). float16/float64/complex/string/resource/
+// variant are out of scope -- rare in this context, not a hard
+// technical limit, can be added if a real model needs one.
 struct DtypeEntry {
     TfLiteType tfl;
-    uint8_t ulab;
+    char typecode;
     const char *name;
 };
 const DtypeEntry kDtypeTable[] = {
-    {kTfLiteFloat32, NDARRAY_FLOAT, "float32"},
-    {kTfLiteInt8, NDARRAY_INT8, "int8"},
-    {kTfLiteUInt8, NDARRAY_UINT8, "uint8"},
-    {kTfLiteInt16, NDARRAY_INT16, "int16"},
-    {kTfLiteUInt16, NDARRAY_UINT16, "uint16"},
+    {kTfLiteFloat32, 'f', "float32"},
+    {kTfLiteInt8, 'b', "int8"},
+    {kTfLiteUInt8, 'B', "uint8"},
+    {kTfLiteInt16, 'h', "int16"},
+    {kTfLiteUInt16, 'H', "uint16"},
+    {kTfLiteInt32, 'i', "int32"},
+    {kTfLiteUInt32, 'I', "uint32"},
+    {kTfLiteInt64, 'q', "int64"},
+    {kTfLiteUInt64, 'Q', "uint64"},
+    {kTfLiteBool, 'B', "bool (as uint8 0/1)"},
 };
 
-uint8_t tfl_to_ulab_dtype(TfLiteType t, const char **name_out) {
+char tfl_typecode(TfLiteType t, const char **name_out) {
     for (const auto &e : kDtypeTable) {
         if (e.tfl == t) {
             if (name_out) {
                 *name_out = e.name;
             }
-            return e.ulab;
+            return e.typecode;
         }
     }
-    return 0;
+    return '\0';
+}
+
+// Allocates a fresh, GC-owned array.array of the given typecode/length
+// -- same role ndarray_new_dense_ndarray() played before, built from
+// the same public primitives array_make_new() itself uses
+// (mp_binary_get_size for itemsize, m_new for the GC-owned backing
+// buffer). array_new() itself (objarray.c) is static, not exported, so
+// this is a small, deliberate duplicate, not a shared/cross-linked
+// implementation.
+mp_obj_array_t *new_typed_array(char typecode, size_t len) {
+    size_t itemsize = mp_binary_get_size('@', typecode, nullptr);
+    auto *o = m_new_obj(mp_obj_array_t);
+    o->base.type = &mp_type_array;
+    o->typecode = typecode;
+    o->free = 0;
+    o->len = len;
+    o->items = m_new(byte, itemsize * len);
+    return o;
 }
 
 typedef struct _tflite_model_obj_t {
@@ -158,30 +186,65 @@ mp_obj_t tflite_model_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
     return MP_OBJ_FROM_PTR(self);
 }
 
-// Copies ndarray `arr_obj`'s buffer into TFLite input tensor `index`.
-// Strict: dtype and byte size must match exactly, no conversion -- no
-// quantization abstraction, no implicit cast (see session-state).
+// Builds a tuple of this tensor's dimensions -- the input_shape()/
+// output_shape() methods below, and run()'s own dtype/size checks.
+mp_obj_t tensor_shape_tuple(const TfLiteTensor *tensor) {
+    int32_t ndim = TfLiteTensorNumDims(tensor);
+    mp_obj_t *items = m_new(mp_obj_t, ndim);
+    for (int32_t i = 0; i < ndim; i++) {
+        items[i] = mp_obj_new_int(TfLiteTensorDim(tensor, i));
+    }
+    return mp_obj_new_tuple(ndim, items);
+}
+
+mp_obj_t tflite_model_input_shape(mp_obj_t self_in, mp_obj_t index_in) {
+    auto *self = (tflite_model_obj_t *) MP_OBJ_TO_PTR(self_in);
+    if (!self->interp) {
+        raise_os_error(MP_EINVAL, "tflite: model is closed");
+    }
+    mp_int_t index = mp_obj_get_int(index_in);
+    if (index < 0 || index >= TfLiteInterpreterGetInputTensorCount(self->interp)) {
+        raise_os_error(MP_EINVAL, "tflite: no such input tensor index");
+    }
+    return tensor_shape_tuple(TfLiteInterpreterGetInputTensor(self->interp, (int32_t) index));
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(tflite_model_input_shape_obj, tflite_model_input_shape);
+
+mp_obj_t tflite_model_output_shape(mp_obj_t self_in, mp_obj_t index_in) {
+    auto *self = (tflite_model_obj_t *) MP_OBJ_TO_PTR(self_in);
+    if (!self->interp) {
+        raise_os_error(MP_EINVAL, "tflite: model is closed");
+    }
+    mp_int_t index = mp_obj_get_int(index_in);
+    if (index < 0 || index >= TfLiteInterpreterGetOutputTensorCount(self->interp)) {
+        raise_os_error(MP_EINVAL, "tflite: no such output tensor index");
+    }
+    return tensor_shape_tuple(TfLiteInterpreterGetOutputTensor(self->interp, (int32_t) index));
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(tflite_model_output_shape_obj, tflite_model_output_shape);
+
+// Copies array.array `arr_obj`'s buffer into TFLite input tensor
+// `index`. Strict: typecode and byte size must match exactly, no
+// conversion -- no quantization abstraction, no implicit cast (see
+// session-state).
 void copy_input(TfLiteInterpreter *interp, int32_t index, mp_obj_t arr_obj) {
-    if (!mp_obj_is_type(arr_obj, &ulab_ndarray_type)) {
-        raise_os_error(MP_EINVAL, "tflite: run() arguments must be ulab ndarrays");
+    if (!mp_obj_is_type(arr_obj, &mp_type_array)) {
+        raise_os_error(MP_EINVAL, "tflite: run() arguments must be array.array");
     }
     TfLiteTensor *tensor = TfLiteInterpreterGetInputTensor(interp, index);
     const char *name = nullptr;
-    uint8_t want_dtype = tfl_to_ulab_dtype(TfLiteTensorType(tensor), &name);
-    if (want_dtype == 0) {
-        raise_os_error(MP_EINVAL,
-            "tflite: input tensor dtype not supported in this version (only float32/int8/uint8/int16/uint16)");
-    }
-    auto *arr = (ndarray_obj_t *) MP_OBJ_TO_PTR(arr_obj);
-    if (arr->dtype != want_dtype) {
-        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("tflite: input %d dtype mismatch, tensor wants %s"),
-            (int) index, name);
+    char want_typecode = tfl_typecode(TfLiteTensorType(tensor), &name);
+    if (want_typecode == '\0') {
+        raise_os_error(MP_EINVAL, "tflite: input tensor dtype not supported in this version");
     }
     mp_buffer_info_t bufinfo;
     // mp_get_buffer_raise rejects non-contiguous views -- a success
-    // here IS the "safe to hand this pointer straight to TfLite" signal
-    // (see session-state: ulab ndarray audit).
+    // here IS the "safe to hand this pointer straight to TfLite" signal.
     mp_get_buffer_raise(arr_obj, &bufinfo, MP_BUFFER_READ);
+    if (bufinfo.typecode != want_typecode) {
+        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("tflite: input %d dtype mismatch, tensor wants %s"),
+            (int) index, name);
+    }
     size_t tensor_bytes = TfLiteTensorByteSize(tensor);
     if (bufinfo.len != tensor_bytes) {
         mp_raise_msg_varg(&mp_type_ValueError,
@@ -193,46 +256,32 @@ void copy_input(TfLiteInterpreter *interp, int32_t index, mp_obj_t arr_obj) {
     }
 }
 
-// Allocates a fresh, GC-owned ndarray and copies TFLite output tensor
-// into it. Always a copy in v1: wrapping the interpreter's own arena
-// buffer zero-copy would dangle across the next invoke() or close() --
-// deferred to v2 (see session-state).
+// Allocates a fresh, GC-owned array.array and copies TFLite output
+// tensor into it. Always a copy in v1: wrapping the interpreter's own
+// arena buffer zero-copy would dangle across the next invoke() or
+// close() -- deferred, see session-state. Flat (1-D): shape is a
+// separate query (output_shape()), not carried by run()'s own return
+// value.
 mp_obj_t copy_output(const TfLiteTensor *tensor) {
     const char *name = nullptr;
-    uint8_t dtype = tfl_to_ulab_dtype(TfLiteTensorType(tensor), &name);
-    if (dtype == 0) {
-        raise_os_error(MP_EINVAL,
-            "tflite: output tensor dtype not supported in this version (only float32/int8/uint8/int16/uint16)");
+    char typecode = tfl_typecode(TfLiteTensorType(tensor), &name);
+    if (typecode == '\0') {
+        raise_os_error(MP_EINVAL, "tflite: output tensor dtype not supported in this version");
     }
-    int32_t ndim = TfLiteTensorNumDims(tensor);
-    if (ndim < 1 || ndim > ULAB_MAX_DIMS) {
-        raise_os_error(MP_EINVAL, "tflite: output tensor rank not supported");
-    }
-    // ndarray_new_ndarray() reads the TRAILING ndim slots of a full
-    // ULAB_MAX_DIMS-length shape array (right-aligned, like
-    // ndarray_new_ndarray_from_tuple's own construction) -- confirmed
-    // by reading ndarray.c directly, not assumed. A left-aligned fill
-    // here silently produced a 0-length/wrong-length array (caught by
-    // the byte-size check below) rather than a crash.
-    size_t shape[ULAB_MAX_DIMS] = {0};
-    for (int32_t i = 0; i < ndim; i++) {
-        shape[ULAB_MAX_DIMS - ndim + i] = (size_t) TfLiteTensorDim(tensor, i);
-    }
-    ndarray_obj_t *out = ndarray_new_dense_ndarray((uint8_t) ndim, shape, dtype);
     size_t bytes = TfLiteTensorByteSize(tensor);
-    if (bytes != out->len * out->itemsize) {
-        raise_os_error(MP_EIO, "tflite: output tensor size mismatch");
-    }
-    if (TfLiteTensorCopyToBuffer(tensor, out->array, bytes) != kTfLiteOk) {
+    size_t itemsize = mp_binary_get_size('@', typecode, nullptr);
+    mp_obj_array_t *out = new_typed_array(typecode, bytes / itemsize);
+    if (TfLiteTensorCopyToBuffer(tensor, out->items, bytes) != kTfLiteOk) {
         raise_os_error(MP_EIO, "tflite: failed to copy output from tensor");
     }
     return MP_OBJ_FROM_PTR(out);
 }
 
-// run(*inputs): one positional ndarray per input tensor, in order.
-// Returns a single ndarray if the model has exactly one output tensor,
-// otherwise a tuple -- matches the common case (most models, including
-// add_simple.tflite) without forcing "(y,) = model.run(x)" everywhere.
+// run(*inputs): one positional array.array per input tensor, in order.
+// Returns a single array.array if the model has exactly one output
+// tensor, otherwise a tuple -- matches the common case (most models,
+// including add_simple.tflite) without forcing "(y,) = model.run(x)"
+// everywhere.
 mp_obj_t tflite_model_run(size_t n_args, const mp_obj_t *args) {
     auto *self = (tflite_model_obj_t *) MP_OBJ_TO_PTR(args[0]);
     if (!self->interp) {
@@ -269,6 +318,8 @@ static MP_DEFINE_CONST_FUN_OBJ_1(tflite_model_close_obj, tflite_model_close);
 
 const mp_rom_map_elem_t tflite_model_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_run), MP_ROM_PTR(&tflite_model_run_obj)},
+    {MP_ROM_QSTR(MP_QSTR_input_shape), MP_ROM_PTR(&tflite_model_input_shape_obj)},
+    {MP_ROM_QSTR(MP_QSTR_output_shape), MP_ROM_PTR(&tflite_model_output_shape_obj)},
     {MP_ROM_QSTR(MP_QSTR_close), MP_ROM_PTR(&tflite_model_close_obj)},
     {MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&tflite_model_close_obj)},
 };
@@ -290,17 +341,17 @@ const char tflite_help_text[] =
     "class: tflite.Model(path)\n"
     "  loads a .tflite model and allocates tensors immediately; path is a VFS path (e.g. \"/my_model.tflite\")\n"
     "methods:\n"
-    "  run(*inputs): one positional ulab.numpy ndarray per input tensor, in the model's own order\n"
-    "    strict: each array's dtype and byte size must exactly match the corresponding tensor (no quantization/scale/zero_point handling, no implicit cast)\n"
-    "    returns a single ndarray if the model has one output tensor, otherwise a tuple of ndarrays\n"
-    "    always allocates fresh output arrays (no zero-copy in this version)\n"
+    "  run(*inputs): one positional array.array per input tensor, in the model's own order\n"
+    "    strict: each array's typecode and byte size must exactly match the corresponding tensor (no quantization/scale/zero_point handling, no implicit cast)\n"
+    "    returns a single array.array if the model has one output tensor, otherwise a tuple of array.array; always flat (1-D), always a fresh copy\n"
+    "  input_shape(i)/output_shape(i): tuple of dimensions for input/output tensor i; run()'s own arrays carry no shape, query it here\n"
     "  close(): frees the model and interpreter; also called automatically on garbage collection\n"
-    "dtypes_supported: float32, int8, uint8, int16, uint16 (matching ulab's own dtype set; int32/int64/bool are not yet supported)\n"
+    "dtypes_supported: float32('f'), int8('b'), uint8('B'), int16('h'), uint16('H'), int32('i'), uint32('I'), int64('q'), uint64('Q'), bool (as uint8 'B', 0/1)\n"
     "errors:\n"
     "  OSError(ENOENT): model file not found or not a valid .tflite file\n"
     "  OSError(EIO): interpreter creation, tensor allocation, inference, or tensor copy failed\n"
-    "  OSError(EINVAL): called on a closed model, or a tensor dtype is outside dtypes_supported\n"
-    "  ValueError: wrong number of run() arguments, or an input array's dtype/size does not match its tensor\n"
+    "  OSError(EINVAL): called on a closed model, a bad tensor index, or a tensor dtype outside dtypes_supported\n"
+    "  ValueError: wrong number of run() arguments, or an input array's typecode/size does not match its tensor\n"
     "notes:\n"
     "  CPU-only: no GPU/NPU delegate is ever attached by this module (see litert.help() for accelerator-capable inference)\n"
     "see_also: litert.help()\n"

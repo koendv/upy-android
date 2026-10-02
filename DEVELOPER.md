@@ -32,9 +32,14 @@ Each of the upy-specific modules (`csi`, `display`, `android` and its submodules
 Two independent native modules, not an OpenMV `ml`/`py_ml.c` compatibility
 layer (OpenMV's `ml` module has a restrictive license; this port never
 mirrors its API, so there's nothing to clean-room). Both take/return
-`ulab.numpy` ndarrays directly -- no quantization/scale/zero_point
-handling by either module, no automatic dequantization: a script that
-needs those does its own math on the raw ndarray.
+plain `array.array` directly, not `ulab.numpy` ndarray -- ndarray's
+zero-copy angle matters on MCUs, not here, and it capped dtype coverage
+at ulab's five dtypes for no real benefit. `array.array`'s typecodes
+cover the real dtype range each backend actually supports. No
+quantization/scale/zero_point handling by either module, no automatic
+dequantization: a script that needs those does its own math on the raw
+array. Shape is a separate `input_shape(i)`/`output_shape(i)` query,
+not carried by `run()`'s own return value.
 
 - `tflite`: classic TensorFlow Lite C API, CPU-only, built from
   LiteRT's own copy of the TFLite source (see `app/src/main/cpp/tflite/README.md`

@@ -1,11 +1,14 @@
 // upy-android native litert module (top-level `litert`). Standalone
 // LiteRT (not the Play-Store-delivered variant), CompiledModel.run()
-// takes/returns ulab.numpy ndarrays directly. Rewritten from scratch:
-// the previous version exposed a bespoke TensorBuffer type with
-// per-dtype write_int8/write_float/write_int/write_bool/write_long
-// methods, built for ml.py (now deleted) and OpenMV API compatibility
-// (no longer a goal -- see DEVELOPER.md). No backward compatibility
-// with that old API is kept.
+// takes/returns array.array directly. A prior version used
+// ulab.numpy ndarray instead; dropped because it capped litert's
+// reachable dtypes at ulab's five (no int32/int64/bool), even though
+// the Kotlin litert-api bridge already had working int32/bool/int64
+// write/read paths going unused just to fit ndarray. array.array is a
+// MicroPython builtin whose typecodes cover the real
+// LiteRtElementType range this bridge supports directly. See
+// tflite_module.cpp's identical-in-spirit header comment and
+// session-state for the fuller reasoning.
 //
 // Zero cross-links with tflite_module.cpp: independent source,
 // independent registry/teardown. The two modules share only the one
@@ -20,13 +23,9 @@
 extern "C" {
 #include "py/runtime.h"
 #include "py/obj.h"
+#include "py/objarray.h"
+#include "py/binary.h"
 #include "py/mperrno.h"
-// ndarray.h has no extern "C" guards of its own (ulab is a plain-C
-// library) -- wrapped here so its functions resolve to ndarray.c's
-// actual C symbols at link time, not C++-mangled names nothing
-// defines. See tflite_module.cpp's identical comment for the full
-// story (first file in this project to hit it).
-#include "ndarray.h"
 }
 
 #include "litert_jni_bridge.h"
@@ -37,8 +36,6 @@ extern "C" {
 #include "litert/c/litert_environment.h"
 #include "litert/c/litert_model.h"
 #include "litert/c/litert_model_types.h"
-
-extern "C" const mp_obj_type_t ulab_ndarray_type;
 
 // see session-state: litert_module.cpp#module_design
 extern const mp_obj_type_t litert_environment_type;
@@ -100,6 +97,20 @@ void registry_remove(LitertHandleNode **head, LitertHandleNode *node) {
         }
         link = &(*link)->next;
     }
+}
+
+// Allocates a fresh, GC-owned array.array of the given typecode/length
+// -- same role as tflite_module.cpp's identical helper (independent
+// copy, not shared code).
+mp_obj_array_t *new_typed_array(char typecode, size_t len) {
+    size_t itemsize = mp_binary_get_size('@', typecode, nullptr);
+    auto *o = m_new_obj(mp_obj_array_t);
+    o->base.type = &mp_type_array;
+    o->typecode = typecode;
+    o->free = 0;
+    o->len = len;
+    o->items = m_new(byte, itemsize * len);
+    return o;
 }
 
 // ---------------- Environment ----------------
@@ -182,11 +193,10 @@ struct litert_compiled_model_obj_t {
     mp_obj_base_t base;
     LitertHandleNode *node;
     // strdup'd copy of the (already VFS-leading-slash-stripped) path
-    // this model was constructed from. Used by output_element_type()
-    // below, which reopens the same file directly via the plain C API
-    // (LiteRtCreateModelFromFile) to find out an output tensor's dtype
-    // -- Kotlin's CompiledModel has no "what dtype is output N" query
-    // of its own.
+    // this model was constructed from. Used by tensor_info() below,
+    // which reopens the same file directly via the plain C API
+    // (LiteRtCreateModelFromFile) to find a tensor's dtype/shape --
+    // Kotlin's CompiledModel has no such query of its own.
     char *path;
 };
 
@@ -248,12 +258,14 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
     return MP_OBJ_FROM_PTR(self);
 }
 
-// Finds output tensor `index`'s element type by reopening the model
-// file via the plain LiteRt C API (cheap: flatbuffer metadata only, no
-// interpreter/arena) -- Kotlin's CompiledModel has no "what dtype is
-// output N" query of its own. Only float32/int8 are distinguished;
-// anything else raises directly (v1 scope, see session-state).
-LiteRtElementType output_element_type(litert_compiled_model_obj_t *self, mp_int_t index) {
+// Finds tensor `index` (input or output) by reopening the model file
+// via the plain LiteRt C API (cheap: flatbuffer metadata only, no
+// interpreter/arena) -- Kotlin's CompiledModel has no "what dtype/shape
+// is tensor N" query of its own. Gives back both the element type and
+// a shape tuple in one pass (same model-reopen, used by both run()'s
+// dtype dispatch and the input_shape()/output_shape() methods).
+void tensor_info(litert_compiled_model_obj_t *self, bool is_output, mp_int_t index,
+                  LiteRtElementType *out_element_type, mp_obj_t *out_shape) {
     LiteRtEnvironment environment = nullptr;
     if (LiteRtCreateEnvironment(0, nullptr, &environment) != kLiteRtStatusOk) {
         raise_os_error(MP_EIO, "litert: failed to create environment for tensor introspection");
@@ -270,10 +282,13 @@ LiteRtElementType output_element_type(litert_compiled_model_obj_t *self, mp_int_
         raise_os_error(MP_EIO, "litert: model has no signatures");
     }
     LiteRtTensor tensor = nullptr;
-    if (LiteRtGetSignatureOutputTensorByIndex(signature, (LiteRtParamIndex) index, &tensor) != kLiteRtStatusOk) {
+    LiteRtStatus status = is_output
+        ? LiteRtGetSignatureOutputTensorByIndex(signature, (LiteRtParamIndex) index, &tensor)
+        : LiteRtGetSignatureInputTensorByIndex(signature, (LiteRtParamIndex) index, &tensor);
+    if (status != kLiteRtStatusOk) {
         LiteRtDestroyModel(model);
         LiteRtDestroyEnvironment(environment);
-        raise_os_error(MP_EINVAL, "litert: no such output tensor index");
+        raise_os_error(MP_EINVAL, is_output ? "litert: no such output tensor index" : "litert: no such input tensor index");
     }
 
     LiteRtTensorTypeId type_id;
@@ -282,7 +297,6 @@ LiteRtElementType output_element_type(litert_compiled_model_obj_t *self, mp_int_
         LiteRtDestroyEnvironment(environment);
         raise_os_error(MP_EIO, "litert: failed to get tensor type id");
     }
-    LiteRtElementType element_type;
     if (type_id == kLiteRtUnrankedTensorType) {
         LiteRtUnrankedTensorType unranked;
         if (LiteRtGetUnrankedTensorType(tensor, &unranked) != kLiteRtStatusOk) {
@@ -290,7 +304,8 @@ LiteRtElementType output_element_type(litert_compiled_model_obj_t *self, mp_int_
             LiteRtDestroyEnvironment(environment);
             raise_os_error(MP_EIO, "litert: failed to get unranked tensor type");
         }
-        element_type = unranked.element_type;
+        *out_element_type = unranked.element_type;
+        *out_shape = mp_const_none;
     } else {
         LiteRtRankedTensorType ranked;
         if (LiteRtGetRankedTensorType(tensor, &ranked) != kLiteRtStatusOk) {
@@ -298,12 +313,37 @@ LiteRtElementType output_element_type(litert_compiled_model_obj_t *self, mp_int_
             LiteRtDestroyEnvironment(environment);
             raise_os_error(MP_EIO, "litert: failed to get ranked tensor type");
         }
-        element_type = ranked.element_type;
+        *out_element_type = ranked.element_type;
+        unsigned int rank = ranked.layout.rank;
+        mp_obj_t *dims = m_new(mp_obj_t, rank);
+        for (unsigned int i = 0; i < rank; i++) {
+            dims[i] = mp_obj_new_int(ranked.layout.dimensions[i]);
+        }
+        *out_shape = mp_obj_new_tuple(rank, dims);
     }
     LiteRtDestroyModel(model);
     LiteRtDestroyEnvironment(environment);
-    return element_type;
 }
+
+mp_obj_t litert_compiled_model_input_shape(mp_obj_t self_in, mp_obj_t index_in) {
+    auto *self = (litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_model_closed(self);
+    LiteRtElementType element_type;
+    mp_obj_t shape;
+    tensor_info(self, false, mp_obj_get_int(index_in), &element_type, &shape);
+    return shape;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_input_shape_obj, litert_compiled_model_input_shape);
+
+mp_obj_t litert_compiled_model_output_shape(mp_obj_t self_in, mp_obj_t index_in) {
+    auto *self = (litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in);
+    raise_if_model_closed(self);
+    LiteRtElementType element_type;
+    mp_obj_t shape;
+    tensor_info(self, true, mp_obj_get_int(index_in), &element_type, &shape);
+    return shape;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_output_shape_obj, litert_compiled_model_output_shape);
 
 // A set of TensorBuffers created via create_input_buffers()/
 // create_output_buffers() -- internal plumbing only in this version,
@@ -348,31 +388,45 @@ void close_buffer_set(BufferSet &bufs) {
     free(bufs.nodes);
 }
 
-// Writes a ulab ndarray's buffer into an input TensorBuffer. Strict:
-// only float32/int8 are supported in this version (the Kotlin
-// litert-api itself has no uint8/int16/uint16 path -- see
-// litert/README.md); anything else is rejected before touching Kotlin
-// at all. No quantization/scale/zero_point handling -- no implicit
-// conversion (see session-state).
-void write_ndarray_to_buffer(LitertHandleNode *node, mp_obj_t arr_obj) {
-    if (!mp_obj_is_type(arr_obj, &ulab_ndarray_type)) {
-        raise_os_error(MP_EINVAL, "litert: run() arguments must be ulab ndarrays");
+// Writes an array.array's buffer into an input TensorBuffer, via
+// whichever typed bridge call matches the array's typecode. No
+// quantization/scale/zero_point handling -- no implicit conversion
+// (see session-state). bool tensors take a uint8 ('B') array of 0/1
+// bytes, reinterpreted as C++ bool: safe on this target specifically
+// (sizeof(bool) == 1 on arm64 clang), not a portable assumption in
+// general.
+void write_array_to_buffer(LitertHandleNode *node, mp_obj_t arr_obj) {
+    if (!mp_obj_is_type(arr_obj, &mp_type_array)) {
+        raise_os_error(MP_EINVAL, "litert: run() arguments must be array.array");
     }
-    auto *arr = (ndarray_obj_t *) MP_OBJ_TO_PTR(arr_obj);
     mp_buffer_info_t bufinfo;
     // mp_get_buffer_raise rejects non-contiguous views -- a success
-    // here IS the "safe to hand this pointer to litert" signal (see
-    // session-state: ulab ndarray audit).
+    // here IS the "safe to hand this pointer to litert" signal.
     mp_get_buffer_raise(arr_obj, &bufinfo, MP_BUFFER_READ);
 
     char *err = nullptr;
     bool ok;
-    if (arr->dtype == NDARRAY_FLOAT) {
-        ok = litert_bridge_kotlin_write_float(node->global_ref, (const float *) bufinfo.buf, arr->len, &err);
-    } else if (arr->dtype == NDARRAY_INT8) {
-        ok = litert_bridge_kotlin_write_int8(node->global_ref, (const int8_t *) bufinfo.buf, bufinfo.len, &err);
-    } else {
-        raise_os_error(MP_EINVAL, "litert: input dtype not supported in this version (only float32/int8)");
+    switch (bufinfo.typecode) {
+        case 'f':
+            ok = litert_bridge_kotlin_write_float(node->global_ref, (const float *) bufinfo.buf,
+                bufinfo.len / sizeof(float), &err);
+            break;
+        case 'b':
+            ok = litert_bridge_kotlin_write_int8(node->global_ref, (const int8_t *) bufinfo.buf, bufinfo.len, &err);
+            break;
+        case 'i':
+            ok = litert_bridge_kotlin_write_int(node->global_ref, (const int32_t *) bufinfo.buf,
+                bufinfo.len / sizeof(int32_t), &err);
+            break;
+        case 'q':
+            ok = litert_bridge_kotlin_write_long(node->global_ref, (const int64_t *) bufinfo.buf,
+                bufinfo.len / sizeof(int64_t), &err);
+            break;
+        case 'B':
+            ok = litert_bridge_kotlin_write_bool(node->global_ref, (const bool *) bufinfo.buf, bufinfo.len, &err);
+            break;
+        default:
+            raise_os_error(MP_EINVAL, "litert: input dtype not supported in this version (only f/b/i/q/B typecodes)");
     }
     // litert-api's own TensorBuffer.write*() validates length itself
     // and raises its own LiteRtException on a size mismatch, surfaced
@@ -383,13 +437,13 @@ void write_ndarray_to_buffer(LitertHandleNode *node, mp_obj_t arr_obj) {
 }
 
 // Reads output TensorBuffer `index` back as a freshly allocated,
-// GC-owned, flat (1-D) ndarray. Always a copy in v1. Only
-// float32/int8 are supported, same reasoning as write_ndarray_to_buffer
-// above.
-mp_obj_t read_buffer_as_ndarray(litert_compiled_model_obj_t *self, LitertHandleNode *node, mp_int_t index) {
-    LiteRtElementType element_type = output_element_type(self, index);
+// GC-owned, flat (1-D) array.array. Always a copy in v1. Dtype
+// dispatch mirrors write_array_to_buffer above.
+mp_obj_t read_buffer_as_array(litert_compiled_model_obj_t *self, LitertHandleNode *node, mp_int_t index) {
+    LiteRtElementType element_type;
+    mp_obj_t shape_unused;
+    tensor_info(self, true, index, &element_type, &shape_unused);
     char *err = nullptr;
-    size_t shape[ULAB_MAX_DIMS] = {0};
 
     if (element_type == kLiteRtElementTypeFloat32) {
         float *out = nullptr;
@@ -397,11 +451,10 @@ mp_obj_t read_buffer_as_ndarray(litert_compiled_model_obj_t *self, LitertHandleN
         if (!litert_bridge_kotlin_read_float(node->global_ref, &out, &len, &err)) {
             raise_os_error_free(MP_EIO, err);
         }
-        shape[ULAB_MAX_DIMS - 1] = len;
-        ndarray_obj_t *nd = ndarray_new_dense_ndarray(1, shape, NDARRAY_FLOAT);
-        memcpy(nd->array, out, len * sizeof(float));
+        mp_obj_array_t *arr = new_typed_array('f', len);
+        memcpy(arr->items, out, len * sizeof(float));
         free(out);
-        return MP_OBJ_FROM_PTR(nd);
+        return MP_OBJ_FROM_PTR(arr);
     }
     if (element_type == kLiteRtElementTypeInt8) {
         int8_t *out = nullptr;
@@ -409,19 +462,51 @@ mp_obj_t read_buffer_as_ndarray(litert_compiled_model_obj_t *self, LitertHandleN
         if (!litert_bridge_kotlin_read_int8(node->global_ref, &out, &len, &err)) {
             raise_os_error_free(MP_EIO, err);
         }
-        shape[ULAB_MAX_DIMS - 1] = len;
-        ndarray_obj_t *nd = ndarray_new_dense_ndarray(1, shape, NDARRAY_INT8);
-        memcpy(nd->array, out, len);
+        mp_obj_array_t *arr = new_typed_array('b', len);
+        memcpy(arr->items, out, len);
         free(out);
-        return MP_OBJ_FROM_PTR(nd);
+        return MP_OBJ_FROM_PTR(arr);
     }
-    raise_os_error(MP_EINVAL, "litert: output dtype not supported in this version (only float32/int8)");
+    if (element_type == kLiteRtElementTypeInt32) {
+        int32_t *out = nullptr;
+        size_t len = 0;
+        if (!litert_bridge_kotlin_read_int(node->global_ref, &out, &len, &err)) {
+            raise_os_error_free(MP_EIO, err);
+        }
+        mp_obj_array_t *arr = new_typed_array('i', len);
+        memcpy(arr->items, out, len * sizeof(int32_t));
+        free(out);
+        return MP_OBJ_FROM_PTR(arr);
+    }
+    if (element_type == kLiteRtElementTypeInt64) {
+        int64_t *out = nullptr;
+        size_t len = 0;
+        if (!litert_bridge_kotlin_read_long(node->global_ref, &out, &len, &err)) {
+            raise_os_error_free(MP_EIO, err);
+        }
+        mp_obj_array_t *arr = new_typed_array('q', len);
+        memcpy(arr->items, out, len * sizeof(int64_t));
+        free(out);
+        return MP_OBJ_FROM_PTR(arr);
+    }
+    if (element_type == kLiteRtElementTypeBool) {
+        bool *out = nullptr;
+        size_t len = 0;
+        if (!litert_bridge_kotlin_read_bool(node->global_ref, &out, &len, &err)) {
+            raise_os_error_free(MP_EIO, err);
+        }
+        mp_obj_array_t *arr = new_typed_array('B', len);
+        memcpy(arr->items, out, len);  // sizeof(bool) == 1 on this target -- see write_array_to_buffer's own note
+        free(out);
+        return MP_OBJ_FROM_PTR(arr);
+    }
+    raise_os_error(MP_EINVAL, "litert: output dtype not supported in this version (only float32/int8/int32/int64/bool)");
     return mp_const_none;  // unreachable: raise_os_error() never returns
 }
 
-// run(*inputs): one positional ndarray per input tensor, in the
-// model's own order. Returns a single ndarray if the model has one
-// output tensor, otherwise a tuple -- same convention as
+// run(*inputs): one positional array.array per input tensor, in the
+// model's own order. Returns a single array.array if the model has
+// one output tensor, otherwise a tuple -- same convention as
 // tflite.Model.run() (independent implementation, not shared code).
 mp_obj_t litert_compiled_model_run(size_t n_args, const mp_obj_t *args) {
     auto *self = (litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(args[0]);
@@ -439,7 +524,7 @@ mp_obj_t litert_compiled_model_run(size_t n_args, const mp_obj_t *args) {
     }
 
     for (size_t i = 0; i < inputs.count; i++) {
-        write_ndarray_to_buffer(inputs.nodes[i], args[1 + i]);
+        write_array_to_buffer(inputs.nodes[i], args[1 + i]);
     }
 
     auto *input_refs = (void **) malloc(sizeof(void *) * inputs.count);
@@ -464,11 +549,11 @@ mp_obj_t litert_compiled_model_run(size_t n_args, const mp_obj_t *args) {
 
     mp_obj_t result;
     if (outputs.count == 1) {
-        result = read_buffer_as_ndarray(self, outputs.nodes[0], 0);
+        result = read_buffer_as_array(self, outputs.nodes[0], 0);
     } else {
         mp_obj_t *items = m_new(mp_obj_t, outputs.count);
         for (size_t i = 0; i < outputs.count; i++) {
-            items[i] = read_buffer_as_ndarray(self, outputs.nodes[i], (mp_int_t) i);
+            items[i] = read_buffer_as_array(self, outputs.nodes[i], (mp_int_t) i);
         }
         result = mp_obj_new_tuple(outputs.count, items);
     }
@@ -509,6 +594,8 @@ static MP_DEFINE_CONST_FUN_OBJ_1(litert_compiled_model_del_obj, litert_compiled_
 
 const mp_rom_map_elem_t litert_compiled_model_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_run), MP_ROM_PTR(&litert_compiled_model_run_obj)},
+    {MP_ROM_QSTR(MP_QSTR_input_shape), MP_ROM_PTR(&litert_compiled_model_input_shape_obj)},
+    {MP_ROM_QSTR(MP_QSTR_output_shape), MP_ROM_PTR(&litert_compiled_model_output_shape_obj)},
     {MP_ROM_QSTR(MP_QSTR_close), MP_ROM_PTR(&litert_compiled_model_close_obj)},
     {MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&litert_compiled_model_del_obj)},
 };
@@ -541,12 +628,14 @@ const char litert_help_text[] =
     "  litert.Options(accelerator=litert.Accelerator.CPU): accelerator is litert.Accelerator.{NONE,CPU,GPU,NPU}\n"
     "  litert.CompiledModel(environment, path, options=None): loads and compiles a .tflite model; path is a VFS path\n"
     "methods (CompiledModel):\n"
-    "  run(*inputs): one positional ulab.numpy ndarray per input tensor, in the model's own order\n"
-    "    strict: float32 and int8 only in this version (the Kotlin litert-api itself has no uint8/int16/uint16 path); no quantization/scale/zero_point handling, no implicit cast\n"
-    "    returns a single ndarray if the model has one output tensor, otherwise a tuple of ndarrays (always flat/1-D, always a fresh copy)\n"
+    "  run(*inputs): one positional array.array per input tensor, in the model's own order\n"
+    "    strict: each array's typecode must be one of f/b/i/q/B (float32/int8/int32/int64/bool); no quantization/scale/zero_point handling, no implicit cast\n"
+    "    returns a single array.array if the model has one output tensor, otherwise a tuple of array.array; always flat (1-D), always a fresh copy\n"
+    "  input_shape(i)/output_shape(i): tuple of dimensions for input/output tensor i; run()'s own arrays carry no shape, query it here\n"
     "  close(): frees the model; also called automatically on garbage collection\n"
+    "dtypes_supported: float32('f'), int8('b'), int32('i'), int64('q'), bool (as uint8 'B', 0/1) -- the Kotlin litert-api itself has no uint8/int16/uint16 path, unlike tflite\n"
     "errors:\n"
-    "  OSError(EINVAL): construction with a closed/wrong-type Environment or Options, or a call on a closed CompiledModel\n"
+    "  OSError(EINVAL): construction with a closed/wrong-type Environment or Options, a call on a closed CompiledModel, a bad tensor index, or a dtype outside dtypes_supported\n"
     "  OSError(EIO): compile, buffer creation, write, run, or read failure (Kotlin/JNI exception text is forwarded)\n"
     "  ValueError: wrong number of run() arguments\n"
     "notes:\n"

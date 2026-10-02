@@ -1,11 +1,12 @@
 # litert confidence test (top-level `litert`).
-# litert.CompiledModel.run(*inputs) takes/returns ulab.numpy ndarrays
-# directly -- no TensorBuffer, no write_*/read_* methods, no
-# quantization/scale/zero_point handling by the module itself. v1
-# supports float32 and int8 only (the Kotlin litert-api itself has no
-# uint8/int16/uint16 path). A script that wants a quantized model's
-# real-world values does its own scale/zero_point math on the raw int8
-# ndarray, same as this test does below.
+# litert.CompiledModel.run(*inputs) takes/returns plain array.array
+# directly -- no ndarray, no TensorBuffer, no write_*/read_* methods,
+# no quantization/scale/zero_point handling by the module itself. v1
+# supports float32('f'), int8('b'), int32('i'), int64('q'), and
+# bool(as uint8 'B') -- the Kotlin litert-api's own real dtype range.
+# A script that wants a quantized model's real-world values does its
+# own scale/zero_point math on the raw int8 array, same as this test
+# does below.
 #
 # Setup: same two fixtures as before.
 #   adb push examples/quant/single_add_default_a8w8_recipe_quantized.tflite /data/local/tmp/single_add_quant.tflite
@@ -15,7 +16,7 @@
 #   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
 #       'cat /data/local/tmp/add_simple.tflite > files/add_simple.tflite'
 
-from ulab import numpy as np
+import array
 
 import litert
 
@@ -44,16 +45,15 @@ def run_case_int8(label, in1, in2, expected):
 
     q1 = quantize(in1, SCALE_IN1, ZP_IN1)
     q2 = quantize(in2, SCALE_IN2, ZP_IN2)
-    x1 = np.array([q1] * N, dtype=np.int8)
-    x2 = np.array([q2] * N, dtype=np.int8)
+    x1 = array.array("b", [q1] * N)
+    x2 = array.array("b", [q2] * N)
 
     y = model.run(x1, x2)
 
     model.close()
     env.close()
 
-    raw0 = int(y[0])
-    actual = dequantize(raw0, SCALE_OUT, ZP_OUT)
+    actual = dequantize(y[0], SCALE_OUT, ZP_OUT)
     ok = abs(actual - expected) <= TOLERANCE
     print(("PASS" if ok else "FAIL"), label,
           "in1=%r in2=%r expected=%.4f actual=%.4f" % (in1, in2, expected, actual))
@@ -67,7 +67,7 @@ def run_case_float():
 
     values = (1.0, 2.0, 3.0, 4.0)
     expected = (2.0, 4.0, 6.0, 8.0)
-    x = np.array(values, dtype=np.float)
+    x = array.array("f", values)
 
     y = model.run(x)
 
