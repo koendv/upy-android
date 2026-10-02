@@ -1,5 +1,6 @@
 package eu.kdvelectronics.upyandroid.ui
 
+import android.content.ClipData
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -51,6 +52,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
+import androidx.compose.ui.platform.ClipEntry
+import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
@@ -168,6 +171,7 @@ fun TerminalScreen(
     onReconnect: () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val clipboard = LocalClipboard.current
     var input by viewModel.terminalInput
     // Process-wide, not per-ViewModel. See TerminalLog.kt's own
     // header comment (adb-exec/SSH both write into this same log).
@@ -357,6 +361,19 @@ fun TerminalScreen(
                     onClick = {
                         coroutineScope.launch(Dispatchers.IO) { terminalManager.reset() }
                         TerminalLog.clear()
+                    },
+                )
+                TooltipIconButton(
+                    icon = SymbolIcon.CONTENT_COPY,
+                    label = "Copy",
+                    // Whole buffer, no truncation -- user's own call.
+                    // Line.text excludes its trailing \n (see
+                    // TerminalLog.kt), joinToString adds it back.
+                    onClick = {
+                        val text = lines.joinToString("\n") { it.text }
+                        coroutineScope.launch {
+                            clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("terminal", text)))
+                        }
                     },
                 )
                 TooltipIconButton(

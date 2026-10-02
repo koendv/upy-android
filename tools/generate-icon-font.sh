@@ -27,7 +27,7 @@ ICON_NAMES=(
     drive_folder_upload note_add create_new_folder refresh arrow_back
     memory terminal_2 password_2 public lock shop adb
     edit delete drive_file_rename_outline folder_open
-    vertical_align_bottom
+    vertical_align_bottom content_copy
 )
 
 OUT_FONT="upy-android/app/src/main/res/font/upy_symbols.ttf"
