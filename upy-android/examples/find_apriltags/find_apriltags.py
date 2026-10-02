@@ -2,6 +2,7 @@
 #
 # - in Files, tap find_apriltags.py -> Run
 # - switch to the Camera tab while script running
+# - point the camera at a page or screen showing TAG36H11 tags
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
