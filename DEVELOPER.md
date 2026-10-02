@@ -23,6 +23,8 @@ AI prompt:
 >`adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help`
 > and follow what it says.
 
+Each of our own modules (`csi`, `display`, `android` and its submodules) has a `help()` function, e.g. `import csi; print(csi.help())`, so an AI driving the phone this way can learn the API without repo access. When you add, remove, or change a method's signature/behavior, update that module's `help()` text in the same commit -- it's hand-written prose next to the `locals_dict`/globals table, not generated, so nothing else keeps it in sync.
+
 ## ml machine learning
 
 The `ml` (machine learning) is a clean-room rewrite of the OpenMV `ml` module.

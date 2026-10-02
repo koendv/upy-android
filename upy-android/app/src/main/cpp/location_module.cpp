@@ -173,6 +173,8 @@ mp_obj_t location_help() {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(location_help_obj, location_help);
 
+// Keep location_help_text (android.location.help(), above) in sync
+// with this table -- see DEVELOPER.md's "adb server" section.
 const mp_rom_map_elem_t location_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_location)},
     {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&location_help_obj)},

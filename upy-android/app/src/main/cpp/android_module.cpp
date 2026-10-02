@@ -82,6 +82,8 @@ mp_obj_t android_help() {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(android_help_obj, android_help);
 
+// Keep android_help_text (android.help(), above) in sync with this
+// table -- see DEVELOPER.md's "adb server" section.
 const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_android)},
     {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&android_help_obj)},

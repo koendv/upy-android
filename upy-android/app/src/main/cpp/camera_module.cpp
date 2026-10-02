@@ -1364,6 +1364,8 @@ mp_obj_t csi_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, con
     return MP_OBJ_FROM_PTR(self);
 }
 
+// Keep csi_help_text (csi.help(), above) in sync with this table -- see
+// DEVELOPER.md's "adb server" section.
 const mp_rom_map_elem_t csi_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&csi_reset_obj)},
     {MP_ROM_QSTR(MP_QSTR_pixformat), MP_ROM_PTR(&csi_pixformat_obj)},

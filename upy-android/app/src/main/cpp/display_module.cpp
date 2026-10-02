@@ -158,6 +158,8 @@ mp_obj_t display_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw,
     return MP_OBJ_FROM_PTR(self);
 }
 
+// Keep display_help_text (display.help(), below) in sync with this
+// table -- see DEVELOPER.md's "adb server" section.
 const mp_rom_map_elem_t display_locals_dict_table[] = {
     {MP_ROM_QSTR(MP_QSTR_write), MP_ROM_PTR(&display_write_obj)},
 };
