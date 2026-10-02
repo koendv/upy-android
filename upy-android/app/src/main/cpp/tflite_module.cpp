@@ -6,14 +6,9 @@
 // litert_module.cpp/LiteRtShim.kt: independent source, independent
 // Python-facing API, each with its own registry/teardown below.
 //
-// I/O is plain array.array, not ulab.ndarray: a prior version used
-// ndarray directly, but that tied tflite's dtype coverage to ulab's
-// five dtypes (no int32/int64/bool) for no real benefit on this
-// hardware -- ulab's zero-copy angle matters on MCUs, not here, where
-// copying is already cheap and TfLite's own C API is raw bytes either
-// way. array.array is a MicroPython builtin (no new dependency) whose
-// typecodes cover the real TfLiteType range directly. See
-// session-state for the fuller reasoning.
+// I/O is plain array.array: a MicroPython builtin (no new dependency)
+// whose typecodes cover the real TfLiteType range directly, raw bytes
+// copied straight into/out of the tensor.
 // see session-state: tflite_module.cpp#module_design
 
 #include <cstdlib>
@@ -39,9 +34,7 @@ void raise_os_error(int errno_, const char *msg) {
     nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
 }
 
-// Engine-reset teardown registry. Deliberately a separate, independent
-// implementation from litert_module.cpp's own LitertHandleNode (same
-// shape, no shared code -- see this file's own header comment).
+// Engine-reset teardown registry.
 struct TfliteModelNode {
     TfLiteModel *model;
     TfLiteInterpreter *interp;
@@ -107,9 +100,8 @@ char tfl_typecode(TfLiteType t, const char **name_out) {
     return '\0';
 }
 
-// Allocates a fresh, GC-owned array.array of the given typecode/length
-// -- same role ndarray_new_dense_ndarray() played before, built from
-// the same public primitives array_make_new() itself uses
+// Allocates a fresh, GC-owned array.array of the given typecode/length,
+// built from the same public primitives array_make_new() itself uses
 // (mp_binary_get_size for itemsize, m_new for the GC-owned backing
 // buffer). array_new() itself (objarray.c) is static, not exported, so
 // this is a small, deliberate duplicate, not a shared/cross-linked
@@ -151,10 +143,8 @@ mp_obj_t tflite_model_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, parsed);
 
     const char *path = mp_obj_str_get_str(parsed[ARG_path].u_obj);
-    // TfLiteModelCreateFromFile is a real fopen(), not VFS-aware -- same
-    // underlying reason as litert_module.cpp's identical-in-spirit
-    // leading-slash strip (independent code, not shared): this port's
-    // VFS root is mounted at "/", but the real filesystem cwd is
+    // TfLiteModelCreateFromFile is a real fopen(), not VFS-aware: this
+    // port's VFS root is mounted at "/", but the real filesystem cwd is
     // already the app's private storage.
     if (path[0] == '/') {
         path++;

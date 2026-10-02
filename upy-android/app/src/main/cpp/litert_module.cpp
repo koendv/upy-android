@@ -1,14 +1,8 @@
 // upy-android native litert module (top-level `litert`). Standalone
 // LiteRT (not the Play-Store-delivered variant), CompiledModel.run()
-// takes/returns array.array directly. A prior version used
-// ulab.numpy ndarray instead; dropped because it capped litert's
-// reachable dtypes at ulab's five (no int32/int64/bool), even though
-// the Kotlin litert-api bridge already had working int32/bool/int64
-// write/read paths going unused just to fit ndarray. array.array is a
-// MicroPython builtin whose typecodes cover the real
-// LiteRtElementType range this bridge supports directly. See
-// tflite_module.cpp's identical-in-spirit header comment and
-// session-state for the fuller reasoning.
+// takes/returns array.array directly: a MicroPython builtin whose
+// typecodes cover the real LiteRtElementType range this bridge
+// supports.
 //
 // Zero cross-links with tflite_module.cpp: independent source,
 // independent registry/teardown. The two modules share only the one
@@ -99,9 +93,7 @@ void registry_remove(LitertHandleNode **head, LitertHandleNode *node) {
     }
 }
 
-// Allocates a fresh, GC-owned array.array of the given typecode/length
-// -- same role as tflite_module.cpp's identical helper (independent
-// copy, not shared code).
+// Allocates a fresh, GC-owned array.array of the given typecode/length.
 mp_obj_array_t *new_typed_array(char typecode, size_t len) {
     size_t itemsize = mp_binary_get_size('@', typecode, nullptr);
     auto *o = m_new_obj(mp_obj_array_t);
@@ -193,7 +185,7 @@ struct litert_compiled_model_obj_t {
     mp_obj_base_t base;
     LitertHandleNode *node;
     // strdup'd copy of the (already VFS-leading-slash-stripped) path
-    // this model was constructed from. Used by tensor_info() below,
+    // this model was constructed from. Used by find_tensor() below,
     // which reopens the same file directly via the plain C API
     // (LiteRtCreateModelFromFile) to find a tensor's dtype/shape --
     // Kotlin's CompiledModel has no such query of its own.
@@ -261,11 +253,10 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
 // Finds tensor `index` (input or output) by reopening the model file
 // via the plain LiteRt C API (cheap: flatbuffer metadata only, no
 // interpreter/arena) -- Kotlin's CompiledModel has no "what dtype/shape
-// is tensor N" query of its own. Gives back both the element type and
-// a shape tuple in one pass (same model-reopen, used by both run()'s
-// dtype dispatch and the input_shape()/output_shape() methods).
-void tensor_info(litert_compiled_model_obj_t *self, bool is_output, mp_int_t index,
-                  LiteRtElementType *out_element_type, mp_obj_t *out_shape) {
+// is tensor N" query of its own. Caller must LiteRtDestroyModel/
+// LiteRtDestroyEnvironment once done with *out_tensor.
+void find_tensor(litert_compiled_model_obj_t *self, bool is_output, mp_int_t index,
+                  LiteRtEnvironment *out_environment, LiteRtModel *out_model, LiteRtTensor *out_tensor) {
     LiteRtEnvironment environment = nullptr;
     if (LiteRtCreateEnvironment(0, nullptr, &environment) != kLiteRtStatusOk) {
         raise_os_error(MP_EIO, "litert: failed to create environment for tensor introspection");
@@ -290,6 +281,18 @@ void tensor_info(litert_compiled_model_obj_t *self, bool is_output, mp_int_t ind
         LiteRtDestroyEnvironment(environment);
         raise_os_error(MP_EINVAL, is_output ? "litert: no such output tensor index" : "litert: no such input tensor index");
     }
+    *out_environment = environment;
+    *out_model = model;
+    *out_tensor = tensor;
+}
+
+// Dtype only, no shape tuple -- run()'s own dispatch needs just this,
+// not the input_shape()/output_shape() methods' full shape build.
+LiteRtElementType tensor_element_type(litert_compiled_model_obj_t *self, bool is_output, mp_int_t index) {
+    LiteRtEnvironment environment;
+    LiteRtModel model;
+    LiteRtTensor tensor;
+    find_tensor(self, is_output, index, &environment, &model, &tensor);
 
     LiteRtTensorTypeId type_id;
     if (LiteRtGetTensorTypeId(tensor, &type_id) != kLiteRtStatusOk) {
@@ -297,6 +300,7 @@ void tensor_info(litert_compiled_model_obj_t *self, bool is_output, mp_int_t ind
         LiteRtDestroyEnvironment(environment);
         raise_os_error(MP_EIO, "litert: failed to get tensor type id");
     }
+    LiteRtElementType element_type;
     if (type_id == kLiteRtUnrankedTensorType) {
         LiteRtUnrankedTensorType unranked;
         if (LiteRtGetUnrankedTensorType(tensor, &unranked) != kLiteRtStatusOk) {
@@ -304,8 +308,7 @@ void tensor_info(litert_compiled_model_obj_t *self, bool is_output, mp_int_t ind
             LiteRtDestroyEnvironment(environment);
             raise_os_error(MP_EIO, "litert: failed to get unranked tensor type");
         }
-        *out_element_type = unranked.element_type;
-        *out_shape = mp_const_none;
+        element_type = unranked.element_type;
     } else {
         LiteRtRankedTensorType ranked;
         if (LiteRtGetRankedTensorType(tensor, &ranked) != kLiteRtStatusOk) {
@@ -313,35 +316,59 @@ void tensor_info(litert_compiled_model_obj_t *self, bool is_output, mp_int_t ind
             LiteRtDestroyEnvironment(environment);
             raise_os_error(MP_EIO, "litert: failed to get ranked tensor type");
         }
-        *out_element_type = ranked.element_type;
+        element_type = ranked.element_type;
+    }
+    LiteRtDestroyModel(model);
+    LiteRtDestroyEnvironment(environment);
+    return element_type;
+}
+
+// Shape tuple, for input_shape()/output_shape() below.
+mp_obj_t tensor_shape(litert_compiled_model_obj_t *self, bool is_output, mp_int_t index) {
+    LiteRtEnvironment environment;
+    LiteRtModel model;
+    LiteRtTensor tensor;
+    find_tensor(self, is_output, index, &environment, &model, &tensor);
+
+    LiteRtTensorTypeId type_id;
+    if (LiteRtGetTensorTypeId(tensor, &type_id) != kLiteRtStatusOk) {
+        LiteRtDestroyModel(model);
+        LiteRtDestroyEnvironment(environment);
+        raise_os_error(MP_EIO, "litert: failed to get tensor type id");
+    }
+    mp_obj_t shape;
+    if (type_id == kLiteRtUnrankedTensorType) {
+        shape = mp_const_none;
+    } else {
+        LiteRtRankedTensorType ranked;
+        if (LiteRtGetRankedTensorType(tensor, &ranked) != kLiteRtStatusOk) {
+            LiteRtDestroyModel(model);
+            LiteRtDestroyEnvironment(environment);
+            raise_os_error(MP_EIO, "litert: failed to get ranked tensor type");
+        }
         unsigned int rank = ranked.layout.rank;
         mp_obj_t *dims = m_new(mp_obj_t, rank);
         for (unsigned int i = 0; i < rank; i++) {
             dims[i] = mp_obj_new_int(ranked.layout.dimensions[i]);
         }
-        *out_shape = mp_obj_new_tuple(rank, dims);
+        shape = mp_obj_new_tuple(rank, dims);
     }
     LiteRtDestroyModel(model);
     LiteRtDestroyEnvironment(environment);
+    return shape;
 }
 
 mp_obj_t litert_compiled_model_input_shape(mp_obj_t self_in, mp_obj_t index_in) {
     auto *self = (litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in);
     raise_if_model_closed(self);
-    LiteRtElementType element_type;
-    mp_obj_t shape;
-    tensor_info(self, false, mp_obj_get_int(index_in), &element_type, &shape);
-    return shape;
+    return tensor_shape(self, false, mp_obj_get_int(index_in));
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_input_shape_obj, litert_compiled_model_input_shape);
 
 mp_obj_t litert_compiled_model_output_shape(mp_obj_t self_in, mp_obj_t index_in) {
     auto *self = (litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(self_in);
     raise_if_model_closed(self);
-    LiteRtElementType element_type;
-    mp_obj_t shape;
-    tensor_info(self, true, mp_obj_get_int(index_in), &element_type, &shape);
-    return shape;
+    return tensor_shape(self, true, mp_obj_get_int(index_in));
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_output_shape_obj, litert_compiled_model_output_shape);
 
@@ -440,9 +467,7 @@ void write_array_to_buffer(LitertHandleNode *node, mp_obj_t arr_obj) {
 // GC-owned, flat (1-D) array.array. Always a copy in v1. Dtype
 // dispatch mirrors write_array_to_buffer above.
 mp_obj_t read_buffer_as_array(litert_compiled_model_obj_t *self, LitertHandleNode *node, mp_int_t index) {
-    LiteRtElementType element_type;
-    mp_obj_t shape_unused;
-    tensor_info(self, true, index, &element_type, &shape_unused);
+    LiteRtElementType element_type = tensor_element_type(self, true, index);
     char *err = nullptr;
 
     if (element_type == kLiteRtElementTypeFloat32) {
@@ -506,8 +531,7 @@ mp_obj_t read_buffer_as_array(litert_compiled_model_obj_t *self, LitertHandleNod
 
 // run(*inputs): one positional array.array per input tensor, in the
 // model's own order. Returns a single array.array if the model has
-// one output tensor, otherwise a tuple -- same convention as
-// tflite.Model.run() (independent implementation, not shared code).
+// one output tensor, otherwise a tuple.
 mp_obj_t litert_compiled_model_run(size_t n_args, const mp_obj_t *args) {
     auto *self = (litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(args[0]);
     raise_if_model_closed(self);
