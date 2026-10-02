@@ -110,7 +110,20 @@ target_link_options(upy_engine PRIVATE
 
 # Same per-file flags as OpenMV's lib/apriltag/apriltag.mk: its config hook
 # (my-overrides/openmv/apriltag_config.h) and its upstream-warning suppressions.
-set_source_files_properties(${MPY_APRILTAG_SOURCES}
+#
+# micropython_embed/openmv/apriltag.c (imlib_find_rects/imlib_find_apriltags)
+# must get this too, even though it's globbed into MPY_OPENMV_SOURCES, not
+# MPY_APRILTAG_SOURCES: it includes apriltag.h directly and calls
+# apriltag_detector_create()/zarray_add() etc. Without APRILTAG_HAVE_CONFIG
+# here, this TU saw apriltag_detector_t with the *default* (upstream)
+# APRILTAG_ENABLE_PROFILE/APRILTAG_ENABLE_PTHREADS values (1, 1) instead of
+# apriltag_config.h's (0, 0) -- a different struct layout (extra
+# timeprofile_t*/pthread_mutex_t fields) than every other AprilTag TU, which
+# shifted tag_families to the wrong offset and crashed with "za != NULL" in
+# zarray_add (reading what apriltag_detector_create() actually wrote to the
+# following field, left zero). Confirmed on-device 2026-10-02, see
+# session-state.
+set_source_files_properties(${MPY_APRILTAG_SOURCES} micropython_embed/openmv/apriltag.c
     PROPERTIES
     COMPILE_DEFINITIONS "APRILTAG_HAVE_CONFIG"
     COMPILE_OPTIONS "-Wno-unused-variable;-Wno-unused-but-set-variable;-Wno-sign-compare;-Wno-missing-braces;-Wno-unused-function;-Wno-format;-Wno-double-promotion"
