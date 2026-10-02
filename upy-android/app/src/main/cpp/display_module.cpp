@@ -171,9 +171,31 @@ MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &display_locals_dict
     );
 
+// Runtime-queryable usage reference for an AI (or human) driving this
+// module blind over adb, with no repo access -- see
+// AdbExecProvider.kt/adb_help.yaml (help -> help('modules') -> import
+// display; print(display.help())).
+// see session-state: display_module.cpp#display_help
+const char display_help_text[] =
+    "module: display\n"
+    "class: display.SPIDisplay(vflip=False, hmirror=False)\n"
+    "  draws to the app's on-screen camera-preview Surface; the name is carried over from OpenMV's API, there is no real SPI bus involved\n"
+    "methods:\n"
+    "  write(image, x=0, y=0, hint=0): draw an image_t (e.g. from csi.CSI().snapshot()) to the screen\n"
+    "    image is upscaled by the largest integer factor (2x/4x/8x) that still fits the surface, letterboxed/pillarboxed in opaque black\n"
+    "    hint: OpenMV's IMAGE_HINT_HMIRROR / IMAGE_HINT_VFLIP / IMAGE_HINT_TRANSPOSE bits, combined with the vflip/hmirror set at construction\n"
+    "    no-op (returns None) if no Surface is currently attached, i.e. the app isn't showing the camera screen\n"
+    "see_also: csi.help(), android.help()\n"
+;
+mp_obj_t display_help() {
+    return mp_obj_new_str(display_help_text, strlen(display_help_text));
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(display_help_obj, display_help);
+
 const mp_rom_map_elem_t display_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_display)},
     {MP_ROM_QSTR(MP_QSTR_SPIDisplay), MP_ROM_PTR(&spi_display_type)},
+    {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&display_help_obj)},
 };
 MP_DEFINE_CONST_DICT(display_module_globals, display_module_globals_table);
 

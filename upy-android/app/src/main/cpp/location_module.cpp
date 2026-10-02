@@ -147,8 +147,35 @@ mp_obj_t location_last() {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(location_last_obj, location_last);
 
+// Runtime-queryable usage reference for an AI (or human) driving this
+// module blind over adb, with no repo access -- see
+// AdbExecProvider.kt/adb_help.yaml (help -> help('modules') -> import
+// android; print(android.location.help())).
+const char location_help_text[] =
+    "module: android.location (import android; android.location.*)\n"
+    "a thin wrapper over Android's LocationManager (GPS/network provider)\n"
+    "methods:\n"
+    "  start(interval_ms=1000, min_distance_m=0): begin location updates\n"
+    "    OSError(EACCES) if location permission not granted (a prompt appears on the phone; run again after granting)\n"
+    "    OSError(ENODEV) if no location provider is enabled in Android settings\n"
+    "  stop(): end updates (also done implicitly by reset())\n"
+    "  read(timeout_ms=0): the fix that's new since the last read() call\n"
+    "    timeout_ms=0: non-blocking, None if nothing new\n"
+    "    timeout_ms>0: wait up to that many ms\n"
+    "    timeout_ms=-1: wait indefinitely (interruptible)\n"
+    "  last(): Android's last known fix regardless of read() history, or None\n"
+    "fix_format: (latitude, longitude, altitude_m, accuracy_m, speed_mps, bearing_deg, time_ms, provider)\n"
+    "  values Android does not have for this fix are None (latitude, longitude, time_ms and provider are always present)\n"
+    "see_also: android.help()\n"
+;
+mp_obj_t location_help() {
+    return mp_obj_new_str(location_help_text, strlen(location_help_text));
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(location_help_obj, location_help);
+
 const mp_rom_map_elem_t location_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_location)},
+    {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&location_help_obj)},
     {MP_ROM_QSTR(MP_QSTR_start), MP_ROM_PTR(&location_start_obj)},
     {MP_ROM_QSTR(MP_QSTR_stop), MP_ROM_PTR(&location_stop_obj)},
     {MP_ROM_QSTR(MP_QSTR_read), MP_ROM_PTR(&location_read_obj)},

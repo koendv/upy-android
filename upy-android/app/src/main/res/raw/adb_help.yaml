@@ -29,4 +29,5 @@ limits:
 env:
   fs: / is app private storage; /examples has samples
   modules: "help('modules')"
+  module_help: "our own modules (csi, display, android) have a help() function, e.g. import csi; print(csi.help()); android submodules too, e.g. android.location.help()"
   phone: import android

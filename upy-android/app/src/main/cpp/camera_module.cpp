@@ -999,6 +999,55 @@ mp_obj_t csi_framebuffers(size_t n_args, const mp_obj_t *args) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(csi_framebuffers_obj, 1, 2, csi_framebuffers);
 
+// Runtime-queryable usage reference for an AI (or human) driving this
+// module blind over adb, with no repo access -- see
+// AdbExecProvider.kt/adb_help.yaml, which is the first hop of this same
+// chain (help -> help('modules') -> import csi; print(csi.help())).
+// see session-state: camera_module.cpp#csi_help
+const char csi_help_text[] =
+    "module: csi (camera)\n"
+    "class: csi.CSI(cid=None)\n"
+    "  cid: optional int, camera id (see camera_list()); default picks first camera\n"
+    "methods:\n"
+    "  reset(): open/reopen the camera; call first\n"
+    "  pixformat(fmt=None): get/set csi.GRAYSCALE or csi.RGB565; changing closes and lazily reopens the session\n"
+    "  framesize(size=None): get/set (w,h) tuple or a named constant (csi.QVGA etc); changing closes and lazily reopens\n"
+    "  framesize_list(): list of (w,h) this camera actually supports\n"
+    "  camera_list(): list of (id, facing, has_flash) for every camera on this device\n"
+    "  snapshot(time=None, frames=None):\n"
+    "    no args: returns the latest available frame (an image_t); blocks up to one frame interval if none is ready yet; OSError(ETIMEDOUT) if the camera is wedged\n"
+    "    time=ms: sleep ms, then return None (warmup; does not raise on a wedged camera)\n"
+    "    frames=n: wait for n frames to have arrived, then return None (warmup)\n"
+    "  framebuffers(n=None): get/set buffer count (1/2/3 = single/double/triple buffering); default 2\n"
+    "  width()/height(): current frame dimensions\n"
+    "  auto_gain(enable)/auto_exposure(enable)/auto_whitebal(enable): on/off only; gain_db/exposure_us/rgb_gain_db kwargs accepted but ignored (printed warning)\n"
+    "  brightness(level): exposure compensation in EV steps; True if in range, False if not\n"
+    "  framerate(fps=None): get/set target fps; set raises ValueError listing supported ranges if fps is not one of them\n"
+    "  special_effect(csi.NORMAL|csi.NEGATIVE): False if unsupported\n"
+    "  colorbar(enable): sensor test pattern; False if unsupported\n"
+    "  hmirror(enable=None)/vflip(enable=None)/transpose(enable=None): get/set, applied in software (not hardware)\n"
+    "  window(roi=None): get/set (w,h) centered or (x,y,w,h); clipped to frame; software crop\n"
+    "  sleep(enable): True stops streaming (session closes); next snapshot() restarts it\n"
+    "  shutdown(enable): True closes the camera entirely; reset() reopens\n"
+    "  contrast()/saturation()/quality()/gainceiling()/auto_blc(): accepted, no Camera2 equivalent, always no-ops\n"
+    "constants: csi.GRAYSCALE, csi.RGB565, named framesizes (csi.QVGA, csi.VGA, csi.HD, ...), csi.NORMAL, csi.NEGATIVE\n"
+    "errors:\n"
+    "  OSError(EINVAL): called before reset()\n"
+    "  OSError(EIO): camera open/characteristics read failure\n"
+    "  OSError(EACCES): camera permission not granted\n"
+    "  OSError(ENODEV): no camera on this device\n"
+    "  OSError(ETIMEDOUT): snapshot() timed out waiting for a frame\n"
+    "deviations_from_openmv:\n"
+    "  - snapshot() reads from a continuously-running background capture, not an on-demand hardware trigger; it can block up to one frame interval on every call, not just the first\n"
+    "  - hmirror/vflip/transpose/window are done in software here, not hardware\n"
+    "  - manual gain/exposure/white-balance values are not implemented, only auto on/off\n"
+    "see_also: display.help(), android.help()\n"
+;
+mp_obj_t csi_help() {
+    return mp_obj_new_str(csi_help_text, strlen(csi_help_text));
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(csi_help_obj, csi_help);
+
 // ---------------------------------------------------------------------------
 // Camera controls, OpenMV csi names and signatures (py_csi_ng.c), mapped to
 // Camera2 capture request entries. Controls without a Camera2 equivalent
@@ -1359,6 +1408,7 @@ MP_DEFINE_CONST_OBJ_TYPE(
 const mp_rom_map_elem_t csi_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_csi)},
     {MP_ROM_QSTR(MP_QSTR_CSI), MP_ROM_PTR(&csi_type)},
+    {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&csi_help_obj)},
     {MP_ROM_QSTR(MP_QSTR_GRAYSCALE), MP_ROM_INT(PIXFORMAT_GRAYSCALE)},
     {MP_ROM_QSTR(MP_QSTR_RGB565), MP_ROM_INT(PIXFORMAT_RGB565)},
     // OpenMV framesize names; the camera must list the size (framesize_list()).
