@@ -23,19 +23,28 @@ AI prompt:
 >`adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help`
 > and follow what it says.
 
-Each of the upy-specific modules (`csi`, `display`, `android` and its submodules) has a `help()` function, e.g. `import csi; print(csi.help())`, so an AI driving the phone this way can learn the API without repo access. When adding, removing, or changing a method's signature/behavior, update that module's `help()` text in the same commit.
+Each of the upy-specific modules (`csi`, `display`, `android` and its submodules, `tflite`, `litert`) has a `help()` function, e.g. `import csi; print(csi.help())`, so an AI driving the phone this way can learn the API without repo access. When adding, removing, or changing a method's signature/behavior, update that module's `help()` text in the same commit.
 
 `/examples` on the device has reference scripts (e.g. `find_apriltags.py`, `face_detection.py`) covering the OpenMV modules (`image`, `gif`, `mjpeg`, ...) that don't have a `help()`.
 
-## ml machine learning
+## machine learning: tflite, litert
 
-The `ml` (machine learning) is a clean-room rewrite of the OpenMV `ml` module.
+Two independent native modules, not an OpenMV `ml`/`py_ml.c` compatibility
+layer (OpenMV's `ml` module has a restrictive license; this port never
+mirrors its API, so there's nothing to clean-room). Both take/return
+`ulab.numpy` ndarrays directly -- no quantization/scale/zero_point
+handling by either module, no automatic dequantization: a script that
+needs those does its own math on the raw ndarray.
 
-The OpenMV `ml` (machine learning) module has a restrictive license. 
+- `tflite`: classic TensorFlow Lite C API, CPU-only, built from
+  LiteRT's own copy of the TFLite source (see `app/src/main/cpp/tflite/README.md`
+  for why that source, not upstream TensorFlow).
+- `litert`: standalone LiteRT (bundled in the APK, not the
+  Play-Store-delivered variant), accelerator-capable via
+  `litert.Accelerator.{CPU,GPU,NPU}`.
 
-The module was rewritten using two AI agents, one agent to write the specification, another to write the source. This is similar to Phoenix Technologies' 1984 PC BIOS clean room development. 
-
-If your use is commercial, assume this does not protect you and get legal counsel.
+Both link the same `libLiteRt.so` -- one copy of TFLite in the process,
+not two. See each module's own `help()` for the exact API.
 
 ### version
 

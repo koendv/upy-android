@@ -71,7 +71,7 @@ const char android_help_text[] =
     "  android.zoom: set(ratio) -- combined optical+digital zoom ratio; range() -- (min,max) tuple; requires reset() first\n"
     "  android.proximity: distance_cm() -- proximity sensor reading in cm; OSError(ENODEV) if no sensor\n"
     "  android.imu: acceleration_mg()/angular_rate_mdps()/roll()/pitch()/sleep(enable) -- accelerometer/gyroscope\n"
-    "  android.settings: settings() -- dict snapshot of app settings (heap_size_mb, ssh_enabled, http_server_enabled, http_private_files_enabled, litert_playstore_enabled, adb_exec_enabled); read-only here, set from the app UI\n"
+    "  android.settings: settings() -- dict snapshot of app settings (heap_size_mb, ssh_enabled, http_server_enabled, http_private_files_enabled, adb_exec_enabled); read-only here, set from the app UI\n"
     "  android.mediastore: save_image(data, name, mime_type=\"image/jpeg\") -- save bytes to the device's shared Photos/gallery; returns the new content:// URI\n"
     "  android.fileprovider: share(path, mime_type=\"application/octet-stream\") -- open Android's share sheet for a file; fire-and-forget, no return value, silently does nothing if no app window is focused\n"
     "  android.location: GPS/network location; see android.location.help()\n"

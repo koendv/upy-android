@@ -17,12 +17,11 @@ namespace {
 
 mp_obj_t android_settings() {
     SettingsSnapshot s = settings_snapshot_get();
-    mp_obj_t dict = mp_obj_new_dict(6);
+    mp_obj_t dict = mp_obj_new_dict(5);
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_heap_size_mb), mp_obj_new_int(s.heap_size_mb));
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_ssh_enabled), s.ssh_enabled ? mp_const_true : mp_const_false);
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_http_server_enabled), s.http_server_enabled ? mp_const_true : mp_const_false);
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_http_private_files_enabled), s.http_private_files_enabled ? mp_const_true : mp_const_false);
-    mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_litert_playstore_enabled), s.litert_playstore_enabled ? mp_const_true : mp_const_false);
     mp_obj_dict_store(dict, MP_OBJ_NEW_QSTR(MP_QSTR_adb_exec_enabled), s.adb_exec_enabled ? mp_const_true : mp_const_false);
     return dict;
 }

@@ -78,7 +78,6 @@ fun SettingsScreen(
     var httpServerEnabled by remember { mutableStateOf(settingsManager.httpServerEnabled) }
     var httpPassword by remember { mutableStateOf(settingsManager.httpPassword) }
     var httpPrivateFilesEnabled by remember { mutableStateOf(settingsManager.httpPrivateFilesEnabled) }
-    var litertPlaystoreEnabled by remember { mutableStateOf(settingsManager.litertPlaystoreEnabled) }
     var adbExecEnabled by remember { mutableStateOf(settingsManager.adbExecEnabled) }
     // Settings is a peer nav-suite tab, not a screen with its own Back
     // button. The old "only prompt on Back" trigger is gone, since a
@@ -184,12 +183,6 @@ fun SettingsScreen(
             ) {
                 httpPrivateFilesEnabled = it
                 settingsManager.httpPrivateFilesEnabled = it
-                onSettingsChanged()
-            }
-
-            SettingsRow("Enable LiteRT Play Store access", litertPlaystoreEnabled, icon = SymbolIcon.SHOP) {
-                litertPlaystoreEnabled = it
-                settingsManager.litertPlaystoreEnabled = it
                 onSettingsChanged()
             }
 

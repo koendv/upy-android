@@ -63,13 +63,6 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_HTTP_PRIVATE_FILES_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_HTTP_PRIVATE_FILES_ENABLED, value).apply()
 
-    // Persisted and exposed via android.settings only. Does not yet
-    // gate a real WorkManager init, since nothing in this build calls
-    // AiPackModelProvider/AiPackManager to gate.
-    var litertPlaystoreEnabled: Boolean
-        get() = prefs.getBoolean(KEY_LITERT_PLAYSTORE_ENABLED, false)
-        set(value) = prefs.edit().putBoolean(KEY_LITERT_PLAYSTORE_ENABLED, value).apply()
-
     // Last bundled-demo-scripts version actually copied into the VFS's
     // own /examples/ directory. See MainActivity's own
     // seedDemoScriptsIfNeeded(). 0 (never seeded) on a fresh install.
@@ -80,13 +73,6 @@ class SettingsManager(context: Context) {
     var demoScriptsVersion: Int
         get() = prefs.getInt(KEY_DEMO_SCRIPTS_VERSION, 0)
         set(value) = prefs.edit().putInt(KEY_DEMO_SCRIPTS_VERSION, value).apply()
-
-    // Same version-stamped-not-one-shot reasoning as demoScriptsVersion
-    // above, but for the `ml` library package (seeded to VFS root, not
-    // /examples/, see seedMlLibraryIfNeeded()'s own comment for why).
-    var mlLibraryVersion: Int
-        get() = prefs.getInt(KEY_ML_LIBRARY_VERSION, 0)
-        set(value) = prefs.edit().putInt(KEY_ML_LIBRARY_VERSION, value).apply()
 
     // Same version-stamped reasoning, for the /rom/ files. See seedRomIfNeeded().
     var romVersion: Int
@@ -106,9 +92,7 @@ class SettingsManager(context: Context) {
         private const val KEY_HTTP_SERVER_ENABLED = "http_server_enabled"
         private const val KEY_HTTP_PASSWORD = "http_password"
         private const val KEY_HTTP_PRIVATE_FILES_ENABLED = "http_private_files_enabled"
-        private const val KEY_LITERT_PLAYSTORE_ENABLED = "litert_playstore_enabled"
         private const val KEY_DEMO_SCRIPTS_VERSION = "demo_scripts_version"
-        private const val KEY_ML_LIBRARY_VERSION = "ml_library_version"
         private const val KEY_ROM_VERSION = "rom_version"
     }
 }

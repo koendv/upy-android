@@ -165,18 +165,6 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
 
 // The `ml` library package, seeded into the VFS ROOT (not /examples/ --
 // a deliberate, documented exception to that convention) by
-// MainActivity's own seedMlLibraryIfNeeded(): it must live at VFS root
-// for `import ml` to resolve to it at all (MicroPython's own module
-// resolution -- non-extensible builtins, then filesystem, then
-// extensible builtins -- only shadows OpenMV's own extensible `ml`/`tf`
-// built-in when the filesystem package sits at a location already on
-// sys.path, which this port sets to just ['/']). Same "one real copy,
-// not hand-duplicated" reasoning as copyNotice/copyDemoScripts above.
-val copyMlLibrary = tasks.register<Copy>("copyMlLibrary") {
-    from(rootProject.file("libraries/ml/__init__.py"))
-    into(layout.projectDirectory.dir("src/main/assets/ml"))
-}
-
 // Native inputs, generated from upstream.properties by the
 // native-bringup/ scripts. Each task only reruns when its inputs change.
 val bringup = rootProject.file("native-bringup")
@@ -327,7 +315,7 @@ val generateBuildInfo = tasks.register("generateBuildInfo") {
 
 tasks.named("preBuild") {
     dependsOn(
-        copyNotice, copyDemoScripts, copyMlLibrary, copyRom, generateEmbed, extractLitert, stageLitertDelegate,
+        copyNotice, copyDemoScripts, copyRom, generateEmbed, extractLitert, stageLitertDelegate,
         genLicenses, generateBuildInfo,
     )
 }

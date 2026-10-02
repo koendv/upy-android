@@ -1,19 +1,21 @@
-# litert confidence test (top-level `litert`, was android.litert).
-# litert deliberately stays a faithful, literal mirror of litert-api's
-# own Kotlin TensorBuffer surface: write_int8/read_int8 (raw bytes)
-# plus write_float/read_float/write_int/read_int/write_bool/read_bool/
-# write_long/read_long (typed arrays, one real Kotlin method each),
-# with no ndarray/auto-quantize convenience layer of its own (tried and
-# dropped). `ml`/`tf` covers that use case now. android.rt, which used
-# to, has been deleted.
+# litert confidence test (top-level `litert`).
+# litert.CompiledModel.run(*inputs) takes/returns ulab.numpy ndarrays
+# directly -- no TensorBuffer, no write_*/read_* methods, no
+# quantization/scale/zero_point handling by the module itself. v1
+# supports float32 and int8 only (the Kotlin litert-api itself has no
+# uint8/int16/uint16 path). A script that wants a quantized model's
+# real-world values does its own scale/zero_point math on the raw int8
+# ndarray, same as this test does below.
 #
-# Setup: same two fixtures ml_selftest.py also uses.
+# Setup: same two fixtures as before.
 #   adb push examples/quant/single_add_default_a8w8_recipe_quantized.tflite /data/local/tmp/single_add_quant.tflite
 #   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
 #       'cat /data/local/tmp/single_add_quant.tflite > files/single_add_quant.tflite'
 #   adb push examples/add_simple/add_simple.tflite /data/local/tmp/add_simple.tflite
 #   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
 #       'cat /data/local/tmp/add_simple.tflite > files/add_simple.tflite'
+
+from ulab import numpy as np
 
 import litert
 
@@ -39,25 +41,19 @@ def run_case_int8(label, in1, in2, expected):
     env = litert.Environment()
     options = litert.Options(litert.Accelerator.CPU)
     model = litert.CompiledModel(env, QUANT_MODEL_PATH, options)
-    inputs = model.create_input_buffers()
-    outputs = model.create_output_buffers()
 
     q1 = quantize(in1, SCALE_IN1, ZP_IN1)
     q2 = quantize(in2, SCALE_IN2, ZP_IN2)
-    inputs[0].write_int8(bytes((q1 & 0xFF,)) * N)
-    inputs[1].write_int8(bytes((q2 & 0xFF,)) * N)
+    x1 = np.array([q1] * N, dtype=np.int8)
+    x2 = np.array([q2] * N, dtype=np.int8)
 
-    model.run(inputs, outputs)
-    raw_out = outputs[0].read_int8()
+    y = model.run(x1, x2)
 
-    for buf in inputs + outputs:
-        buf.close()
     model.close()
     env.close()
 
-    raw0 = raw_out[0]
-    signed0 = raw0 - 256 if raw0 > 127 else raw0
-    actual = dequantize(signed0, SCALE_OUT, ZP_OUT)
+    raw0 = int(y[0])
+    actual = dequantize(raw0, SCALE_OUT, ZP_OUT)
     ok = abs(actual - expected) <= TOLERANCE
     print(("PASS" if ok else "FAIL"), label,
           "in1=%r in2=%r expected=%.4f actual=%.4f" % (in1, in2, expected, actual))
@@ -65,30 +61,23 @@ def run_case_int8(label, in1, in2, expected):
 
 
 def run_case_float():
-    # add_simple.tflite: real typed write_float()/read_float(), not
-    # write_int8()/read_int8(). Exercises the new typed pair directly,
-    # matching litert-api's own TensorBuffer.writeFloat()/readFloat().
     env = litert.Environment()
     options = litert.Options(litert.Accelerator.CPU)
     model = litert.CompiledModel(env, "/add_simple.tflite", options)
-    inputs = model.create_input_buffers()
-    outputs = model.create_output_buffers()
 
     values = (1.0, 2.0, 3.0, 4.0)
     expected = (2.0, 4.0, 6.0, 8.0)
-    inputs[0].write_float(values)
+    x = np.array(values, dtype=np.float)
 
-    model.run(inputs, outputs)
-    actual = outputs[0].read_float()
+    y = model.run(x)
 
-    for buf in inputs + outputs:
-        buf.close()
     model.close()
     env.close()
 
+    actual = tuple(y)
     ok = len(actual) == len(expected) and all(abs(a - b) <= 1e-5 for a, b in zip(actual, expected))
-    print(("PASS" if ok else "FAIL"), "write_float/read_float",
-          "input=%r expected=%r actual=%r" % (values, expected, tuple(actual)))
+    print(("PASS" if ok else "FAIL"), "float32 run()",
+          "input=%r expected=%r actual=%r" % (values, expected, actual))
     return ok
 
 

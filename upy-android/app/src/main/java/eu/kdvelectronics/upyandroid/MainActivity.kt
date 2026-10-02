@@ -97,11 +97,6 @@ private fun NavHostController.navigateToTab(route: String) {
 // demo script reach existing installs too, not just fresh ones.
 private const val CURRENT_DEMO_SCRIPTS_VERSION = 13
 
-// Bumped whenever the bundled `ml` library package's own content
-// changes. See seedMlLibraryIfNeeded() below. Same reasoning as
-// CURRENT_DEMO_SCRIPTS_VERSION.
-private const val CURRENT_ML_LIBRARY_VERSION = 1
-
 // Bumped whenever the bundled /rom/ files change. See seedRomIfNeeded().
 private const val CURRENT_ROM_VERSION = 1
 
@@ -155,7 +150,6 @@ class MainActivity : ComponentActivity() {
         filesManager = FilesManager(filesDir)
         settingsManager = SettingsManager(this)
         seedDemoScriptsIfNeeded()
-        seedMlLibraryIfNeeded()
         seedRomIfNeeded()
         // Lives in this (default/UI) process, not :engine. See
         // HttpServerManager.kt's own header comment. A process-wide
@@ -440,29 +434,6 @@ class MainActivity : ComponentActivity() {
             }
         }
         settingsManager.demoScriptsVersion = CURRENT_DEMO_SCRIPTS_VERSION
-    }
-
-    // Seeds the `ml` library package into VFS root (filesDir directly,
-    // not a subdirectory like examples/). A deliberate exception to
-    // seedDemoScriptsIfNeeded()'s own "never VFS root" convention: this
-    // package must sit at "/ml/" for `import ml` to resolve to it at
-    // all, since MicroPython's own module resolution checks the
-    // filesystem (this port's own sys.path is just ["/"]) before any
-    // extensible built-in. OpenMV's own `ml`/`tf` built-in
-    // (py_ml.c/tflm_backend.cc) has since been removed entirely, so
-    // this is no longer a shadowing concern, just where `import ml`
-    // resolves from. Version-stamped, same reasoning as
-    // seedDemoScriptsIfNeeded().
-    private fun seedMlLibraryIfNeeded() {
-        if (settingsManager.mlLibraryVersion >= CURRENT_ML_LIBRARY_VERSION) return
-
-        val mlDir = File(filesDir, "ml").apply { mkdirs() }
-        assets.open("ml/__init__.py").use { input ->
-            File(mlDir, "__init__.py").outputStream().use { output ->
-                input.copyTo(output)
-            }
-        }
-        settingsManager.mlLibraryVersion = CURRENT_ML_LIBRARY_VERSION
     }
 
     // Seeds assets/rom/ (Haar cascades) into the VFS's /rom/, the path

@@ -25,7 +25,7 @@ ICON_NAMES=(
     link link_off stop play_arrow restart_alt delete_sweep
     keyboard_arrow_up keyboard_arrow_down
     drive_folder_upload note_add create_new_folder refresh arrow_back
-    memory terminal_2 password_2 public lock shop adb
+    memory terminal_2 password_2 public lock adb
     edit delete drive_file_rename_outline folder_open
     vertical_align_bottom content_copy
 )

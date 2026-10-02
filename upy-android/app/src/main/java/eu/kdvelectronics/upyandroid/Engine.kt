@@ -47,7 +47,6 @@ object Engine {
         sshEnabled: Boolean,
         httpServerEnabled: Boolean,
         httpPrivateFilesEnabled: Boolean,
-        litertPlaystoreEnabled: Boolean,
         adbExecEnabled: Boolean,
     )
 }

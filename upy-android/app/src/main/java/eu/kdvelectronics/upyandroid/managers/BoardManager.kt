@@ -176,7 +176,6 @@ class BoardManager(
             putBoolean("ssh_enabled", s.sshEnabled)
             putBoolean("http_server_enabled", s.httpServerEnabled)
             putBoolean("http_private_files_enabled", s.httpPrivateFilesEnabled)
-            putBoolean("litert_playstore_enabled", s.litertPlaystoreEnabled)
             putBoolean("adb_exec_enabled", s.adbExecEnabled)
         }
         try {

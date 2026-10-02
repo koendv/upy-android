@@ -29,6 +29,6 @@ limits:
 env:
   fs: / is app private storage; /examples has samples
   modules: "help('modules')"
-  module_help: "csi, display, and android (and its submodules) are upy-android-specific and have a help() function, e.g. import csi; print(csi.help()); android submodules too, e.g. android.location.help()"
+  module_help: "csi, display, android (and its submodules), tflite, and litert are upy-android-specific and have a help() function, e.g. import csi; print(csi.help()); android submodules too, e.g. android.location.help()"
   examples: "os.listdir('/examples') lists scripts to use as a pattern for modules without a help() (image, gif, mjpeg, ...)"
   phone: import android

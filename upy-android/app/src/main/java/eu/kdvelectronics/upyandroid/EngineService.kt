@@ -130,7 +130,6 @@ class EngineService : Service() {
                 settings.getBoolean("ssh_enabled", false),
                 settings.getBoolean("http_server_enabled", false),
                 settings.getBoolean("http_private_files_enabled", false),
-                settings.getBoolean("litert_playstore_enabled", false),
                 settings.getBoolean("adb_exec_enabled", false),
             )
         }
