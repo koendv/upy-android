@@ -2,14 +2,139 @@
 
 [MicroPython](https://micropython.org/) for Android with an [OpenMV](https://github.com/openmv/openmv)-inspired computer-vision API.
 
-
 |[![screenshot](doc/pictures/screenshot\_small.jpg)](doc/pictures/screenshot\_big.jpg)|[![street crossing](doc/pictures/street\_crossing.jpg)](https://github.com/koendv/upy-android/raw/refs/heads/main/doc/pictures/street_crossing.mp4)|
 |---|---|
 | Command screen | Camera Screen |
 
+### What upy-android is
+
+upy-android turns an Android phone into a camera vision module. You program the phone in MicroPython.
+
+A phone has advantages over a microcontroller camera board:
+
+- a better camera
+- a faster CPU
+- a GPU and NPU for neural networks
+- Wi-Fi, a screen and a battery
+
+### Connecting to your hardware
+
+The phone sends results over Wi-Fi or USB:
+
+- MQTT (`umqtt`, with TLS). For example, to an MQTT broker or an ESP32.
+- SSH shell on port 2222. Password login.
+- HTTP file server on port 8080.
+- adb over USB. Run scripts from a PC.
+
+### Install
+
+Download the APK from [Releases](https://github.com/koendv/upy-android/releases) and install it.
+
+Requirements: Android 8.1 or later (API 27), 64-bit ARM (`arm64-v8a`).
+
+### Phone settings
+
+These settings depend on the phone brand. The names can be different on your phone.
+
+- **Install the APK.** Allow **Install unknown apps** for your browser or file manager.
+- **Keep scripts running.** Some phones stop apps in the background. For upy-android, set battery usage to **No restrictions** and allow **Autostart** if your phone has this setting.
+- **USB debugging.** Needed for adb. Open **Settings > About phone** and tap **Build number** 7 times. Then enable **USB debugging** in **Developer options**. Some phones, for example Xiaomi, also need **USB debugging (Security settings)** and **Install via USB**.
+
+### Example
+
+This script prints the id and center of every [AprilTag](doc/apriltags.pdf) the camera sees. The **Camera** screen shows the image, with a box around each tag:
+
+```python
+import csi, display
+
+cam = csi.CSI()
+cam.reset()
+cam.pixformat(csi.GRAYSCALE)
+cam.framesize((320, 240))
+lcd = display.SPIDisplay()
+
+while True:
+    img = cam.snapshot()
+    for tag in img.find_apriltags():
+        img.draw_detection(tag)
+        print(tag.id, tag.cx, tag.cy)
+    lcd.write(img)
+```
+
+More example scripts are in `/examples` on the phone.
+
+### Programming
+
+#### Programming by hand
+
+- **Built-in editor.** Open the **Files** screen and tap a file. Tap **Edit** to open the editor. The editor has syntax highlighting, undo, redo, run and save. Tap **Run** to run the file. The output is in the **Command** screen.
+- **Other editor apps.** Open the **Files** screen, tap a file and tap **Open with**. Choose an editor app. If the editor app can write back, **Save** writes the file back to upy-android.
+- **Files from other apps.** In another app, tap **Share** and choose upy-android. The file is saved in `/` of the upy-android file store. The **Import** button in the **Files** screen does the same with a file picker.
+- **SSH.** Enable SSH in **Settings**. Then run `ssh -p 2222 user@<phone-ip>` on your PC. You get a Python shell. Type code, then an empty line to run the code.
+- **SFTP.** Enable SSH in **Settings**. Then use `sftp -P 2222 user@<phone-ip>`, `scp -P 2222`, or a program such as FileZilla or WinSCP. SFTP can only access the upy-android file store. This is the same `/` as in MicroPython.
+
+#### AI-assisted programming
+
+An AI coding agent on your PC can write and run scripts on the phone. Any agent that can run shell commands works, for example Claude Code. You describe what you want. The agent writes the code, runs it on the phone and checks the result.
+
+Setup:
+
+1. Connect the phone to the PC with a USB cable. Enable USB debugging (see [Phone settings](#phone-settings)).
+2. In upy-android, open **Settings** and enable **adb exec**.
+3. Give the agent this prompt:
+
+   > An Android phone is connected over USB. The app content provider runs code over adb. Start with:
+   > `adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help`
+   > and follow what it says.
+
+The agent reads the help page and the `help()` of each module. The agent learns the API from the phone. A good first question: "Describe the features of this micropython."
+
+Agree on the plan before the agent writes code. Use these steps:
+
+1. "Do not generate yet, first discuss."
+2. Describe what you want.
+3. "Is my intent clear?" Repeat until the answer is yes.
+4. "Do you have additional questions?"
+5. "Do you need additional data?"
+6. "Proceed."
+
+For a real example session, see [doc/SAMPLE_SESSION.md](doc/SAMPLE_SESSION.md).
+
+### Modules
+
+| Module | Description |
+|---|---|
+| `csi` | Camera. Grayscale or RGB565. Select frame size, frame rate and camera. Automatic gain, exposure and white balance. |
+| `display` | Shows images in the **Camera** screen of the app. |
+| `image` | OpenMV image processing: AprilTags, Data Matrix, circles, rectangles, lines, edges, template matching, HOG, LBP, face and eye detection. |
+| `gif`, `mjpeg` | Video recording. |
+| `android` | Flashlight, zoom, proximity sensor, accelerometer, gyroscope, location, save to gallery, share. |
+| `tflite` | TensorFlow Lite inference on the CPU. |
+| `litert` | LiteRT inference on the CPU, GPU or NPU. |
+| `ulab` | Arrays, similar to NumPy. |
+| `umqtt` | MQTT client, with TLS. |
+
+The modules `csi`, `display`, `android`, `tflite` and `litert` have a `help()` function. For example: `import csi; print(csi.help())`.
+
+### Performance
+
+Phone: REDMI Note 15 5G, Android 16. Grayscale images.
+
+| Function | Resolution | Time per frame | Frame rate |
+|---|---|---|---|
+| `find_apriltags()` | 640×480 | 9 ms | 31 fps (camera limit) |
+| `find_line_segments()` | 320×240 | 16 ms | 25 fps (camera limit) |
+| `find_line_segments()` | 640×480 | 82 ms | 12 fps |
+
+One AprilTag was in view. The time of `find_line_segments()` depends on the image.
+
 ### Status
 
-Working prototype. Largely generated with AI assistance, not fully audited. Use with caution.
+Working prototype. Programmed with AI assistance, not fully audited. Moderate your expectations. Use with caution.
+
+### Development
+
+Building, the adb test setup and other developer notes: [doc/DEVELOPER.md](doc/DEVELOPER.md).
 
 ### License
 
