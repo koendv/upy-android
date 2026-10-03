@@ -109,7 +109,7 @@ For a real example session, see [doc/SAMPLE_SESSION.md](doc/SAMPLE_SESSION.md).
 | `image` | OpenMV image processing: AprilTags, Data Matrix, circles, rectangles, lines, edges, template matching, HOG, LBP, face and eye detection. |
 | `gif`, `mjpeg` | Video recording. |
 | `android` | Flashlight, zoom, proximity sensor, accelerometer, gyroscope, location, save to gallery, share. |
-| `tflite` | TensorFlow Lite inference on the CPU. |
+| `tflite` | TensorFlow Lite inference on the CPU, or with Android NNAPI (`tflite.set_nnapi(True)`). |
 | `litert` | LiteRT inference on the CPU, GPU or NPU. |
 | `ulab` | Arrays, similar to NumPy. |
 | `umqtt` | MQTT client, with TLS. |
