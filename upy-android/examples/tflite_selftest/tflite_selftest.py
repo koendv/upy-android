@@ -4,19 +4,13 @@
 # support). tflite.Model.run(*inputs) takes/returns plain array.array,
 # same shape as litert.CompiledModel.run().
 #
-# Setup: same two fixtures.
-#   adb push examples/quant/single_add_default_a8w8_recipe_quantized.tflite /data/local/tmp/single_add_quant.tflite
-#   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
-#       'cat /data/local/tmp/single_add_quant.tflite > files/single_add_quant.tflite'
-#   adb push examples/add_simple/add_simple.tflite /data/local/tmp/add_simple.tflite
-#   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
-#       'cat /data/local/tmp/add_simple.tflite > files/add_simple.tflite'
+# Models: add_simple.tflite and single_add_quant.tflite, shipped in /examples.
 
 import array
 
 import tflite
 
-QUANT_MODEL_PATH = "/single_add_quant.tflite"
+QUANT_MODEL_PATH = "/examples/single_add_quant.tflite"
 N = 32 * 32
 TOLERANCE = 0.02
 
@@ -54,7 +48,7 @@ def run_case_int8(label, in1, in2, expected):
 
 
 def run_case_float():
-    model = tflite.Model("/add_simple.tflite")
+    model = tflite.Model("/examples/add_simple.tflite")
 
     print("input_shape:", model.input_shape(0))
     print("output_shape:", model.output_shape(0))

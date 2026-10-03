@@ -95,7 +95,7 @@ private fun NavHostController.navigateToTab(route: String) {
 // Bumped whenever a bundled demo script's own content changes. See
 // seedDemoScriptsIfNeeded() below. Lets an app update that fixes a
 // demo script reach existing installs too, not just fresh ones.
-private const val CURRENT_DEMO_SCRIPTS_VERSION = 13
+private const val CURRENT_DEMO_SCRIPTS_VERSION = 14
 
 // Bumped whenever the bundled /rom/ files change. See seedRomIfNeeded().
 private const val CURRENT_ROM_VERSION = 1
@@ -426,6 +426,10 @@ class MainActivity : ComponentActivity() {
             "find_template.py",
             "location.py",
             "mqtt_tls.py",
+            "tflite_selftest.py",
+            "litert_selftest.py",
+            "add_simple.tflite",
+            "single_add_quant.tflite",
         )) {
             assets.open("examples/$name").use { input ->
                 File(examplesDir, name).outputStream().use { output ->

@@ -10,7 +10,7 @@
 # correct, only deterministic-looking. Read it before trusting it. Use
 # --record to force a new baseline.
 #
-# Default set: mediastore, litert, ml. Deterministic, self-contained.
+# Default set: mediastore, litert, tflite. Deterministic, self-contained.
 # fileprovider and mqtt are opt-in only:
 #   fileprovider pops a real OS share sheet. A successful API call does
 #   not mean the sheet appeared on screen. Only verify this visually.
@@ -40,14 +40,17 @@ TESTS = {
     "litert": (
         "litert_selftest/litert_selftest.py",
         [
-            ("quant/single_add_default_a8w8_recipe_quantized.tflite", "/single_add_quant.tflite"),
-            ("add_simple/add_simple.tflite", "/add_simple.tflite"),
+            ("quant/single_add_default_a8w8_recipe_quantized.tflite", "/examples/single_add_quant.tflite"),
+            ("add_simple/add_simple.tflite", "/examples/add_simple.tflite"),
         ],
         False,
     ),
-    "ml": (
-        "ml_selftest/ml_selftest.py",
-        [("add_simple/add_simple.tflite", "/add_simple.tflite")],
+    "tflite": (
+        "tflite_selftest/tflite_selftest.py",
+        [
+            ("quant/single_add_default_a8w8_recipe_quantized.tflite", "/examples/single_add_quant.tflite"),
+            ("add_simple/add_simple.tflite", "/examples/add_simple.tflite"),
+        ],
         False,
     ),
     "fileprovider": ("fileprovider_selftest/fileprovider_selftest.py", [], True),

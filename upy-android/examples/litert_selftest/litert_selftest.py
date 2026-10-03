@@ -8,19 +8,13 @@
 # own scale/zero_point math on the raw int8 array, same as this test
 # does below.
 #
-# Setup: same two fixtures as before.
-#   adb push examples/quant/single_add_default_a8w8_recipe_quantized.tflite /data/local/tmp/single_add_quant.tflite
-#   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
-#       'cat /data/local/tmp/single_add_quant.tflite > files/single_add_quant.tflite'
-#   adb push examples/add_simple/add_simple.tflite /data/local/tmp/add_simple.tflite
-#   adb shell run-as eu.kdvelectronics.upyandroid sh -c \
-#       'cat /data/local/tmp/add_simple.tflite > files/add_simple.tflite'
+# Models: add_simple.tflite and single_add_quant.tflite, shipped in /examples.
 
 import array
 
 import litert
 
-QUANT_MODEL_PATH = "/single_add_quant.tflite"
+QUANT_MODEL_PATH = "/examples/single_add_quant.tflite"
 N = 32 * 32
 TOLERANCE = 0.02
 
@@ -63,7 +57,7 @@ def run_case_int8(label, in1, in2, expected):
 def run_case_float():
     env = litert.Environment()
     options = litert.Options(litert.Accelerator.CPU)
-    model = litert.CompiledModel(env, "/add_simple.tflite", options)
+    model = litert.CompiledModel(env, "/examples/add_simple.tflite", options)
 
     values = (1.0, 2.0, 3.0, 4.0)
     expected = (2.0, 4.0, 6.0, 8.0)

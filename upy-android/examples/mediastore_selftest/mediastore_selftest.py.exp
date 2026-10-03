@@ -1,0 +1,3 @@
+android.mediastore selftest
+uri starts with content://: True
+PASS

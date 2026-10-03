@@ -1,0 +1,6 @@
+litert selftest
+PASS sanity in1=0.3 in2=0.0 expected=0.2995 actual=0.2995
+PASS saturate in1=1.25 in2=0.0 expected=0.9985 actual=0.9985
+PASS round in1=0.70023656 in2=0.0 expected=0.6989 actual=0.6989
+PASS float32 run() input=(1.0, 2.0, 3.0, 4.0) expected=(2.0, 4.0, 6.0, 8.0) actual=(2.0, 4.0, 6.0, 8.0)
+PASS

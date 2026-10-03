@@ -159,12 +159,15 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
         rootProject.file("examples/find_template/find_template.py"),
         rootProject.file("examples/location/location.py"),
         rootProject.file("examples/mqtt_tls/mqtt_tls.py"),
+        rootProject.file("examples/tflite_selftest/tflite_selftest.py"),
+        rootProject.file("examples/litert_selftest/litert_selftest.py"),
+        rootProject.file("examples/add_simple/add_simple.tflite"),
+        rootProject.file("examples/quant/single_add_default_a8w8_recipe_quantized.tflite"),
     )
+    rename("single_add_default_a8w8_recipe_quantized.tflite", "single_add_quant.tflite")
     into(layout.projectDirectory.dir("src/main/assets/examples"))
 }
 
-// The `ml` library package, seeded into the VFS ROOT (not /examples/ --
-// a deliberate, documented exception to that convention) by
 // Native inputs, generated from upstream.properties by the
 // native-bringup/ scripts. Each task only reruns when its inputs change.
 val bringup = rootProject.file("native-bringup")
