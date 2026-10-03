@@ -4,7 +4,7 @@
 
 |[![screenshot](doc/pictures/screenshot\_small.jpg)](doc/pictures/screenshot\_big.jpg)|[![street crossing](doc/pictures/street\_crossing.jpg)](https://github.com/koendv/upy-android/raw/refs/heads/main/doc/pictures/street_crossing.mp4)|
 |---|---|
-| Command screen | Camera Screen |
+| Command screen | Camera screen |
 
 ### What upy-android is
 
@@ -38,7 +38,7 @@ These settings depend on the phone brand. The names can be different on your pho
 
 - **Install the APK.** Allow **Install unknown apps** for your browser or file manager.
 - **Keep scripts running.** Some phones stop apps in the background. For upy-android, set battery usage to **No restrictions** and allow **Autostart** if your phone has this setting.
-- **USB debugging.** Needed for adb. Open **Settings > About phone** and tap **Build number** 7 times. Then enable **USB debugging** in **Developer options**. Some phones, for example Xiaomi, also need **USB debugging (Security settings)** and **Install via USB**.
+- **USB debugging.** Needed for adb. Open **Settings > About phone** and tap **Build number** 7 times. Then enable **USB debugging** in **Developer options**.
 
 ### Example
 
@@ -126,7 +126,7 @@ Phone: REDMI Note 15 5G, Android 16. Grayscale images.
 | `find_line_segments()` | 320×240 | 16 ms | 25 fps (camera limit) |
 | `find_line_segments()` | 640×480 | 82 ms | 12 fps |
 
-One AprilTag was in view. The time of `find_line_segments()` depends on the image.
+For `find_apriltags()`, one AprilTag was in view. The time of `find_line_segments()` depends on the image.
 
 ### Status
 

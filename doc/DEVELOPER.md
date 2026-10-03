@@ -77,7 +77,25 @@ To enable adb exec: in upy-android, open **Settings** and enable **adb exec**. T
 adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help
 ```
 
-The help page explains the other methods (`status`, `run`, `reset`, `interrupt`). To use adb exec with an AI agent, see [AI-assisted programming](../README.md#ai-assisted-programming) in the README.
+Run a script from the PC:
+
+```bash
+tools/upy-adb script.py
+```
+
+`tools/upy-adb` resets the interpreter, runs the file on the phone and prints the output. Without the tool, the script goes base64-encoded in the `run` call:
+
+```bash
+adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method run --arg "$(base64 -w0 script.py)"
+```
+
+To stop a running script, for example one with `while True`, run in a second terminal:
+
+```bash
+adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method interrupt
+```
+
+Output is limited to 32 KB, a script to about 96 KB. The help page explains all methods (`status`, `run`, `reset`, `interrupt`) and limits. To use adb exec with an AI agent, see [AI-assisted programming](../README.md#ai-assisted-programming) in the README.
 
 The modules `csi`, `display`, `android` (and its submodules), `tflite` and `litert` have a `help()` function, for example `import csi; print(csi.help())`. With these, an agent can learn the API from the phone. When you add, remove or change a method, update the module's `help()` text in the same commit.
 
@@ -95,7 +113,7 @@ Both scripts need one phone connected, with the app installed and **adb exec** e
 Enable these in **Settings**. Login is with a password.
 
 ```bash
-ssh -p 2222 user@<phone-ip>      # micropython shell
+ssh -p 2222 user@<phone-ip>      # MicroPython shell
 sftp -P 2222 user@<phone-ip>     # only files in the app's file store
 ```
 
@@ -127,13 +145,7 @@ Notes:
 
 ### Version
 
-The app version is set in one place, [`upy-android/version.properties`](../upy-android/version.properties):
-
-```
-version=0.4
-```
-
-To change the version, edit that line and commit.
+The app version is set in one place, [`upy-android/version.properties`](../upy-android/version.properties). To change the version, edit that file and commit.
 
 ### GitHub release
 

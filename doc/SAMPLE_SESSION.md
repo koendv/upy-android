@@ -9,7 +9,7 @@ Before starting (not part of the recorded session):
 
 A real session, shortened. Your prompts are unchanged. The agent's replies are shortened, and `[...]` marks a cut. The session started with the setup prompt and "Describe the features of this micropython."
 
-> **You:** Do not generate yet, first discuss. I want to install the Mosquitto MQTT broker on this PC,Ubuntu 24.04, IP 192.168.1.20. The phone must reach it over Wi-Fi.
+> **You:** Do not generate yet, first discuss. I want to install the Mosquitto MQTT broker on this PC, Ubuntu 24.04, IP 192.168.1.20. The phone must reach it over Wi-Fi.
 >
 > **Agent:** Here's the plan. Nothing has been installed or changed yet. [...] Mosquitto 2.x accepts connections only from the PC itself until you configure it otherwise, so we'd add a small config file, `/etc/mosquitto/conf.d/lan.conf`, with `listener 1883`. [...] Do you want a password, and do you want TLS? Is ufw active? What will the phone send?
 >
