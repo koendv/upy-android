@@ -1,4 +1,5 @@
 name: upy-android adb exec
+source: https://github.com/koendv/upy-android
 protocol: 1
 runtime: MicroPython ports/embed, OpenMV subset
 model: each run executes one whole script; no REPL
