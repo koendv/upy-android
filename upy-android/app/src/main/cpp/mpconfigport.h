@@ -157,18 +157,20 @@ unsigned long mp_android_random_seed_init(void);
 #define MICROPY_PY_TIME_INCLUDEFILE              "modtime_android.c"
 
 // binascii module: off by default at CORE_FEATURES (needs EXTRA_FEATURES).
-// hexlify/unhexlify additionally need MICROPY_PY_BUILTINS_BYTES_HEX (also
-// EXTRA_FEATURES-gated). The underlying mp_obj_bytes_hex/bytes_fromhex
-// implementations are core py/objstr.c, already unconditionally compiled,
-// this flag just exposes them (and bytes.hex()/bytes.fromhex() as a side
-// effect, which is a reasonable pairing, not scope creep). crc32 is
-// deliberately left off (MICROPY_PY_BINASCII_CRC32 stays at its
-// EXTRA_FEATURES-gated default of off). Enabling it would pull in
-// lib/uzlib/uzlib.h, a whole extra vendoring dependency, for one function
-// most scripts won't need; hexlify/unhexlify/a2b_base64/b2a_base64 cover
-// the common case with zero extra files beyond modbinascii.c itself.
+// hexlify/unhexlify also need MICROPY_PY_BUILTINS_BYTES_HEX. crc32 is the
+// standard CRC-32 (zlib/PNG), unlike OpenMV's crc.crc32(); it uses
+// lib/uzlib, so it needs MICROPY_PY_DEFLATE.
 #define MICROPY_PY_BINASCII                      (1)
 #define MICROPY_PY_BUILTINS_BYTES_HEX            (1)
+#define MICROPY_PY_BINASCII_CRC32                (1)
+
+// deflate module, with compression. lib/uzlib is #include'd by moddeflate.c.
+#define MICROPY_PY_DEFLATE                       (1)
+#define MICROPY_PY_DEFLATE_COMPRESS              (1)
+
+// hashlib module: sha256 only. sha1/md5 need an SSL library, left out with
+// sockets. lib/crypto-algorithms is #include'd by modhashlib.c.
+#define MICROPY_PY_HASHLIB                       (1)
 
 // heapq module: off by default at CORE_FEATURES (needs EXTRA_FEATURES).
 // extmod/modheapq.c has zero further dependencies (no vendored lib,

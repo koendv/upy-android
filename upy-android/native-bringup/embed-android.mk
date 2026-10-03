@@ -6,7 +6,7 @@
 # bluetooth, ssl, don't make sense for "embed MicroPython in an
 # arbitrary host app"), so this project has to opt the few modules it
 # actually uses back in itself: json, os, random, re, time, binascii,
-# and the VFS/POSIX-file layer.
+# hashlib, deflate, and the VFS/POSIX-file layer.
 #
 # Every file below was confirmed byte-identical to its real upstream
 # path before this was written. This file's whole point is to fetch
@@ -19,11 +19,14 @@
 # resolves relative to the including file's own directory first,
 # before any -I path), so they only need to exist at extmod/lib/re1.5/
 # alongside the copied modre.c. Never compiled separately, never in
-# SRC_QSTR.
+# SRC_QSTR. Same for lib/uzlib (moddeflate.c, modbinascii.c's crc32) and
+# lib/crypto-algorithms (modhashlib.c's sha256).
 
 ANDROID_EXTMOD_FILES = \
 	misc.h \
 	modbinascii.c \
+	moddeflate.c \
+	modhashlib.c \
 	modheapq.c \
 	modjson.c \
 	modos.c \
@@ -45,6 +48,20 @@ ANDROID_RE15_FILES = \
 	compilecode.c \
 	re1.5.h \
 	recursiveloop.c
+
+ANDROID_UZLIB_FILES = \
+	adler32.c \
+	crc32.c \
+	defl_static.c \
+	header.c \
+	lz77.c \
+	tinflate.c \
+	uzlib.h \
+	uzlib_conf.h
+
+ANDROID_CRYPTO_FILES = \
+	sha256.c \
+	sha256.h
 
 # Same ordering requirement as micropython_embed.mk's own SRC_QSTR
 # entries (this file is included before `include embed.mk` there):
@@ -72,6 +89,14 @@ android-extmod-package: micropython-embed-package
 	$(Q)$(MKDIR) -p $(PACKAGE_DIR)/extmod/lib/re1.5
 	$(Q)for f in $(ANDROID_RE15_FILES); do \
 		$(CP) $(MICROPYTHON_TOP)/lib/re1.5/$$f $(PACKAGE_DIR)/extmod/lib/re1.5/$$f; \
+	done
+	$(Q)$(MKDIR) -p $(PACKAGE_DIR)/extmod/lib/uzlib
+	$(Q)for f in $(ANDROID_UZLIB_FILES); do \
+		$(CP) $(MICROPYTHON_TOP)/lib/uzlib/$$f $(PACKAGE_DIR)/extmod/lib/uzlib/$$f; \
+	done
+	$(Q)$(MKDIR) -p $(PACKAGE_DIR)/extmod/lib/crypto-algorithms
+	$(Q)for f in $(ANDROID_CRYPTO_FILES); do \
+		$(CP) $(MICROPYTHON_TOP)/lib/crypto-algorithms/$$f $(PACKAGE_DIR)/extmod/lib/crypto-algorithms/$$f; \
 	done
 	$(ECHO) "- extmod/sources.cmake"
 	$(Q)echo "set(MPY_EXTMOD_SOURCES" > $(PACKAGE_DIR)/extmod/sources.cmake
