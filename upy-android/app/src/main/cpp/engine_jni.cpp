@@ -130,6 +130,8 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeExec(JNIEnv *env, jobject, jstrin
         mp_embed_set_output_chunk_cb(&chunk_cb_trampoline, &ctx);
     }
 
+    // An interrupt sent while no script was running would hit this one.
+    MP_STATE_MAIN_THREAD(mp_pending_exception) = MP_OBJ_NULL;
     mp_embed_exec_str(code_chars);
 
     mp_embed_set_output_chunk_cb(nullptr, nullptr);
