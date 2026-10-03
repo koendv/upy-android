@@ -204,6 +204,9 @@ fun TerminalScreen(
             (maxChars * glyphAdvancePx).toInt()
         }
     }
+    LaunchedEffect(lines.isEmpty()) {
+        if (lines.isEmpty()) horizontalScrollState.scrollTo(0)
+    }
     // Explicit toggle, default on, not implicit at-bottom detection --
     // matches Arduino IDE's own monitorModel.autoscroll. see session-state.
     var autoscroll by remember { mutableStateOf(true) }
@@ -328,7 +331,10 @@ fun TerminalScreen(
                     }
                 }
             }
-            HorizontalScrollbar(state = horizontalScrollState, modifier = Modifier.padding(top = 2.dp))
+            // maxValue only updates when a row is laid out, so it goes stale after clear().
+            if (lines.isNotEmpty()) {
+                HorizontalScrollbar(state = horizontalScrollState, modifier = Modifier.padding(top = 2.dp))
+            }
 
             if (status !is ConnectionStatus.Connected) {
                 TextButton(onClick = onReconnect) {
