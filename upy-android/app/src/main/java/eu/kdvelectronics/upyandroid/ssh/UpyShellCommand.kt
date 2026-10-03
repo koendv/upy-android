@@ -6,6 +6,7 @@ import org.apache.sshd.server.Environment
 import org.apache.sshd.server.ExitCallback
 import org.apache.sshd.server.channel.ChannelSession
 import org.apache.sshd.server.command.Command
+import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
@@ -52,8 +53,12 @@ class UpyShellCommand(private val context: Context) : Command {
     }
 
     private fun write(s: String) {
-        output.write(s.toByteArray(Charsets.UTF_8))
-        output.flush()
+        try {
+            output.write(s.toByteArray(Charsets.UTF_8))
+            output.flush()
+        } catch (e: IOException) {
+            // client disconnected
+        }
     }
 
     private fun runLoop() {
