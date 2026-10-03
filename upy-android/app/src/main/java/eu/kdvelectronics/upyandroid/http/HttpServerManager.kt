@@ -28,7 +28,7 @@ import java.io.FileNotFoundException
 // see session-state: HttpServerManager.kt#HttpServerManager
 object HttpServerManager {
     private const val TAG = "HttpServerManager"
-    const val PORT = 8080
+    const val HTTP_PORT = 8080
 
     @Volatile
     private var server: EmbeddedServer<*, *>? = null
@@ -46,8 +46,8 @@ object HttpServerManager {
     }
 
     private fun start(context: Context, settingsManager: SettingsManager) {
-        Log.i(TAG, "starting HTTP server on port $PORT")
-        server = embeddedServer(CIO, port = PORT) {
+        Log.i(TAG, "starting HTTP server on port $HTTP_PORT")
+        server = embeddedServer(CIO, port = HTTP_PORT) {
             install(StatusPages) {
                 exception<FileNotFoundException> { call, _ ->
                     call.respond(HttpStatusCode.NotFound)

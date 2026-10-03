@@ -36,6 +36,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import eu.kdvelectronics.upyandroid.MainActivity
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
+import eu.kdvelectronics.upyandroid.http.HttpServerManager
+import eu.kdvelectronics.upyandroid.ssh.SshServerManager
 
 private val ICON_SIZE = 20.dp
 
@@ -136,7 +138,7 @@ fun SettingsScreen(
                 }
             }
 
-            SettingsRow("Enable SSH", sshEnabled, icon = SymbolIcon.TERMINAL_2) {
+            SettingsRow("Enable SSH (port ${SshServerManager.SSH_PORT})", sshEnabled, icon = SymbolIcon.TERMINAL_2) {
                 sshEnabled = it
                 settingsManager.sshEnabled = it
                 onSettingsChanged()
@@ -155,7 +157,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            SettingsRow("Enable HTTP server", httpServerEnabled, icon = SymbolIcon.PUBLIC) {
+            SettingsRow("Enable HTTP server (port ${HttpServerManager.HTTP_PORT})", httpServerEnabled, icon = SymbolIcon.PUBLIC) {
                 httpServerEnabled = it
                 settingsManager.httpServerEnabled = it
                 if (!it) {

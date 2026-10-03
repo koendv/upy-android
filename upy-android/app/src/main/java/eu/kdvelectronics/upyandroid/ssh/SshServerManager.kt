@@ -11,7 +11,7 @@ import java.io.File
 // see session-state: SshServerManager.kt#SshServerManager
 object SshServerManager {
     private const val TAG = "SshServerManager"
-    const val PORT = 8022
+    const val SSH_PORT = 2222
     private const val HOST_KEY_FILE_NAME = ".ssh_host_key"
 
     @Volatile
@@ -30,11 +30,11 @@ object SshServerManager {
     }
 
     private fun start(context: Context, settingsManager: SettingsManager) {
-        Log.i(TAG, "starting SSH server on port $PORT")
+        Log.i(TAG, "starting SSH server on port $SSH_PORT")
         // see session-state: SshServerManager.kt#SshServerManager
         PathUtils.setUserHomeFolderResolver { context.filesDir.toPath() }
         val sshd = SshServer.setUpDefaultServer()
-        sshd.port = PORT
+        sshd.port = SSH_PORT
         // see session-state: SshServerManager.kt#SshServerManager
         sshd.keyPairProvider = SimpleGeneratorHostKeyProvider(File(context.filesDir, HOST_KEY_FILE_NAME).toPath())
         sshd.passwordAuthenticator = { _, password, _ ->
