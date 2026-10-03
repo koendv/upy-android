@@ -8,15 +8,16 @@
 # Usage:
 #   tools/run-upstream-tests.sh [run-tests.py args...]
 #   tools/run-upstream-tests.sh -d basics        # a real, dependency-free subset to start with
-#   tools/run-upstream-tests.sh tests/basics/int1.py
+#   tools/run-upstream-tests.sh basics/int1.py   # test paths are relative to tests/
 #
 # MICROPYTHON_TOP overrides the pinned upstream checkout to test
-# against. Default: this project's own read-only historical-reference
-# clone. Never write into it. -r below points elsewhere for that reason.
+# against. Default: the checkout the build fetches (upy-android/upstream/
+# micropython, pinned in upstream.properties). Don't write into it; -r below
+# points elsewhere for that reason.
 set -e
 cd "$(dirname "$0")/.."
 
-MICROPYTHON_TOP=${MICROPYTHON_TOP:-/home/koen/src/repos/upy-android/upstream/micropython}
+MICROPYTHON_TOP=${MICROPYTHON_TOP:-$(pwd)/upy-android/upstream/micropython}
 if [ ! -f "$MICROPYTHON_TOP/tests/run-tests.py" ]; then
     echo "run-upstream-tests: $MICROPYTHON_TOP/tests/run-tests.py not found -- set MICROPYTHON_TOP" >&2
     exit 1
@@ -32,7 +33,10 @@ export MICROPY_MICROPYTHON="$(pwd)/tools/upy-adb"
 # -r: run-tests.py's own default (tests/results, inside MICROPYTHON_TOP)
 # would write into the frozen historical-reference checkout. Never edit
 # or write there. A fresh mktemp -d instead.
-if python3 "$MICROPYTHON_TOP/tests/run-tests.py" -j1 -r "$RESULT_DIR" "$@"; then
+# run-tests.py runs each test with its relative directory as cwd, so it
+# must itself run from tests/, like upstream (cd tests; ./run-tests.py).
+cd "$MICROPYTHON_TOP/tests"
+if python3 run-tests.py -j1 -r "$RESULT_DIR" "$@"; then
     rm -rf "$RESULT_DIR"
     exit 0
 else
