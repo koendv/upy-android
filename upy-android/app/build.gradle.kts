@@ -436,4 +436,5 @@ dependencies {
     // stable GA per Maven Central metadata (3.0.0 is still milestone-
     // only, per this project's own preference for stable releases).
     implementation("org.apache.sshd:sshd-core:2.19.0")
+    implementation("org.apache.sshd:sshd-sftp:2.19.0")
 }

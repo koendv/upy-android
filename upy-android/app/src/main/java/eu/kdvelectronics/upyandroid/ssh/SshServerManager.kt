@@ -3,9 +3,11 @@ package eu.kdvelectronics.upyandroid.ssh
 import android.content.Context
 import android.util.Log
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
+import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
 import org.apache.sshd.common.util.io.PathUtils
 import org.apache.sshd.server.SshServer
 import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
+import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import java.io.File
 
 // see session-state: SshServerManager.kt#SshServerManager
@@ -43,6 +45,9 @@ object SshServerManager {
             configured.isNotEmpty() && password == configured
         }
         sshd.shellFactory = org.apache.sshd.server.shell.ShellFactory { UpyShellCommand(context) }
+        // SFTP rooted at the MicroPython filesystem, no access outside it.
+        sshd.fileSystemFactory = VirtualFileSystemFactory(context.filesDir.toPath())
+        sshd.subsystemFactories = listOf(SftpSubsystemFactory())
         sshd.start()
         server = sshd
     }
