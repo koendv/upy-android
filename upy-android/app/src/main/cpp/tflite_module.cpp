@@ -1,5 +1,6 @@
 // upy-android native tflite module (top-level `tflite`). Classic
-// TensorFlow Lite C API, CPU-only (no delegate is ever attached here).
+// TensorFlow Lite C API, CPU by default; set_nnapi(True) hands new models
+// to Android NNAPI.
 // Links the SAME libLiteRt.so the litert module links -- see
 // CMakeLists.txt's comment on why one shared native library, not two
 // competing copies of TFLite in one process. Zero cross-links with
@@ -24,7 +25,13 @@ extern "C" {
 
 #include "tflite/c/c_api.h"
 
+// From tflite's c_api_experimental.h, exported by libLiteRt.so.
+extern "C" void TfLiteInterpreterOptionsSetUseNNAPI(TfLiteInterpreterOptions *options, bool enable);
+
 namespace {
+
+// set_nnapi(): applies to models created afterwards.
+bool g_use_nnapi = false;
 
 void raise_os_error(int errno_, const char *msg) {
     mp_obj_t args[2] = {
@@ -156,6 +163,9 @@ mp_obj_t tflite_model_make_new(const mp_obj_type_t *type, size_t n_args, size_t 
     }
 
     TfLiteInterpreterOptions *options = TfLiteInterpreterOptionsCreate();
+    if (g_use_nnapi) {
+        TfLiteInterpreterOptionsSetUseNNAPI(options, true);
+    }
     TfLiteInterpreter *interp = TfLiteInterpreterCreate(model, options);
     TfLiteInterpreterOptionsDelete(options);
     if (!interp) {
@@ -336,6 +346,8 @@ const char tflite_help_text[] =
     "    returns a single array.array if the model has one output tensor, otherwise a tuple of array.array; always flat (1-D), always a fresh copy\n"
     "  input_shape(i)/output_shape(i): tuple of dimensions for input/output tensor i; run()'s own arrays carry no shape, query it here\n"
     "  close(): frees the model and interpreter; also called automatically on garbage collection\n"
+    "functions:\n"
+    "  set_nnapi(enable): True hands models created afterwards to Android NNAPI, False (default) uses the CPU; no argument returns the current setting; reset to False by an interpreter reset\n"
     "dtypes_supported: float32('f'), int8('b'), uint8('B'), int16('h'), uint16('H'), int32('i'), uint32('I'), int64('q'), uint64('Q'), bool (as uint8 'B', 0/1)\n"
     "errors:\n"
     "  OSError(ENOENT): model file not found or not a valid .tflite file\n"
@@ -343,7 +355,7 @@ const char tflite_help_text[] =
     "  OSError(EINVAL): called on a closed model, a bad tensor index, or a tensor dtype outside dtypes_supported\n"
     "  ValueError: wrong number of run() arguments, or an input array's typecode/size does not match its tensor\n"
     "notes:\n"
-    "  CPU-only: no GPU/NPU delegate is ever attached by this module (see litert.help() for accelerator-capable inference)\n"
+    "  NNAPI is deprecated since Android 15 and may silently fall back to the CPU; compare speed to see if it helps (see litert.help() for accelerator-capable inference)\n"
     "see_also: litert.help()\n"
 ;
 mp_obj_t tflite_help() {
@@ -351,10 +363,23 @@ mp_obj_t tflite_help() {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(tflite_help_obj, tflite_help);
 
+mp_obj_t tflite_set_nnapi(size_t n_args, const mp_obj_t *args) {
+    if (n_args == 0) {
+        return mp_obj_new_bool(g_use_nnapi);
+    }
+    if (mp_obj_is_type(args[0], &mp_type_list) || mp_obj_is_type(args[0], &mp_type_tuple)) {
+        mp_raise_ValueError(MP_ERROR_TEXT("tflite: NNAPI device selection not supported yet"));
+    }
+    g_use_nnapi = mp_obj_is_true(args[0]);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(tflite_set_nnapi_obj, 0, 1, tflite_set_nnapi);
+
 const mp_rom_map_elem_t tflite_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_tflite)},
     {MP_ROM_QSTR(MP_QSTR_Model), MP_ROM_PTR(&tflite_model_type)},
     {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&tflite_help_obj)},
+    {MP_ROM_QSTR(MP_QSTR_set_nnapi), MP_ROM_PTR(&tflite_set_nnapi_obj)},
 };
 MP_DEFINE_CONST_DICT(tflite_module_globals, tflite_module_globals_table);
 
@@ -368,6 +393,7 @@ extern "C" const mp_obj_module_t tflite_module = {
 MP_REGISTER_MODULE(MP_QSTR_tflite, tflite_module);
 
 extern "C" void tflite_close_all(void) {
+    g_use_nnapi = false;
     while (g_tflite_models) {
         TfliteModelNode *node = g_tflite_models;
         TfLiteInterpreterDelete(node->interp);
