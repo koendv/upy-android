@@ -194,16 +194,35 @@ void raise_os_error(int errno_, const char *msg) {
     nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
 }
 
+// Set when Android takes the camera away (e.g. the app is no longer
+// visible). Cleared by reset().
+std::atomic<bool> g_cam_lost{false};
+
+void mark_camera_lost() {
+    g_cam_lost.store(true);
+    if (g_cam.active_wait_sem) {
+        sem_post(g_cam.active_wait_sem);
+    }
+}
+
+void check_camera_lost() {
+    if (g_cam_lost.load()) {
+        raise_os_error(MP_EIO, "camera disconnected (app not in foreground)");
+    }
+}
+
 void on_device_disconnected(void *context, ACameraDevice *device) {
     (void) context;
     (void) device;
     LOGW("camera device disconnected");
+    mark_camera_lost();
 }
 
 void on_device_error(void *context, ACameraDevice *device, int error) {
     (void) context;
     (void) device;
     LOGW("camera device error: %d", error);
+    mark_camera_lost();
 }
 
 // Tears down the session/reader/request layer only. The device stays
@@ -664,6 +683,7 @@ void wait_for_frame() {
                 deadline.tv_nsec -= 1000000000L;
             }
             sem_timedwait(g_cam.active_wait_sem, &deadline);
+            check_camera_lost();
             if (framebuffer_readable(fb)) {
                 got = true;
                 break;
@@ -719,6 +739,7 @@ void csi_snapshot_warmup(mp_int_t time_limit_ms, mp_int_t frames_limit) {
                 deadline.tv_nsec -= 1000000000L;
             }
             sem_timedwait(g_cam.active_wait_sem, &deadline);
+            check_camera_lost();
 
             if (g_cam.frame_seq.load(std::memory_order_relaxed) != seq_before) {
                 last_progress = now_ms();
@@ -749,6 +770,7 @@ mp_obj_t csi_snapshot(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args
     if (!g_cam.device) {
         raise_os_error(MP_EINVAL, "camera not reset -- call reset() first");
     }
+    check_camera_lost();
     ensure_session();
 
     if (args[ARG_time].u_int >= 0 || args[ARG_frames].u_int >= 0) {
@@ -776,6 +798,7 @@ static MP_DEFINE_CONST_FUN_OBJ_KW(csi_snapshot_obj, 1, csi_snapshot);
 mp_obj_t csi_reset(mp_obj_t self_in) {
     (void) self_in;
     camera_close_all();
+    g_cam_lost.store(false);
     g_cam.pixfmt = PIXFORMAT_GRAYSCALE;
     g_cam.width = kDefaultWidth;
     g_cam.height = kDefaultHeight;
@@ -1033,7 +1056,7 @@ const char csi_help_text[] =
     "constants: csi.GRAYSCALE, csi.RGB565, named framesizes (csi.QVGA, csi.VGA, csi.HD, ...), csi.NORMAL, csi.NEGATIVE\n"
     "errors:\n"
     "  OSError(EINVAL): called before reset()\n"
-    "  OSError(EIO): camera open/characteristics read failure\n"
+    "  OSError(EIO): camera open/characteristics read failure, or camera disconnected (app not in foreground); call reset() after returning to the app\n"
     "  OSError(EACCES): camera permission not granted\n"
     "  OSError(ENODEV): no camera on this device\n"
     "  OSError(ETIMEDOUT): snapshot() timed out waiting for a frame\n"
