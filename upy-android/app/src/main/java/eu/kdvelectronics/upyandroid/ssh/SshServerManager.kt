@@ -38,7 +38,7 @@ object SshServerManager {
         val sshd = SshServer.setUpDefaultServer()
         sshd.port = SSH_PORT
         // see session-state: SshServerManager.kt#SshServerManager
-        sshd.keyPairProvider = SimpleGeneratorHostKeyProvider(File(context.filesDir, HOST_KEY_FILE_NAME).toPath())
+        sshd.keyPairProvider = SimpleGeneratorHostKeyProvider(File(context.noBackupFilesDir, HOST_KEY_FILE_NAME).toPath())
         sshd.passwordAuthenticator = { _, password, _ ->
             // see session-state: SshServerManager.kt#SshServerManager
             val configured = settingsManager.sshPassword
