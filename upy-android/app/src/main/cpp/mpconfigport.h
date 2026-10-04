@@ -7,9 +7,13 @@
 // Include common MicroPython embed configuration.
 #include <port/mpconfigport_common.h>
 
-// Core-features level: compiler + reasonable stdlib coverage for a REPL,
-// not just the bare minimum the embedding example uses.
-#define MICROPY_CONFIG_ROM_LEVEL                (MICROPY_CONFIG_ROM_LEVEL_CORE_FEATURES)
+// Extra-features level: f-strings, full collections, memoryview, etc.
+// Flash size is not a concern on Android.
+#define MICROPY_CONFIG_ROM_LEVEL                (MICROPY_CONFIG_ROM_LEVEL_EXTRA_FEATURES)
+// No stdin, no readline.
+#define MICROPY_PY_BUILTINS_INPUT               (0)
+// vfs_posix_file.c's sys.stdout writes to fd 1, not the terminal: print() output lost.
+#define MICROPY_PY_SYS_STDFILES                 (0)
 
 // MicroPython configuration.
 #define MICROPY_ENABLE_COMPILER                 (1)
@@ -17,10 +21,7 @@
 #define MICROPY_PY_GC                           (1)
 #define MICROPY_PY_SYS                          (1)
 
-// Crash-mitigation requirements (see project memory, "Crash-mitigation
-// requirements"). These are #ifndef-guarded in py/mpconfig.h and default to
-// on only at ROM level EXTRA_FEATURES (30); CORE_FEATURES is 10, so they
-// must be forced on explicitly here rather than assumed from ROM level.
+// Crash-mitigation requirements. Explicit, independent of the ROM level.
 #define MICROPY_STACK_CHECK                     (1)
 #define MICROPY_KBD_EXCEPTION                   (1)
 #define MICROPY_ENABLE_SCHEDULER                (1)
@@ -51,14 +52,11 @@
 // Real VFS, rooted at the app's own private storage (path passed in at
 // runtime). See engine_jni.cpp's nativeInit()/nativeReset(), which mount
 // a VfsPosix(root=rootPath) at "/" after mp_embed_init(). Scripts get a
-// clean, jailed filesystem view: open("/foo.txt") or open("foo.txt") map
-// transparently to real files under the app's private storage, nothing
-// outside it is reachable. Superseded the original "no VFS at all"
-// decision once a concrete need (scripts doing their own file I/O)
-// showed up. See project memory. port/embed_import_stub.c is REMOVED
-// (not just disabled) since extmod/vfs.c now provides the real
-// mp_import_stat/mp_builtin_open; leaving the stub in would be a
-// duplicate-symbol link error.
+// clean filesystem view: open("/foo.txt") or open("foo.txt") map
+// transparently to real files under the app's private storage. Not a
+// security boundary: os.mount(os.VfsPosix(...)) reaches whatever the
+// Android app sandbox allows. Do not add port/embed_import_stub.c:
+// extmod/vfs.c provides mp_import_stat/mp_builtin_open (duplicate symbols).
 //
 // MICROPY_PY_IO must be on for open() to actually appear as a builtin
 // name. py/modbuiltins.c's builtin table gates the `open` entry on
@@ -70,8 +68,7 @@
 #define MICROPY_READER_POSIX                     (0)
 #define MICROPY_READER_VFS                       (1)
 #define MICROPY_PY_OS                            (1)
-// MICROPY_VFS_POSIX requires this explicitly (extmod/vfs_posix.c has a
-// #error otherwise). Defaults on only at EXTRA_FEATURES ROM level.
+// MICROPY_VFS_POSIX requires this (extmod/vfs_posix.c has a #error otherwise).
 #define MICROPY_ENABLE_FINALISER                 (1)
 // Defaults to (1) already (py/mpconfig.h) but made explicit rather than
 // assumed, per the pattern this whole config follows. VfsPosix defaults
@@ -79,56 +76,26 @@
 // !MICROPY_VFS_POSIX_WRITABLE).
 #define MICROPY_VFS_POSIX_WRITABLE               (1)
 
-// random module: like most flags here, off by default at CORE_FEATURES
-// (needs EXTRA_FEATURES). EXTRA_FUNCS pulls in randrange/randint/choice/
-// random/uniform, not just getrandbits/seed. The PRNG itself (Yasmarang,
-// in extmod/modrandom.c) runs entirely in C with no OS involvement per
-// call. Only the initial seed needs real entropy, via this hook.
-// mp_android_random_seed_init() (mphalport.c) wraps Bionic's
-// arc4random_buf(). No JNI/Kotlin round-trip, no fd/permission
-// handling, available since long before this port's minSdk 26.
-#define MICROPY_PY_RANDOM                        (1)
-#define MICROPY_PY_RANDOM_EXTRA_FUNCS            (1)
+// random: seed from Bionic's arc4random_buf() (mphalport.c).
 unsigned long mp_android_random_seed_init(void);
 #define MICROPY_PY_RANDOM_SEED_INIT_FUNC         (mp_android_random_seed_init())
 
-// json module: off by default at CORE_FEATURES. No extra port support
-// needed. modjson.c only touches py/objstringio.h + py/stream.h, both
-// already present (MICROPY_PY_IO is already on for VFS above).
-#define MICROPY_PY_JSON                          (1)
-
-// re module: off by default at CORE_FEATURES. MATCH_GROUPS/
-// SPAN_START_END default even higher (EVERYTHING, not just
-// EXTRA_FEATURES) but are turned on explicitly here since match.group()/
-// match.span() are basic, expected regex usage, not a rarely-needed
-// extra. RE_DEBUG stays off (dumpcode.c not vendored, not needed).
-#define MICROPY_PY_RE                            (1)
-#define MICROPY_PY_RE_SUB                        (1)
+// re: match.group()/match.span() default on only at EVERYTHING level.
 #define MICROPY_PY_RE_MATCH_GROUPS               (1)
 #define MICROPY_PY_RE_MATCH_SPAN_START_END       (1)
 
-// time module: off by default at CORE_FEATURES (needs BASIC_FEATURES,
-// numerically 20 vs this port's 10). Higher number is MORE features,
-// easy to misread. ports/embed provides NO time HAL at all (unlike
-// math/json/random/re, which needed nothing beyond a config flag +
-// vendoring). Every mp_hal_ticks_*/delay_*/time_ns primitive below is
-// implemented in this port.
+// time: ports/embed provides no time HAL. Every mp_hal_ticks_*/delay_*/
+// time_ns primitive is implemented in this port.
 //
 // MICROPY_PY_TIME_GMTIME_LOCALTIME_MKTIME (the generic extmod/modtime.c
 // path) is deliberately left OFF: that path registers gmtime() and
 // localtime() as literal aliases of the SAME function (see
 // extmod/modtime.c's globals table), so it structurally cannot give
 // gmtime() real UTC and localtime() real device-local time at once.
-// Most embedded ports using it just fake localtime()==UTC because they
-// have no OS timezone database anyway. Android has a real one (Bionic's
-// tzset()/localtime_r(), timezone/DST-aware), so this port uses it:
-// MICROPY_PY_TIME_INCLUDEFILE provides real, distinct gmtime_r()/
+// Android has a real timezone database (Bionic's tzset()/localtime_r()),
+// so MICROPY_PY_TIME_INCLUDEFILE provides real, distinct gmtime_r()/
 // localtime_r()/mktime()-backed implementations via
-// MICROPY_PY_TIME_EXTRA_GLOBALS instead. Same pattern ports/unix uses,
-// minus its custom interruptible-select sleep (this port already gets
-// an interruptible, non-busy-waiting sleep for free from the generic
-// time_sleep() -> mp_hal_delay_ms(), see mphalport.c).
-#define MICROPY_PY_TIME                          (1)
+// MICROPY_PY_TIME_EXTRA_GLOBALS instead. Same pattern ports/unix uses.
 #define MICROPY_PY_TIME_TIME_TIME_NS              (1)
 // MPZ is required by MICROPY_TIMESTAMP_IMPL_TIME_T below. A required
 // combination, not an independent choice. Side effect: real
@@ -156,69 +123,8 @@ unsigned long mp_android_random_seed_init(void);
 // to the bundle's own root, which no existing glob touches.
 #define MICROPY_PY_TIME_INCLUDEFILE              "modtime_android.c"
 
-// binascii module: off by default at CORE_FEATURES (needs EXTRA_FEATURES).
-// hexlify/unhexlify also need MICROPY_PY_BUILTINS_BYTES_HEX. crc32 is the
-// standard CRC-32 (zlib/PNG), unlike OpenMV's crc.crc32(); it uses
-// lib/uzlib, so it needs MICROPY_PY_DEFLATE.
-#define MICROPY_PY_BINASCII                      (1)
-#define MICROPY_PY_BUILTINS_BYTES_HEX            (1)
-#define MICROPY_PY_BINASCII_CRC32                (1)
-
-// deflate module, with compression. lib/uzlib is #include'd by moddeflate.c.
-#define MICROPY_PY_DEFLATE                       (1)
+// deflate compression: off at every level below FULL_FEATURES.
+// binascii.crc32 is the standard CRC-32 (zlib/PNG), unlike OpenMV's crc.crc32().
 #define MICROPY_PY_DEFLATE_COMPRESS              (1)
-
-// hashlib module: sha256 only. sha1/md5 need an SSL library, left out with
-// sockets. lib/crypto-algorithms is #include'd by modhashlib.c.
-#define MICROPY_PY_HASHLIB                       (1)
-
-// heapq module: off by default at CORE_FEATURES (needs EXTRA_FEATURES).
-// extmod/modheapq.c has zero further dependencies (no vendored lib,
-// unlike binascii's crc32/hashlib/deflate). A genuinely free add,
-// same tier as errno/cmath below.
-#define MICROPY_PY_HEAPQ                         (1)
-
-// uctypes module: off by default at CORE_FEATURES (needs
-// EXTRA_FEATURES). extmod/moductypes.c has zero further dependencies,
-// same "genuinely free" tier as heapq above.
-#define MICROPY_PY_UCTYPES                       (1)
-
-// select module: off by default at CORE_FEATURES (needs
-// EXTRA_FEATURES). extmod/modselect.c uses real POSIX <poll.h>
-// directly. No vendored lib. MICROPY_PY_SELECT_SELECT (the classic
-// select.select() call, not just poll()-based objects) defaults to the
-// same tier as the parent flag and is turned on explicitly here for
-// consistency with re's MATCH_GROUPS/SPAN_START_END above (basic,
-// expected usage, not a rarely-needed extra).
-// MICROPY_PY_SELECT_POSIX_OPTIMISATIONS is left at its explicit
-// off-by-default (regardless of rom level). An internal
-// implementation-detail optimization, not investigated, no evidence
-// it's needed.
-#define MICROPY_PY_SELECT                        (1)
-#define MICROPY_PY_SELECT_SELECT                 (1)
-
-// cmath module: off by default at CORE_FEATURES (needs EXTRA_FEATURES),
-// but py/modcmath.c is core (unconditionally compiled, like py/moderrno.c)
-// and MICROPY_PY_BUILTINS_COMPLEX already defaults to on (it just mirrors
-// MICROPY_PY_BUILTINS_FLOAT, already 1 for the math module). Genuinely
-// free, one flag, zero vendoring, same tier as errno.
-#define MICROPY_PY_CMATH                         (1)
-
-// errno module: off by default at CORE_FEATURES (needs EXTRA_FEATURES),
-// but py/moderrno.c is core (unconditionally compiled). Genuinely
-// free, one flag, zero vendoring, same tier as cmath. Pairs naturally
-// with the VFS work: OSError codes currently print as bare numbers
-// (e.g. OSError(2,)), this lets scripts use errno.ENOENT etc. by name.
-#define MICROPY_PY_ERRNO                         (1)
-
-// help() / help('modules'): off by default at CORE_FEATURES (needs
-// EXTRA_FEATURES), but py/builtinhelp.c is core (unconditionally
-// compiled by embed.mk's py/*.c glob). Genuinely free, two flags,
-// zero vendoring, same tier as errno/cmath. help('modules') enumerates
-// every MP_REGISTER_MODULE'd module (walks genhdr's module registry),
-// so it picks up ulab and everything else added this session
-// automatically. No separate list to maintain.
-#define MICROPY_PY_BUILTINS_HELP                 (1)
-#define MICROPY_PY_BUILTINS_HELP_MODULES         (1)
 
 // see session-state: mpconfigport.h#MICROPY_PY_CRC
