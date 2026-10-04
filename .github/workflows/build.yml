@@ -109,7 +109,6 @@ jobs:
           body: >-
             upy-android ${{ inputs.build_type || 'debug' }} build, from
             ${{ steps.vars.outputs.short_sha }}.
-            ${{ inputs.build_type == 'release' && 'Debug-key-signed -- not a production signing identity, see app/build.gradle.kts.' || '' }}
           tag: ${{ steps.vars.outputs.title }}
           name: ${{ steps.vars.outputs.title }}
           commit: ${{ github.sha }}
