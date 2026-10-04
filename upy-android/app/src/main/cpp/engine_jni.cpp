@@ -5,7 +5,6 @@
 #include <jni.h>
 #include <cstdlib>
 #include <mutex>
-#include <string>
 #include <android/native_window_jni.h>
 
 extern "C" {
@@ -62,13 +61,24 @@ struct ChunkCbContext {
     jmethodID on_chunk_method;
 };
 
+// UTF-8 bytes to a Java String, via Java's UTF-8 decoder, not
+// NewStringUTF: keeps NUL bytes, invalid UTF-8 becomes U+FFFD.
+jstring utf8_to_jstring(JNIEnv *env, const char *str, size_t len) {
+    jbyteArray bytes = env->NewByteArray(static_cast<jsize>(len));
+    env->SetByteArrayRegion(bytes, 0, static_cast<jsize>(len), reinterpret_cast<const jbyte *>(str));
+    jclass string_class = env->FindClass("java/lang/String");
+    jmethodID ctor = env->GetMethodID(string_class, "<init>", "([BLjava/lang/String;)V");
+    jstring charset = env->NewStringUTF("UTF-8");
+    auto result = static_cast<jstring>(env->NewObject(string_class, ctor, bytes, charset));
+    env->DeleteLocalRef(charset);
+    env->DeleteLocalRef(string_class);
+    env->DeleteLocalRef(bytes);
+    return result;
+}
+
 void chunk_cb_trampoline(const char *str, size_t len, void *context) {
     auto *ctx = static_cast<ChunkCbContext *>(context);
-    // str is not null-terminated at len. Build an explicit-length
-    // std::string first, same as nativeExec does for the final
-    // accumulated output.
-    std::string chunk(str, len);
-    jstring jchunk = ctx->env->NewStringUTF(chunk.c_str());
+    jstring jchunk = utf8_to_jstring(ctx->env, str, len);
     ctx->env->CallVoidMethod(ctx->sink, ctx->on_chunk_method, jchunk);
     ctx->env->DeleteLocalRef(jchunk);
 }
@@ -135,9 +145,10 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeExec(JNIEnv *env, jobject, jstrin
     mp_embed_exec_str(code_chars);
 
     mp_embed_set_output_chunk_cb(nullptr, nullptr);
-    std::string output = mp_embed_output_get();
+    const char *output = mp_embed_output_get();
+    jstring result = utf8_to_jstring(env, output, mp_embed_output_get_len());
     env->ReleaseStringUTFChars(code, code_chars);
-    return env->NewStringUTF(output.c_str());
+    return result;
 }
 
 // Must be called on the worker thread, right after nativeExec.

@@ -39,6 +39,10 @@ const char *mp_embed_output_get(void) {
     return mp_embed_output_buf;
 }
 
+size_t mp_embed_output_get_len(void) {
+    return mp_embed_output_len;
+}
+
 // Live output tap (see micropython_embed.h). Deliberately separate from
 // the accumulate-into-mp_embed_output_buf logic above: the chunk callback
 // always sees the full, untruncated write, even once the 32KB

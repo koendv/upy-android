@@ -54,6 +54,8 @@ void mp_embed_exec_mpy(const uint8_t *mpy, size_t len);
 // shell, so this return value is the whole answer.
 void mp_embed_output_clear(void);
 const char *mp_embed_output_get(void);
+// Length of mp_embed_output_get()'s output; it may contain NUL bytes.
+size_t mp_embed_output_get_len(void);
 
 // Optional live output tap (upy-android addition, port/mphalport.c).
 // Needed for long-running/infinite scripts (e.g. while True:
