@@ -125,6 +125,20 @@ The HTTP file server is on port 8080.
 - `upy-android/native-bringup/vendor/` has unmodified upstream files. `upy-android/native-bringup/my-overrides/` has this project's own files and patched copies of upstream files. A patched copy has a comment "upy-android PATCH" that explains the change.
 - The build generates `micropython_embed/` from these two directories. Do not edit `micropython_embed/` by hand: the next build overwrites it.
 
+## Networking
+
+For a more robust and simpler implementation, network protocols are not written in Python on top of sockets.
+Sockets are in Android, not MicroPython.
+A known good Java, Kotlin, C or C++ library is wrapped as a MicroPython module.
+
+Three layers, for example `umqtt`:
+
+1. MicroPython module: `mqtt_module.cpp`.
+2. JNI interface: `mqtt_jni_bridge.cpp`, `mqtt/MqttShim.kt`.
+3. External library: HiveMQ MQTT Client.
+
+Protocols that have to be persistent across interpreter resets and crashes, or that need an Activity, are better run in the user interface process, with MicroPython calling them over AIDL.
+
 ## Machine learning: tflite, litert
 
 Two independent native modules:

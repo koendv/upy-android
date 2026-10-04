@@ -4,8 +4,7 @@
 // API follows micropython-lib umqtt.simple 1.8.1: ssl=True uses TLS
 // with Android's CA certificates; ssl_params other than server_hostname,
 // and an SSLContext for ssl, are not supported.
-// TODO: revisit mqtt when the MicroPython Android port has socket +
-// ssl: micropython-lib's own umqtt.simple would then run unmodified.
+// Wraps HiveMQ by design, see doc/DEVELOPER.md, Networking.
 
 #include <cstdlib>
 #include <cstring>

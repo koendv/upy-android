@@ -19,9 +19,7 @@
 //
 // API follows micropython-lib umqtt.simple 1.8.1, with ssl=True only
 // (system CA certificates; no ssl_params, no client certificates).
-// TODO: revisit mqtt when the MicroPython Android port has socket +
-// ssl: micropython-lib's own umqtt.simple would then run unmodified
-// and this HiveMQ shim could go.
+// Wraps HiveMQ by design, see doc/DEVELOPER.md, Networking.
 package eu.kdvelectronics.upyandroid.mqtt
 
 import com.hivemq.client.mqtt.MqttClient
