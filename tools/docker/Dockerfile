@@ -26,14 +26,18 @@
 #
 # Local debug build:
 #   docker build --target tools -t upy-android-tools .
-#   docker build --target build -t upy-android .
+#   docker build --target build \
+#     --secret id=signing_keystore,src=$HOME/.android/debug.keystore \
+#     -t upy-android .
 #   id=$(docker create upy-android)
 #   docker cp "$id":/output ./upy-android_apk
 #   docker rm "$id"
 #
 # Local release build (debug-key-signed so it's installable, NOT a
 # production signing identity, see app/build.gradle.kts):
-#   docker build --target build --build-arg BUILD_TYPE=release -t upy-android .
+#   docker build --target build --build-arg BUILD_TYPE=release \
+#     --secret id=signing_keystore,src=$HOME/.android/debug.keystore \
+#     -t upy-android .
 #   (then the same docker create/cp/rm steps)
 #
 # Tested:
@@ -120,6 +124,9 @@ RUN echo "sdk.dir=${ANDROID_SDK_ROOT}" > local.properties
 
 RUN chmod +x ./gradlew
 
+# Else the signing_keystore mount below creates ~/.android owned by root.
+RUN mkdir -p /home/devuser/.android
+
 # ONE-TIME: generate app/gradle.lockfile to pin down dependencies
 #RUN ./gradlew :app:dependencies --write-locks && \
 #    find . -name 'gradle.lockfile' -o -name '*gradle.lockfile*' && \
@@ -139,6 +146,9 @@ RUN --mount=type=cache,target=/home/devuser/.gradle,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/app/src/main/jniLibs,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/app/.cxx,uid=1000,gid=1000 \
     --mount=type=cache,target=/home/devuser/upy-android/app/build,uid=1000,gid=1000 \
+    --mount=type=secret,id=signing_keystore,target=/home/devuser/.android/debug.keystore,uid=1000,gid=1000,required=false \
+    { [ -f /home/devuser/.android/debug.keystore ] || \
+        echo "WARNING: no signing_keystore secret, APK signed with a random key"; } && \
     if [ "$BUILD_TYPE" = "release" ]; then \
         ./gradlew :app:assembleRelease && \
         cp app/build/outputs/apk/release/app-release.apk /output/upy-release.apk; \

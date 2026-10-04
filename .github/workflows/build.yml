@@ -40,9 +40,19 @@ jobs:
             -t upy-android-tools \
             -f tools/docker/Dockerfile .
 
+      # SIGNING_KEYSTORE: base64 of the signing key, for debug and release.
+      # Without it, Gradle signs with a random key (forks).
       - name: docker build
+        env:
+          SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
         run: |
+          secret=()
+          if [ -n "$SIGNING_KEYSTORE" ]; then
+            echo "$SIGNING_KEYSTORE" | base64 -d > "$RUNNER_TEMP/signing.keystore"
+            secret=(--secret id=signing_keystore,src="$RUNNER_TEMP/signing.keystore")
+          fi
           docker build --target build \
+            "${secret[@]}" \
             --build-arg BUILD_TYPE=${{ inputs.build_type || 'debug' }} \
             --build-arg GIT_COMMIT=${{ github.sha }} \
             -t upy-android \

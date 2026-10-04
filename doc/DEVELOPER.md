@@ -150,3 +150,21 @@ The app version is set in one place, [`upy-android/version.properties`](../upy-a
 ### GitHub release
 
 To publish a release on GitHub: **Actions > upy-android > Run workflow**, tick **release**. The release tag is `v<version>` for a release build and `v<version>-debug-<run>` for a debug build.
+
+### Signing key
+
+If different builds of an app are signed with the same key, upgrading the app keeps the private files.
+If different builds of an app are signed with different keys, the app must be uninstalled before installing the new build, losing all private files.
+
+Debug and release APKs are signed with one key, `~/.android/debug.keystore` on the development PC.
+Keep a backup of this key offline.
+
+GitHub builds read the key from the repository secret `SIGNING_KEYSTORE`:
+
+```
+base64 -w0 ~/.android/debug.keystore | gh secret set SIGNING_KEYSTORE --repo koendv/upy-android
+```
+
+Local Docker builds need `--secret id=signing_keystore,src=$HOME/.android/debug.keystore`.
+
+Without the secret, each Docker or GitHub build uses a different random key.
