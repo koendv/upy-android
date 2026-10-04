@@ -4,6 +4,7 @@ import android.content.Context
 import android.view.Surface
 import eu.kdvelectronics.upyandroid.managers.BoardManager
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
+import eu.kdvelectronics.upyandroid.model.ExecResult
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -21,7 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 // see session-state: ScriptExecCore.kt#ScriptExecCore
 object ScriptExecCore {
     sealed class RunResult {
-        data class Ok(val output: String) : RunResult()
+        data class Ok(val output: String, val exception: String) : RunResult()
         object Busy : RunResult()
         object Disconnected : RunResult()
     }
@@ -74,8 +75,8 @@ object ScriptExecCore {
             if (label != null) {
                 TerminalLog.append("\n>>> ($label)\n$code\n")
             }
-            val output = boardManager?.exec(code) ?: ""
-            return if (!connected) RunResult.Disconnected else RunResult.Ok(output)
+            val result = boardManager?.exec(code) ?: ExecResult("", "")
+            return if (!connected) RunResult.Disconnected else RunResult.Ok(result.output, result.exception)
         } finally {
             inFlight.decrementAndGet()
         }
@@ -91,7 +92,7 @@ object ScriptExecCore {
         inFlight.incrementAndGet()
         try {
             ensureConnected(context)
-            return boardManager?.exec(code) ?: ""
+            return boardManager?.exec(code)?.output ?: ""
         } finally {
             inFlight.decrementAndGet()
         }

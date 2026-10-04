@@ -140,6 +140,12 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeExec(JNIEnv *env, jobject, jstrin
     return env->NewStringUTF(output.c_str());
 }
 
+// Must be called on the worker thread, right after nativeExec.
+extern "C" JNIEXPORT jstring JNICALL
+Java_eu_kdvelectronics_upyandroid_Engine_nativeLastException(JNIEnv *env, jobject) {
+    return env->NewStringUTF(mp_embed_last_exception());
+}
+
 // Safe to call from any thread. Sets a pending-exception flag the
 // worker thread's VM loop polls between bytecode instructions. Does not
 // touch heap/stack/gc state, so no synchronization is needed here.

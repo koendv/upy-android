@@ -1,17 +1,18 @@
 name: upy-android adb exec
 source: https://github.com/koendv/upy-android
-protocol: 1
+protocol: 2
 runtime: MicroPython ports/embed, OpenMV subset
 model: each run executes one whole script; no REPL
-call: "adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method <method> [--arg <arg>]"
+call: "adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method <method> [--arg <arg>] [--extra timeout:i:<seconds>]"
 reply:
   ok: "Result: Bundle[{output=<text>}]"
+  run: "Result: Bundle[{output=<text>, status=ok|exception|timeout, exception=<type name, only with status=exception>}]"
   ack: "Result: Bundle[{}]"
   error: "Result: Bundle[{error=<code>}]"
 methods:
   help: this page
-  status: protocol, app version, engine connected, busy
-  run: {arg: base64 utf-8 script, returns: stdout and traceback}
+  status: protocol, app version, commit, build date, engine connected, busy, screen, foreground, camera available (else why not)
+  run: {arg: base64 utf-8 script, extra timeout (seconds, optional): interrupt after it, returns: stdout, traceback, status}
   reset: fresh interpreter
   interrupt: stop running script
 errors:
@@ -23,7 +24,8 @@ errors:
   unknown_method: see methods
 state:
   - globals persist across runs; reset clears
-  - run blocks until done, no timeout; interrupt via second call
+  - run blocks until done, or until the optional timeout; interrupt via second call
+  - camera needs screen on, unlocked, app in foreground: check status first
 limits:
   output: max 32 KB; longer output ends with ".[truncated]" (1-4 dots); write large results to a file
   script: ~96 KB source; send large data in chunks

@@ -10,9 +10,10 @@ import eu.kdvelectronics.upyandroid.IEngineShareListener;
 // used for USB serial.
 // see session-state: IEngine.aidl#IEngine
 interface IEngine {
-    // Blocks until the code has finished executing. Output includes both
-    // normal print() text and any uncaught-exception traceback.
-    String exec(String code);
+    // Blocks until the code has finished executing. Returns "output":
+    // print() text and any uncaught-exception traceback, and "exception":
+    // the uncaught exception's type name, "" if none.
+    Bundle exec(String code);
 
     // Safe to call while exec() is in flight on another call. Sets a
     // pending-exception flag the running script's VM loop polls.

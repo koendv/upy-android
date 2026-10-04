@@ -26,6 +26,7 @@ object Engine {
     // and engine_jni.cpp's chunk_cb_trampoline. Pass null for the old
     // behavior: accumulated output only, on return.
     external fun nativeExec(code: String, sink: EngineOutputSink?): String
+    external fun nativeLastException(): String
     external fun nativeInterrupt()
     external fun nativeReset(stackSizeBytes: Int, rootPath: String)
     external fun nativeDeinit()

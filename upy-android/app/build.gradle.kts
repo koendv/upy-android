@@ -283,7 +283,8 @@ val copyRom = tasks.register<Copy>("copyRom") {
 // Build date, source commit and MicroPython version, shown in Settings >
 // About. An asset, not BuildConfig, so a new build date does not force a
 // Kotlin recompile. Commit: GIT_COMMIT (set by Docker/CI, which have no
-// .git) or git rev-parse; "unknown" otherwise.
+// .git) or git rev-parse; "unknown" otherwise. git.dirty: uncommitted
+// changes to tracked files (local builds only).
 val generateBuildInfo = tasks.register("generateBuildInfo") {
     dependsOn(fetchUpstream)
     val out = layout.projectDirectory.file("src/main/assets/build_info.properties").asFile
@@ -299,6 +300,12 @@ val generateBuildInfo = tasks.register("generateBuildInfo") {
         } catch (e: IOException) {
             null
         } ?: "unknown"
+        val dirty = System.getenv("GIT_COMMIT").isNullOrBlank() && try {
+            val p = ProcessBuilder("git", "status", "--porcelain", "--untracked-files=no").directory(repoDir).start()
+            p.inputStream.bufferedReader().readText().isNotBlank().also { p.waitFor() }
+        } catch (e: IOException) {
+            false
+        }
         val defines = mpconfig.readLines().mapNotNull {
             Regex("""#define MICROPY_VERSION_(MAJOR|MINOR|MICRO|PRERELEASE) (\d+)""").find(it)?.destructured
         }.associate { (k, v) -> k to v }
@@ -310,6 +317,7 @@ val generateBuildInfo = tasks.register("generateBuildInfo") {
         out.writeText(
             "build.date=$date\n" +
                 "git.commit=$commit\n" +
+                "git.dirty=$dirty\n" +
                 "micropython.version=$mpVersion\n" +
                 "micropython.sha=$micropythonSha\n",
         )

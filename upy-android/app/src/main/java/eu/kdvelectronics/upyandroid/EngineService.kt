@@ -84,13 +84,19 @@ class EngineService : Service() {
     }
 
     private val binder = object : IEngine.Stub() {
-        override fun exec(code: String): String = worker.exec(code) { chunk ->
-            try {
-                outputListener?.onOutputChunk(chunk)
-            } catch (e: RemoteException) {
-                // Main process is gone or unresponsive mid-script. Drop
-                // the chunk and keep the script running; exec()'s own
-                // return value on completion is unaffected.
+        override fun exec(code: String): Bundle {
+            val result = worker.exec(code) { chunk ->
+                try {
+                    outputListener?.onOutputChunk(chunk)
+                } catch (e: RemoteException) {
+                    // Main process is gone or unresponsive mid-script. Drop
+                    // the chunk and keep the script running; exec()'s own
+                    // return value on completion is unaffected.
+                }
+            }
+            return Bundle().apply {
+                putString("output", result.output)
+                putString("exception", result.exception)
             }
         }
 

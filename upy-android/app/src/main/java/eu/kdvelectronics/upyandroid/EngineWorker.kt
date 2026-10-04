@@ -1,6 +1,7 @@
 package eu.kdvelectronics.upyandroid
 
 import android.content.Context
+import eu.kdvelectronics.upyandroid.model.ExecResult
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -50,12 +51,13 @@ class EngineWorker(
     // onChunk fires synchronously on this worker thread, once per
     // print()/traceback write, before exec() itself returns. See
     // EngineOutputSink and engine_jni.cpp.
-    fun exec(code: String, onChunk: (String) -> Unit = {}): String {
+    fun exec(code: String, onChunk: (String) -> Unit = {}): ExecResult {
         val latch = CountDownLatch(1)
-        var result = ""
+        var result = ExecResult("", "")
         taskQueue.put {
             val sink = EngineOutputSink { chunk -> onChunk(chunk) }
-            result = Engine.nativeExec(code, sink)
+            val output = Engine.nativeExec(code, sink)
+            result = ExecResult(output, Engine.nativeLastException())
             latch.countDown()
         }
         latch.await()

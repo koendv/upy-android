@@ -62,9 +62,17 @@ void mp_embed_init(void *gc_heap, size_t gc_heap_size, void *stack_top, size_t s
     mp_embed_mount_vfs(root_path);
 }
 
+// Type name of the last mp_embed_exec_str() uncaught exception, "" if none.
+static char last_exception[64];
+
+const char *mp_embed_last_exception(void) {
+    return last_exception;
+}
+
 #if MICROPY_ENABLE_COMPILER
 // Compile and execute the given source script (Python text).
 void mp_embed_exec_str(const char *src) {
+    last_exception[0] = '\0';
     nlr_buf_t nlr;
     if (nlr_push(&nlr) == 0) {
         // Compile, parse and execute the given string.
@@ -89,6 +97,8 @@ void mp_embed_exec_str(const char *src) {
     } else {
         // Uncaught exception: print it out.
         mp_obj_print_exception(&mp_plat_print, (mp_obj_t)nlr.ret_val);
+        snprintf(last_exception, sizeof(last_exception), "%s",
+            qstr_str(mp_obj_get_type((mp_obj_t)nlr.ret_val)->name));
     }
 }
 #endif

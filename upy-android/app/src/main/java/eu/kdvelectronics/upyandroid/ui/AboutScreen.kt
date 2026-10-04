@@ -60,6 +60,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenAttributions: () -> Unit, onOpenLicens
         }
     }
     val commit = buildInfo.getProperty("git.commit", "unknown")
+    val dirty = if (buildInfo.getProperty("git.dirty") == "true") "-dirty" else ""
     val micropythonSha = buildInfo.getProperty("micropython.sha", "")
 
     Scaffold(
@@ -83,7 +84,7 @@ fun AboutScreen(onBack: () -> Unit, onOpenAttributions: () -> Unit, onOpenLicens
             AboutRow("Build date", buildInfo.getProperty("build.date", "unknown"))
             AboutRow(
                 "Source code",
-                if (commit == "unknown") SOURCE_URL else "$SOURCE_URL @ ${commit.take(7)}",
+                if (commit == "unknown") SOURCE_URL else "$SOURCE_URL @ ${commit.take(7)}$dirty",
                 onClick = {
                     openUrl(context, if (commit == "unknown") SOURCE_URL else "$SOURCE_URL/tree/$commit")
                 },

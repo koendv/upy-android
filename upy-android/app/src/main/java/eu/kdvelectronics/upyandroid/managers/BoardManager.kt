@@ -14,6 +14,7 @@ import eu.kdvelectronics.upyandroid.IEngine
 import eu.kdvelectronics.upyandroid.IEngineOutputListener
 import eu.kdvelectronics.upyandroid.IEngineShareListener
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
+import eu.kdvelectronics.upyandroid.model.ExecResult
 
 /**
  * The local transport: binds to [EngineService] (running in the separate
@@ -219,17 +220,18 @@ class BoardManager(
      * this return value. exec()'s output arrives live via the output
      * listener; this return value is not used to display it.
      */
-    fun exec(code: String): String {
+    fun exec(code: String): ExecResult {
         val e = engine
         if (e == null) {
             onStatusChanges?.invoke(ConnectionStatus.Disconnected("not connected to engine"))
-            return ""
+            return ExecResult("", "")
         }
         return try {
-            e.exec(code)
+            val b = e.exec(code)
+            ExecResult(b.getString("output", ""), b.getString("exception", ""))
         } catch (re: RemoteException) {
             onStatusChanges?.invoke(ConnectionStatus.Disconnected("engine process disconnected during execution"))
-            ""
+            ExecResult("", "")
         }
     }
 
