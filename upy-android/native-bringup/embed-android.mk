@@ -24,6 +24,7 @@
 
 ANDROID_EXTMOD_FILES = \
 	misc.h \
+	modasyncio.c \
 	modbinascii.c \
 	moddeflate.c \
 	modhashlib.c \

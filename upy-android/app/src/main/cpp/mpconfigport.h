@@ -127,4 +127,8 @@ unsigned long mp_android_random_seed_init(void);
 // binascii.crc32 is the standard CRC-32 (zlib/PNG), unlike OpenMV's crc.crc32().
 #define MICROPY_PY_DEFLATE_COMPRESS              (1)
 
+// Frozen Python modules (native-bringup/manifest.py), e.g. asyncio.
+#define MICROPY_MODULE_FROZEN_MPY                (1)
+#define MICROPY_QSTR_EXTRA_POOL                  mp_qstr_frozen_const_pool
+
 // see session-state: mpconfigport.h#MICROPY_PY_CRC

@@ -36,7 +36,7 @@
 #include "port/micropython_embed.h"
 
 // Set micropython virtual file system (vfs) to app private storage
-// Gives scripts a clean, jailed filesystem.
+// Gives scripts a clean filesystem view.
 static void mp_embed_mount_vfs(const char *root_path) {
     char cmd[512];
     snprintf(cmd, sizeof(cmd),
@@ -44,7 +44,7 @@ static void mp_embed_mount_vfs(const char *root_path) {
         "os.mount(os.VfsPosix('%s'), '/')\n"
         // do a chdir to private storage root, so relative paths resolve correctly.
         "os.chdir('/')\n"
-        "sys.path[:] = ['/']\n",
+        "sys.path[:] = ['/', '.frozen']\n",
         root_path);
     mp_embed_exec_str(cmd);
 }

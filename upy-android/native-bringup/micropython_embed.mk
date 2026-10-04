@@ -308,3 +308,16 @@ SRC_QSTR += ../app/src/main/cpp/mqtt_module.cpp
 
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk
+
+# Frozen Python modules: manifest.py, compiled by mpy-cross into
+# port/frozen_content.c. Own rule, because py/manifest.mk's needs the
+# micropython-lib submodule. py/mkrules.mk builds mpy-cross.
+$(BUILD)/frozen_content.c: manifest.py $(GENHDR_OUTPUT) | $(MICROPY_MPYCROSS_DEPENDENCY)
+	$(ECHO) "- frozen_content.c"
+	$(Q)$(MAKE_MANIFEST) -o $@ -v MPY_DIR=$(TOP) -v PORT_DIR=$(CURDIR) -b $(BUILD) manifest.py
+
+.PHONY: android-frozen-package
+android-frozen-package: micropython-embed-package $(BUILD)/frozen_content.c
+	$(Q)$(CP) $(BUILD)/frozen_content.c $(PACKAGE_DIR)/port/frozen_content.c
+
+all: android-frozen-package
