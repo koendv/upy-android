@@ -3,11 +3,18 @@
 # exec-out, not `adb shell`, avoids PTY/CRLF translation on the reply.
 import base64
 import os
+import re
 import subprocess
 
 PACKAGE = "eu.kdvelectronics.upyandroid"
 URI = "content://%s.exec" % PACKAGE
 ADB_TIMEOUT = 25  # seconds
+
+# Protocol 2 run replies end with these fields, after output.
+RUN_STATUS = re.compile(r", status=(ok|exception|timeout)(?:, exception=([A-Za-z_][A-Za-z0-9_]*))?$")
+
+# Type name of the uncaught exception that ended the last run, "" if none.
+last_exception = ""
 
 
 def adb_cmd():
@@ -55,8 +62,12 @@ def content_call(method, arg=None):
 
     if body == "":
         return "", None  # empty Bundle: reset/interrupt ack
+    global last_exception
     if body.startswith("output="):
-        return body[len("output="):], None
+        output = body[len("output="):]
+        m = RUN_STATUS.search(output)
+        last_exception = (m.group(2) or "") if m else ""
+        return output[: m.start()] if m else output, None
     if body.startswith("error="):
         return None, body[len("error="):]
     return None, "unparseable adb reply body: %r" % body

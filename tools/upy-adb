@@ -69,6 +69,9 @@ def main():
     output = _SYSTEMEXIT_TRACEBACK_RE.sub("", output)
     sys.stdout.write(output)
     sys.stdout.flush()
+    # Like the unix micropython: exit 1 on an uncaught exception.
+    if core.last_exception not in ("", "SystemExit"):
+        sys.exit(1)
 
 
 if __name__ == "__main__":
