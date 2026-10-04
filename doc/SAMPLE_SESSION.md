@@ -9,6 +9,14 @@ Before starting (not part of the recorded session):
 
 A real session, shortened. The prompts are unchanged. The agent's replies are shortened, and `[...]` marks a cut. The session started with the setup prompt and "Describe the features of this micropython."
 
+> **Prompt:** An Android phone is connected over USB. The app content provider runs code over adb. Start with: adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help and follow what it says.
+>
+> **Agent:** I'm connected to the phone and can run scripts on it. The help page only describes the interface and doesn't give a task, so tell me what you'd like done next. [...]
+>
+> **Prompt:** Describe the features of this micropython.
+>
+> **Agent:** This is upy-android: MicroPython 1.30.0-preview built as an embedded interpreter inside an Android app [...]. It has a 32 MB heap and runs most of OpenMV's machine-vision API on top of the phone's own camera and sensors. [...]
+>
 > **Prompt:** Do not generate yet, first discuss. I want to install the Mosquitto MQTT broker on this PC, Ubuntu 24.04, IP 192.168.1.20. The phone must reach it over Wi-Fi.
 >
 > **Agent:** Here's the plan. Nothing has been installed or changed yet. [...] Mosquitto 2.x accepts connections only from the PC itself until you configure it otherwise, so we'd add a small config file, `/etc/mosquitto/conf.d/lan.conf`, with `listener 1883`. [...] Do you want a password, and do you want TLS? Is ufw active? What will the phone send?
