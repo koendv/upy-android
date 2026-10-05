@@ -29,10 +29,15 @@ import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -270,15 +275,22 @@ fun TerminalScreen(
                     // sheet has no dedicated "connecting" glyph, and
                     // link_off's "not currently connected" read fits a
                     // transient state well enough.
-                    Symbol(
-                        codepoint = if (status is ConnectionStatus.Connected) SymbolIcon.LINK else SymbolIcon.LINK_OFF,
-                        contentDescription = when (status) {
-                            is ConnectionStatus.Connecting -> "connecting..."
-                            is ConnectionStatus.Connected -> "connected"
-                            is ConnectionStatus.Disconnected -> "disconnected"
-                        },
-                        modifier = Modifier.padding(end = 16.dp)
-                    )
+                    val statusLabel = when (status) {
+                        is ConnectionStatus.Connecting -> "Connecting…"
+                        is ConnectionStatus.Connected -> "Connected"
+                        is ConnectionStatus.Disconnected -> "Disconnected"
+                    }
+                    TooltipBox(
+                        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Below),
+                        tooltip = { PlainTooltip { Text(statusLabel) } },
+                        state = rememberTooltipState(),
+                        modifier = Modifier.padding(end = 16.dp),
+                    ) {
+                        Symbol(
+                            codepoint = if (status is ConnectionStatus.Connected) SymbolIcon.LINK else SymbolIcon.LINK_OFF,
+                            contentDescription = statusLabel,
+                        )
+                    }
                 }
             )
         }
