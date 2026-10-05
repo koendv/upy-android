@@ -24,6 +24,12 @@ jmethodID g_mid_acquire = nullptr;
 jmethodID g_mid_release = nullptr;
 jmethodID g_mid_close = nullptr;
 jmethodID g_mid_interrupt = nullptr;
+jmethodID g_mid_control_start = nullptr;
+jmethodID g_mid_control_wait = nullptr;
+jmethodID g_mid_control_error = nullptr;
+jmethodID g_mid_control_abandon = nullptr;
+jmethodID g_mid_info_numbers = nullptr;
+jmethodID g_mid_info_string = nullptr;
 
 // Null on a thread not attached to the JVM.
 JNIEnv *current_env() {
@@ -104,13 +110,19 @@ extern "C" void camera_bridge_init_impl(void *jni_env) {
     g_mid_id = env->GetStaticMethodID(g_shim_class, "id", "(I)Ljava/lang/String;");
     g_mid_facing = env->GetStaticMethodID(g_shim_class, "facing", "(I)Ljava/lang/String;");
     g_mid_sizes = env->GetStaticMethodID(g_shim_class, "sizes", "(I)[I");
-    g_mid_open = env->GetStaticMethodID(g_shim_class, "open", "(Ljava/lang/String;II)I");
+    g_mid_open = env->GetStaticMethodID(g_shim_class, "open", "(Ljava/lang/String;IIZII)I");
     g_mid_open_info = env->GetStaticMethodID(g_shim_class, "openInfo", "()[I");
     g_mid_buffer = env->GetStaticMethodID(g_shim_class, "buffer", "(I)Ljava/nio/ByteBuffer;");
     g_mid_acquire = env->GetStaticMethodID(g_shim_class, "acquire", "(JJ)[J");
     g_mid_release = env->GetStaticMethodID(g_shim_class, "release", "()V");
     g_mid_close = env->GetStaticMethodID(g_shim_class, "close", "()V");
     g_mid_interrupt = env->GetStaticMethodID(g_shim_class, "interrupt", "()V");
+    g_mid_control_start = env->GetStaticMethodID(g_shim_class, "controlStart", "(IFFII)I");
+    g_mid_control_wait = env->GetStaticMethodID(g_shim_class, "controlWait", "(J)[D");
+    g_mid_control_error = env->GetStaticMethodID(g_shim_class, "controlError", "()Ljava/lang/String;");
+    g_mid_control_abandon = env->GetStaticMethodID(g_shim_class, "controlAbandon", "()V");
+    g_mid_info_numbers = env->GetStaticMethodID(g_shim_class, "infoNumbers", "(IFF)[D");
+    g_mid_info_string = env->GetStaticMethodID(g_shim_class, "infoString", "(I)Ljava/lang/String;");
 }
 
 extern "C" bool camera_bridge_count(int *out_count, char **out_err) {
@@ -146,10 +158,12 @@ extern "C" bool camera_bridge_sizes(int index, int32_t **out_sizes, size_t *out_
     return true;
 }
 
-extern "C" bool camera_bridge_open(const char *id, int width, int height, int *out_status, char **out_err) {
+extern "C" bool camera_bridge_open(const char *id, int width, int height, bool rgb, int fps_min, int fps_max,
+                                   int *out_status, char **out_err) {
     JNIEnv *env = current_env();
     jstring jid = id ? env->NewStringUTF(id) : nullptr;
-    jint status = env->CallStaticIntMethod(g_shim_class, g_mid_open, jid, (jint) width, (jint) height);
+    jint status = env->CallStaticIntMethod(g_shim_class, g_mid_open, jid, (jint) width, (jint) height,
+                                           (jboolean) rgb, (jint) fps_min, (jint) fps_max);
     if (jid) {
         env->DeleteLocalRef(jid);
     }
@@ -222,6 +236,103 @@ extern "C" bool camera_bridge_close(char **out_err) {
     JNIEnv *env = current_env();
     env->CallStaticVoidMethod(g_shim_class, g_mid_close);
     return check(env, out_err);
+}
+
+namespace {
+
+char *control_error(JNIEnv *env) {
+    auto s = (jstring) env->CallStaticObjectMethod(g_shim_class, g_mid_control_error);
+    if (env->ExceptionCheck() || !s) {
+        env->ExceptionClear();
+        return strdup("camera: control failed");
+    }
+    char *out = dup_jstring(env, s);
+    env->DeleteLocalRef(s);
+    return out;
+}
+
+}  // namespace
+
+extern "C" bool camera_bridge_control_start(int op, float a, float b, int n, int flags, int *out_kind, char **out_err) {
+    JNIEnv *env = current_env();
+    jint kind = env->CallStaticIntMethod(g_shim_class, g_mid_control_start, (jint) op, (jfloat) a, (jfloat) b,
+                                         (jint) n, (jint) flags);
+    if (!check(env, out_err)) {
+        return false;
+    }
+    *out_kind = kind;
+    if (kind != 0) {
+        *out_err = control_error(env);
+    }
+    return true;
+}
+
+extern "C" bool camera_bridge_control_wait(long timeout_ms, bool *out_done, int *out_kind, double *out_value,
+                                           char **out_err) {
+    JNIEnv *env = current_env();
+    auto arr = (jdoubleArray) env->CallStaticObjectMethod(g_shim_class, g_mid_control_wait, (jlong) timeout_ms);
+    if (!check(env, out_err)) {
+        return false;
+    }
+    if (!arr) {
+        *out_done = false;
+        return true;
+    }
+    jdouble v[2] = {0, 0};
+    jsize len = env->GetArrayLength(arr);
+    env->GetDoubleArrayRegion(arr, 0, len < 2 ? len : 2, v);
+    env->DeleteLocalRef(arr);
+    *out_done = true;
+    *out_kind = (int) v[0];
+    *out_value = v[1];
+    if (*out_kind != 0) {
+        *out_err = control_error(env);
+    }
+    return true;
+}
+
+extern "C" void camera_bridge_control_abandon(void) {
+    JNIEnv *env = current_env();
+    env->CallStaticVoidMethod(g_shim_class, g_mid_control_abandon);
+    env->ExceptionClear();
+}
+
+extern "C" bool camera_bridge_info_numbers(int key, float x, float y, bool *out_open, double **out_values,
+                                           size_t *out_n, char **out_err) {
+    JNIEnv *env = current_env();
+    auto arr = (jdoubleArray) env->CallStaticObjectMethod(g_shim_class, g_mid_info_numbers, (jint) key,
+                                                          (jfloat) x, (jfloat) y);
+    if (!check(env, out_err)) {
+        return false;
+    }
+    if (!arr) {
+        *out_open = false;
+        return true;
+    }
+    jsize len = env->GetArrayLength(arr);
+    auto *buf = (double *) malloc(sizeof(double) * (len > 0 ? len : 1));
+    env->GetDoubleArrayRegion(arr, 0, len, buf);
+    env->DeleteLocalRef(arr);
+    *out_open = true;
+    *out_values = buf;
+    *out_n = (size_t) len;
+    return true;
+}
+
+extern "C" bool camera_bridge_info_string(int key, bool *out_open, char **out_value, char **out_err) {
+    JNIEnv *env = current_env();
+    auto s = (jstring) env->CallStaticObjectMethod(g_shim_class, g_mid_info_string, (jint) key);
+    if (!check(env, out_err)) {
+        return false;
+    }
+    if (!s) {
+        *out_open = false;
+        return true;
+    }
+    *out_open = true;
+    *out_value = dup_jstring(env, s);
+    env->DeleteLocalRef(s);
+    return true;
 }
 
 extern "C" void camera_bridge_interrupt(void) {
