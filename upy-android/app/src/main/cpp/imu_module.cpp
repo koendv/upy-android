@@ -35,14 +35,6 @@ constexpr int kLooperIdent = 1;
 constexpr float kMetersPerSecondSquaredToMg = 1000.0f / 9.80665f;
 constexpr float kRadToDeg = 180.0f / (float) M_PI;
 
-// Hardcoded rather than queried via JNI/Context. This project's
-// applicationId is fixed (app/build.gradle.kts), so a JNIEnv/Context
-// round-trip would be real added complexity for no practical benefit.
-// No pre-26 dlopen/dlsym fallback either. This project's minSdk is
-// 26, exactly ASensorManager_getInstanceForPackage()'s own
-// __INTRODUCED_IN(26).
-constexpr char kPackageName[] = "eu.kdvelectronics.upyandroid";
-
 // see session-state: imu_module.cpp#ImuState
 struct ImuState {
     ASensorManager *manager;
@@ -76,7 +68,8 @@ void ensure_capabilities_queried() {
     if (g_imu.queried_capabilities) {
         return;
     }
-    g_imu.manager = ASensorManager_getInstanceForPackage(kPackageName);
+    // nullptr: Android looks the package up from the calling uid.
+    g_imu.manager = ASensorManager_getInstanceForPackage(nullptr);
     if (g_imu.manager) {
         g_imu.accel = ASensorManager_getDefaultSensor(g_imu.manager, ASENSOR_TYPE_ACCELEROMETER);
         g_imu.gyro = ASensorManager_getDefaultSensor(g_imu.manager, ASENSOR_TYPE_GYROSCOPE);
