@@ -5,9 +5,8 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
-# - lens_corr() removed: not enabled on Android, phone cameras already correct lens distortion
 #
 # This work is licensed under the MIT license.
 # Copyright (c) 2013-2023 OpenMV LLC. All rights reserved.
@@ -24,20 +23,16 @@
 
 # find_lines() finds infinite length lines. Use find_line_segments() to find non-infinite lines.
 
-import csi
+import camera
 import time
 import display
 import image
 
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.pixformat(csi.RGB565)  # grayscale is faster
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.snapshot(time=2000)
+cam = camera.Camera(size=(160, 120), format=camera.RGB565)  # grayscale is faster
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 clock = time.clock()
 
@@ -52,7 +47,7 @@ max_degree = 179
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
 
     # `threshold` controls how many lines in the image are found. Only lines with
     # edge difference magnitude sums greater than `threshold` are detected...

@@ -5,7 +5,7 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 #
 # This work is licensed under the MIT license.
 # Copyright (c) 2013-2023 OpenMV LLC. All rights reserved.
@@ -18,18 +18,15 @@
 
 # find_line_segments() finds finite length lines (but is slow).
 
-import csi
+import camera
 import time
 import display
 import image
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.pixformat(csi.RGB565)
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
+cam = camera.Camera(size=(160, 120), format=camera.RGB565)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 clock = time.clock()
 
 # All lines also have `x1`, `y1`, `x2`, and `y2` attributes to get their end-points.
@@ -37,7 +34,7 @@ clock = time.clock()
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
 
     # `merge_distance` controls the merging of nearby lines. At 0 (the default), no
     # merging is done. At 1, any line 1 pixel away from another is merged... and so

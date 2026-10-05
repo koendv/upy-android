@@ -45,12 +45,9 @@ These settings depend on the phone brand. The names can be different on your pho
 This script prints the id and center of every [AprilTag](doc/apriltags.pdf) the camera sees. The **Camera** screen shows the image, with a box around each tag:
 
 ```python
-import csi, display
+import camera, display
 
-cam = csi.CSI()
-cam.reset()
-cam.pixformat(csi.GRAYSCALE)
-cam.framesize((320, 240))
+cam = camera.Camera(size=(320, 240))
 lcd = display.SPIDisplay()
 
 while True:
@@ -104,17 +101,17 @@ For a real example session, see [doc/SAMPLE_SESSION.md](doc/SAMPLE_SESSION.md).
 
 | Module | Description |
 |---|---|
-| `csi` | Camera. Grayscale or RGB565. Select frame size, frame rate and camera. Automatic gain, exposure and white balance. |
+| `camera` | Camera, on CameraX. Grayscale or RGB565. Images upright as the phone is held. Zoom, torch, exposure, focus point, frame rate. |
 | `display` | Shows images in the **Camera** screen of the app. |
 | `image` | OpenMV image processing: AprilTags, Data Matrix, circles, rectangles, lines, edges, template matching, HOG, LBP, face and eye detection. |
 | `gif`, `mjpeg` | Video recording. |
-| `android` | Flashlight, zoom, proximity sensor, accelerometer, gyroscope, location, save to gallery, share. |
+| `android` | Proximity sensor, accelerometer, gyroscope, location, save to gallery, share. |
 | `tflite` | TensorFlow Lite inference on the CPU, or with Android NNAPI (`tflite.set_nnapi(True)`). |
 | `litert` | LiteRT inference on the CPU, GPU or NPU. |
 | `ulab` | Arrays, similar to NumPy. |
 | `umqtt` | MQTT client, with TLS. |
 
-The modules `csi`, `display`, `android`, `tflite` and `litert` have a `help()` function. For example: `import csi; print(csi.help())`.
+The modules `camera`, `display`, `android`, `tflite` and `litert` have a `help()` function. For example: `import camera; print(camera.help())`.
 
 ### Performance
 

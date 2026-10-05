@@ -6,8 +6,7 @@
 # - hold the phone so the camera image is upright: Haar cascades only detect upright faces
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
-# - csi0.contrast()/gainceiling() removed: not implemented on Android
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
 #
 # This work is licensed under the MIT license.
@@ -20,15 +19,12 @@
 # the eyes within the face. If you want to determine the eye gaze please see the
 # iris_detection script for an example on how to do that.
 
-import csi
+import camera
 import time
 import display
 import image
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.pixformat(csi.GRAYSCALE)
+cam = camera.Camera(size=(240, 160), format=camera.GRAYSCALE)
 
 # Load Haar Cascade
 # By default this will use all stages, lower satges is faster but less accurate.
@@ -37,7 +33,7 @@ eyes_cascade = image.HaarCascade("/rom/haarcascade_eye.cascade", stages=24)
 print(face_cascade, eyes_cascade)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 # FPS clock
 clock = time.clock()
@@ -46,7 +42,7 @@ while True:
     clock.tick()
 
     # Capture snapshot
-    img = csi0.snapshot()
+    img = cam.snapshot()
 
     # Find a face !
     # Note: Lower scale factor scales-down the image more and detects smaller objects.

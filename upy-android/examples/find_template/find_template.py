@@ -9,8 +9,7 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
-# - csi0.contrast()/gainceiling() removed: not implemented on Android
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - /template.pgm is captured from the camera on first run instead of prepared beforehand
 # - frames are shown on the Camera tab via display.SPIDisplay
 #
@@ -29,7 +28,7 @@
 
 import os
 import time
-import csi
+import camera
 import image
 import display
 from image import SEARCH_EX
@@ -38,13 +37,10 @@ TEMPLATE = "/template.pgm"
 TEMPLATE_W = 40
 TEMPLATE_H = 30
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.pixformat(csi.GRAYSCALE)
+cam = camera.Camera(size=(160, 120), format=camera.GRAYSCALE)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 
 def exists(path):
@@ -59,7 +55,7 @@ if not exists(TEMPLATE):
     # Show a box in the frame center for 5 seconds, then save its contents.
     start = time.ticks_ms()
     while time.ticks_diff(time.ticks_ms(), start) < 5000:
-        img = csi0.snapshot()
+        img = cam.snapshot()
         box = ((img.width() - TEMPLATE_W) // 2, (img.height() - TEMPLATE_H) // 2, TEMPLATE_W, TEMPLATE_H)
         lcd.write(img.copy().draw_rectangle(box), hint=image.CENTER | image.SCALE_ASPECT_KEEP)
     img.save(TEMPLATE, roi=box)
@@ -71,7 +67,7 @@ clock = time.clock()
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
 
     # find_template(template, threshold, [roi, step, search])
     # ROI: The region of interest tuple (x, y, w, h).

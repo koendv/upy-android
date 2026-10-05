@@ -5,8 +5,7 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
-# - csi0.contrast()/gainceiling() removed: not implemented on Android
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
 #
 # This work is licensed under the MIT license.
@@ -20,25 +19,21 @@
 # Note: Due to JPEG artifacts, the HoG visualization looks blurry. To see the
 # image without JPEG artifacts, uncomment the lines that save the image to uSD.
 
-import csi
+import camera
 import time
 import display
 import image
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.pixformat(csi.GRAYSCALE)
-csi0.snapshot(time=2000)
+cam = camera.Camera(size=(320, 240), format=camera.GRAYSCALE)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 clock = time.clock()  # Tracks FPS.
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
     img.find_hog()
     lcd.write(img, hint=image.CENTER | image.SCALE_ASPECT_KEEP)
 

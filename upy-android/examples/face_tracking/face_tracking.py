@@ -5,8 +5,7 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
-# - csi0.contrast()/gainceiling()/window() removed: not implemented on Android
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
 # - hold the phone so the camera image is upright: Haar cascades only detect upright faces
 #
@@ -21,18 +20,14 @@
 # script finds a face in the image using the frontalface Haar Cascade.
 # After which the script uses the keypoints feature to automatically learn your
 # face and track it. Keypoints can be used to automatically track anything.
-import csi
+import camera
 import time
 import image
 import display
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.pixformat(csi.GRAYSCALE)
+cam = camera.Camera(size=(640, 480), format=camera.GRAYSCALE)
 
 # Skip a few frames to allow the sensor settle down
-csi0.snapshot(time=2000)
 
 # Load Haar Cascade
 # By default this will use all stages, lower satges is faster but less accurate.
@@ -40,14 +35,14 @@ face_cascade = image.HaarCascade("/rom/haarcascade_frontalface.cascade", stages=
 print(face_cascade)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 # First set of keypoints
 kpts1 = None
 
 # Find a face!
 while kpts1 is None:
-    img = csi0.snapshot()
+    img = cam.snapshot()
     img.draw_string((0, 0), "Looking for a face...")
     # Find faces
     objects = img.find_features(face_cascade, threshold=0.5, scale=1.25)
@@ -69,7 +64,7 @@ while kpts1 is None:
 # Draw keypoints
 print(kpts1)
 img.draw_keypoints(kpts1, size=24)
-img = csi0.snapshot()
+img = cam.snapshot()
 time.sleep_ms(2000)
 
 # FPS clock
@@ -77,7 +72,7 @@ clock = time.clock()
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
     # Extract keypoints from the whole frame
     kpts2 = img.find_keypoints(
         threshold=10, scale_factor=1.1, max_keypoints=100, normalized=True

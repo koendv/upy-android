@@ -5,7 +5,7 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
 #
 # This work is licensed under the MIT license.
@@ -21,25 +21,21 @@
 # distortion causes those rectangles to look bent. Rounded rectangles are no problem!
 # (But, given this the code will also detect small radius circles too)...
 
-import csi
+import camera
 import time
 import display
 import image
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.pixformat(csi.RGB565)  # grayscale is faster (160x120 max on OpenMV-M7)
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.snapshot(time=2000)
+cam = camera.Camera(size=(160, 120), format=camera.RGB565)  # grayscale is faster (160x120 max on OpenMV-M7)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 clock = time.clock()
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
 
     # `threshold` below should be set to a high enough value to filter out noise
     # rectangles detected in the image which have low edge magnitudes. Rectangles

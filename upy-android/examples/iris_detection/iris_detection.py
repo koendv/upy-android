@@ -6,10 +6,8 @@
 # - hold the phone so the camera image is upright: Haar cascades only detect upright faces
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
-# - csi0.contrast()/gainceiling() removed: not implemented on Android
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
-# - csi0.window() crop removed: not implemented on Android
 #
 # This work is licensed under the MIT license.
 # Copyright (c) 2013-2023 OpenMV LLC. All rights reserved.
@@ -24,15 +22,12 @@
 #
 # Note: This script does not detect a face first, use it with the telephoto lens.
 
-import csi
+import camera
 import time
 import display
 import image
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.pixformat(csi.GRAYSCALE)
+cam = camera.Camera(size=(640, 480), format=camera.GRAYSCALE)
 
 # Load Haar Cascade
 # By default this will use all stages, lower stages is faster but less accurate.
@@ -40,7 +35,7 @@ eyes_cascade = image.HaarCascade("/rom/haarcascade_eye.cascade", stages=24)
 print(eyes_cascade)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 # FPS clock
 clock = time.clock()
@@ -48,7 +43,7 @@ clock = time.clock()
 while True:
     clock.tick()
     # Capture snapshot
-    img = csi0.snapshot()
+    img = cam.snapshot()
     # Find eyes !
     # Note: Lower scale factor scales-down the image more and detects smaller objects.
     # Higher threshold results in a higher detection rate, with more false positives.

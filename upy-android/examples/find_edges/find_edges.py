@@ -5,9 +5,8 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
-# - csi0.gainceiling() removed: not implemented on Android
 #
 # This work is licensed under the MIT license.
 # Copyright (c) 2013-2023 OpenMV LLC. All rights reserved.
@@ -16,24 +15,20 @@
 # Edge detection with Canny:
 #
 # This example demonstrates the Canny edge detector.
-import csi
+import camera
 import image
 import time
 import display
 
-csi0 = csi.CSI()
-csi0.reset()  # Initialize the camera sensor.
-csi0.pixformat(csi.GRAYSCALE)  # or csi.RGB565
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.snapshot(time=2000)  # Let new settings take affect.
+cam = camera.Camera(size=(160, 120), format=camera.GRAYSCALE)  # or camera.RGB565
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 clock = time.clock()  # Tracks FPS.
 while True:
     clock.tick()  # Track elapsed milliseconds between snapshots().
-    img = csi0.snapshot()  # Take a picture and return the image.
+    img = cam.snapshot()  # Take a picture and return the image.
     # Use Canny edge detector
     img.find_edges(image.EDGE_CANNY, threshold=(50, 80))
     # Faster simpler edge detection

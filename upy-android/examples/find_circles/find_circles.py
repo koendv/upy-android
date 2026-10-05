@@ -5,8 +5,7 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
-# - lens_corr() removed: not enabled on Android, phone cameras already correct lens distortion
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
 #
 # This work is licensed under the MIT license.
@@ -21,25 +20,21 @@
 # Note that the find_circles() method will only find circles which are completely
 # inside of the image. Circles which go outside of the image/roi are ignored...
 
-import csi
+import camera
 import time
 import display
 import image
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.pixformat(csi.RGB565)  # grayscale is faster
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.snapshot(time=2000)
+cam = camera.Camera(size=(160, 120), format=camera.RGB565)  # grayscale is faster
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 clock = time.clock()
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
 
     # Circle objects have four values: x, y, r (radius), and magnitude. The
     # magnitude is the strength of the detection of the circle. Higher is

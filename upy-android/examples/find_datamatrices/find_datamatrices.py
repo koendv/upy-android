@@ -5,9 +5,7 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
-# - csi0.auto_gain()/auto_whitebal() removed: not implemented on Android
-# - lens_corr() removed: not enabled on Android, phone cameras already correct lens distortion
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
 #
 # This work is licensed under the MIT license.
@@ -19,26 +17,22 @@
 # This example shows off how easy it is to detect data matrices using the
 # OpenMV Cam M7. Data matrices detection does not work on the M4 Camera.
 
-import csi
+import camera
 import time
 import math
 import display
 import image
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.pixformat(csi.RGB565)
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.snapshot(time=2000)
+cam = camera.Camera(size=(320, 240), format=camera.RGB565)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 clock = time.clock()
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
 
     matrices = img.find_datamatrices()
     for matrix in matrices:

@@ -5,8 +5,7 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution instead of a fixed resolution
-# - csi0.contrast()/gainceiling() removed: not implemented on Android
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
 # - frames are shown on the Camera tab via display.SPIDisplay
 # - hold the phone so the camera image is upright: Haar cascades only detect upright faces
 #
@@ -23,15 +22,12 @@
 # a lot of work to be made into somethin useful. This script will remain to show
 # that the functionality exists, but, in its current state is inadequate.
 
-import csi
+import camera
 import time
 import image
 import display
 
-csi0 = csi.CSI()
-csi0.reset()
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.pixformat(csi.GRAYSCALE)
+cam = camera.Camera(size=(240, 160), format=camera.GRAYSCALE)
 
 # Load Haar Cascade
 # By default this will use all stages, lower satges is faster but less accurate.
@@ -39,12 +35,12 @@ face_cascade = image.HaarCascade("/rom/haarcascade_frontalface.cascade", stages=
 print(face_cascade)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 # Skip a few frames to allow the sensor settle down
 # Note: This takes more time when exec from the IDE.
 for i in range(0, 30):
-    img = csi0.snapshot()
+    img = cam.snapshot()
     img.draw_string((0, 0), "Please wait...")
 
 d0 = None
@@ -53,7 +49,7 @@ clock = time.clock()
 
 while True:
     clock.tick()
-    img = csi0.snapshot()
+    img = cam.snapshot()
 
     objects = img.find_features(face_cascade, threshold=0.5, scale=1.25)
     if objects:

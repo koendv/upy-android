@@ -97,7 +97,7 @@ adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --me
 
 Output is limited to 32 KB, a script to about 96 KB. The help page explains all methods (`status`, `run`, `reset`, `interrupt`) and limits. To use adb exec with an AI agent, see [AI-assisted programming](../README.md#ai-assisted-programming) in the README.
 
-The modules `csi`, `display`, `android` (and its submodules), `tflite` and `litert` have a `help()` function, for example `import csi; print(csi.help())`. With these, an agent can learn the API from the phone. When you add, remove or change a method, update the module's `help()` text in the same commit.
+The modules `camera`, `display`, `android` (and its submodules), `tflite` and `litert` have a `help()` function, for example `import camera; print(camera.help())`. With these, an agent can learn the API from the phone. When you add, remove or change a method, update the module's `help()` text in the same commit.
 
 `/examples` on the phone has example scripts, for example `find_apriltags.py` and `face_detection.py`. They cover the OpenMV modules (`image`, `gif`, `mjpeg`, ...) that have no `help()`.
 

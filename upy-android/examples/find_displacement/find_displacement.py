@@ -5,8 +5,9 @@
 # - interrupt via the Camera screen's Stop button
 #
 # Change with upstream:
-# - csi0.framesize() picks this device's smallest supported resolution; a 64x64 patch from the frame center replaces the 64x64 camera mode
-# - the previous patch is kept as an image instead of csi0.width()/height()/pixformat(), not implemented on Android
+# - camera.Camera() (CameraX) instead of csi.CSI(); no warm-up
+# - a 64x64 patch from the frame center replaces the 64x64 camera mode
+# - the previous patch is kept as an image
 # - frames are shown on the Camera tab via display.SPIDisplay
 #
 # This work is licensed under the MIT license.
@@ -36,23 +37,19 @@
 # 128x64, and 128x128. If you want a resolution of 32x32 you can create
 # it by doing "img.scale(x_scale=0.5, y_scale=0.5, hint=image.AREA)" on a 64x64 image.
 
-import csi
+import camera
 import image
 import time
 import display
 
-csi0 = csi.CSI()
-csi0.reset()  # Reset and initialize the sensor.
-csi0.pixformat(csi.RGB565)  # Set pixel format to RGB565 (or GRAYSCALE)
-csi0.framesize(csi0.framesize_list()[0])  # smallest resolution this Android camera supports
-csi0.snapshot(time=2000)  # Wait for settings take effect.
+cam = camera.Camera(size=(64, 64), format=camera.RGB565)  # nearest size the camera has (or GRAYSCALE)
 
 # Initialize the lcd screen.
-lcd = display.SPIDisplay(vflip=True, hmirror=True)
+lcd = display.SPIDisplay()
 
 # Android cameras have no 64x64 mode: use a 64x64 patch from the frame center.
 def patch():
-    frame = csi0.snapshot()
+    frame = cam.snapshot()
     roi = (frame.width() // 2 - 32, frame.height() // 2 - 32, 64, 64)
     return frame, frame.copy(roi=roi)
 
