@@ -390,8 +390,7 @@ class MainActivity : ComponentActivity() {
     // mapping differs for landscape-natural devices (tablets; untested).
     private fun screenOrientation(rotation: Int): Int {
         if (rotation < 0) return ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        @Suppress("DEPRECATION")
-        val current = windowManager.defaultDisplay.rotation
+        val current = ContextCompat.getDisplayOrDefault(this).rotation
         val portrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
         val naturalPortrait = portrait == (current == Surface.ROTATION_0 || current == Surface.ROTATION_180)
         return if (naturalPortrait) {
