@@ -394,16 +394,8 @@ dependencies {
     // along the way: the dynamic-dim bug, the "options not optional"
     // bug -- see SESSION_STATE.yaml). Real, permanent dependency now --
     // previously added only for a throwaway diagnostic and fully
-    // reverted afterward. Accepted APK-size cost (Guava, WorkManager,
-    // Play Core classes, ~7MB raw, isMinifyEnabled=false strips
-    // nothing) -- verified this project's own use of it (Environment/
-    // CompiledModel/TensorBuffer only, never AssetPackManager/
-    // ModelProvider) cannot trigger actual Play Store network contact
-    // (see SESSION_STATE.yaml's manifest-by-manifest investigation of
-    // every transitive dependency). WorkManager's own unconditional
-    // auto-init is stripped via AndroidManifest.xml's own provider
-    // override, for cleanliness, not because it's unsafe (it's purely
-    // local/on-device).
+    // reverted afterward. Accepted APK-size cost (Guava;
+    // isMinifyEnabled=false strips nothing).
     //
     // NOT also com.google.ai.edge.litert:litert:2.2.0 (the artifact this
     // project used to depend on for android.tf's classic API surface,
@@ -419,7 +411,11 @@ dependencies {
     // AGP never merges. This is still the project's
     // first prebuilt-binary native dependency (see NOTICE.html) --
     // everything else vendored is compiled from source.
-    implementation("com.google.ai.edge.litert:litert-api:$litertVersion")
+    // ai-delivery (Play AI-pack model download, pulls in Play services
+    // basement/tasks) is only used by AiPackModelProvider, which we never load.
+    implementation("com.google.ai.edge.litert:litert-api:$litertVersion") {
+        exclude(group = "com.google.android.play", module = "ai-delivery")
+    }
     // umqtt module (umqtt_module.cpp/MqttShim.kt) -- Part 7. Chosen over
     // Eclipse Paho Android: Paho Android has zero tagged GitHub releases
     // (Maven-only publishing), 241 open issues/29 open PRs, and a dual
