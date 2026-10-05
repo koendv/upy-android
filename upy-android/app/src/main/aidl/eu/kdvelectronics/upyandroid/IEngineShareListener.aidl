@@ -7,8 +7,13 @@ package eu.kdvelectronics.upyandroid;
 //
 // Also carries runtime-permission requests (android.location): only the
 // main process has an Activity to show the permission prompt.
+// And the screen lock while a camera is open.
 oneway interface IEngineShareListener {
     void onShareRequest(String path, String mimeType);
 
     void onPermissionRequest(in String[] permissions);
+
+    // Surface.ROTATION_* the camera image is upright in; the UI locks to
+    // it. -1: no camera open, unlock.
+    void onCameraOrientation(int rotation);
 }

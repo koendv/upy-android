@@ -183,11 +183,11 @@ const char display_help_text[] =
     "class: display.SPIDisplay(vflip=False, hmirror=False)\n"
     "  draws to the app's on-screen camera-preview Surface; the name is carried over from OpenMV's API, there is no real SPI bus involved\n"
     "methods:\n"
-    "  write(image, x=0, y=0, hint=0): draw an image_t (e.g. from csi.CSI().snapshot()) to the screen\n"
+    "  write(image, x=0, y=0, hint=0): draw an image_t (e.g. from camera.Camera().snapshot()) to the screen\n"
     "    image is upscaled by the largest integer factor (2x/4x/8x) that still fits the surface, letterboxed/pillarboxed in opaque black\n"
     "    hint: OpenMV's IMAGE_HINT_HMIRROR / IMAGE_HINT_VFLIP / IMAGE_HINT_TRANSPOSE bits, combined with the vflip/hmirror set at construction\n"
     "    no-op (returns None) if no Surface is currently attached, i.e. the app isn't showing the camera screen\n"
-    "see_also: csi.help(), android.help()\n"
+    "see_also: camera.help(), android.help()\n"
 ;
 mp_obj_t display_help() {
     return mp_obj_new_str(display_help_text, strlen(display_help_text));
@@ -205,7 +205,7 @@ MP_DEFINE_CONST_DICT(display_module_globals, display_module_globals_table);
 
 // extern "C", not inside the anonymous namespace above. genhdr/
 // moduledefs.h declares this with C linkage, same reasoning as
-// csi_module in camera_module.cpp.
+// camera_module in camera_module.cpp.
 extern "C" const mp_obj_module_t display_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &display_module_globals,

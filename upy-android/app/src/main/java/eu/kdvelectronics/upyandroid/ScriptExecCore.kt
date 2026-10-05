@@ -45,6 +45,11 @@ object ScriptExecCore {
     private val _status = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Connecting)
     val status: StateFlow<ConnectionStatus> = _status.asStateFlow()
 
+    // Surface.ROTATION_* the screen locks to while a camera is open, -1
+    // for none. Cleared when the engine goes away.
+    private val _cameraRotation = MutableStateFlow(-1)
+    val cameraRotation: StateFlow<Int> = _cameraRotation.asStateFlow()
+
     @Volatile private var boardManager: BoardManager? = null
     @Volatile private var connected = false
     @Volatile private var latch: CountDownLatch? = null
@@ -152,6 +157,9 @@ object ScriptExecCore {
         ) { status ->
             connected = status is ConnectionStatus.Connected
             _status.value = status
+            if (status is ConnectionStatus.Disconnected) {
+                _cameraRotation.value = -1
+            }
             if (status !is ConnectionStatus.Connecting) {
                 latch?.countDown()
             }
@@ -159,6 +167,7 @@ object ScriptExecCore {
             it.setOutputListener { chunk -> TerminalLog.append(chunk) }
             it.setShareRequestListener(shareRequestListener)
             it.setPermissionRequestListener(permissionRequestListener)
+            it.setCameraRotationListener { rotation -> _cameraRotation.value = rotation }
             boardManager = it
         }
     }

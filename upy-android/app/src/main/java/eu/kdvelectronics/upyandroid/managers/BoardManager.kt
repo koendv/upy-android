@@ -72,6 +72,9 @@ class BoardManager(
     @Volatile
     private var permissionRequestListener: ((permissions: Array<String>) -> Unit)? = null
 
+    @Volatile
+    private var cameraRotationListener: ((rotation: Int) -> Unit)? = null
+
     private val shareListenerStub = object : IEngineShareListener.Stub() {
         override fun onShareRequest(path: String, mimeType: String) {
             shareRequestListener?.invoke(path, mimeType)
@@ -79,6 +82,10 @@ class BoardManager(
 
         override fun onPermissionRequest(permissions: Array<String>) {
             permissionRequestListener?.invoke(permissions)
+        }
+
+        override fun onCameraOrientation(rotation: Int) {
+            cameraRotationListener?.invoke(rotation)
         }
     }
 
@@ -211,6 +218,10 @@ class BoardManager(
 
     fun setPermissionRequestListener(listener: ((permissions: Array<String>) -> Unit)?) {
         permissionRequestListener = listener
+    }
+
+    fun setCameraRotationListener(listener: ((rotation: Int) -> Unit)?) {
+        cameraRotationListener = listener
     }
 
     /**

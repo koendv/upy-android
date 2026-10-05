@@ -1,6 +1,5 @@
-// upy-android native csi (camera) module.
+// upy-android camera module (CameraX).
 // micropython android port only.
-// Compiled directly by the app's own CMake target, not copied via apply-overrides.sh.
 #ifndef UPY_ANDROID_CAMERA_MODULE_H
 #define UPY_ANDROID_CAMERA_MODULE_H
 
@@ -11,19 +10,18 @@
 extern "C" {
 #endif
 
+// Called once from engine_jni.cpp's nativeInit(). jni_env is a JNIEnv*.
+void camera_bridge_init(void *jni_env);
+
+// Closes the open camera, if any. Before mp_embed_deinit().
 void camera_close_all(void);
 
-// Safe to call from any thread, same contract as nativeInterrupt() itself (engine_jni.cpp).
-// Posts into the camera module's persistent frame-ready semaphore, a no-op if the camera has
-// never been reset() at all. The semaphore is registered once, permanently (not per-call) --
-// see camera_module.cpp's own ensure_session()/wait_for_frame() -- so this unblocks whichever
-// interruptible wait, if any, is currently in progress (waiting for the first frame after
-// reset()/a size change, or a csi_snapshot_warmup() call), rather than one specific snapshot()'s
-// own short-lived wait the way it used to.
+// Wakes a waiting snapshot() so Interrupt is seen at once. Any
+// JVM-attached thread, like nativeInterrupt().
 void camera_interrupt_active_wait(void);
 
-// Reports the size and format of the image snapshot() returns: the capture
-// resolution after window() and transpose()
+// Size and format of the images snapshot() returns; 320x240 grayscale
+// when no camera is open. Default for gif/mjpeg.
 void camera_get_current_size(int32_t *width, int32_t *height, bool *color);
 
 #ifdef __cplusplus

@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Used by the csi (camera) module inside :engine, not the main
+    <!-- Used by the camera module inside :engine, not the main
          process - see project memory / SESSION_STATE.yaml. required
          false: most Android devices have a camera, but this app should
          not refuse to install on one that genuinely lacks any. -->

@@ -198,7 +198,7 @@ CFLAGS += -Ivendor/openmv
 # real, post-rename file.
 CFLAGS += -Imy-overrides/openmv/ulab-shim
 
-# camera_module.cpp: this project's own native csi (camera) module, not
+# camera_module.cpp: this project's own native camera module, not
 # vendored OpenMV code. Lives directly under app/src/main/cpp/, its
 # real permanent location, not under my-overrides/ (never copied by
 # apply-overrides.sh), so this SRC_QSTR entry points straight at the
@@ -208,9 +208,8 @@ SRC_QSTR += ../app/src/main/cpp/camera_module.cpp
 CFLAGS += -I../app/src/main/cpp
 # The qstr-scan pass preprocesses with the host gcc (embed.mk's own
 # default), not the Android NDK clang wrapper the real build uses.
-# Unlike every other vendored file so far, camera_module.cpp #includes
-# genuine NDK-only headers (<camera/...>, <media/...>). Pointing CFLAGS
-# at the real NDK sysroot was tried first and broke every other
+# Some app modules #include NDK-only headers (<android/...>). Pointing
+# CFLAGS at the real NDK sysroot was tried first and broke every other
 # SRC_QSTR file in this same combined scan: CFLAGS here is one global
 # list shared across the whole `gcc -E file1.c file2.c ...` invocation
 # (this Makefile has no per-file CFLAGS mechanism), so the NDK's own
@@ -219,7 +218,7 @@ CFLAGS += -I../app/src/main/cpp
 # include guards, no declarations) that satisfy the #include lines
 # without pulling in any real NDK system header. Safe because -E only
 # macro-expands and resolves #includes, it never type-checks the
-# ACameraManager* etc. bodies that follow, which is all a qstr scan needs.
+# bodies that follow, which is all a qstr scan needs.
 CFLAGS += -Iqstr-stub
 
 # display_module.cpp: this project's own native display module, same

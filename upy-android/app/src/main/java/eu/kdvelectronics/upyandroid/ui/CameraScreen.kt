@@ -1,7 +1,5 @@
 package eu.kdvelectronics.upyandroid.ui
 
-import android.app.Activity
-import android.content.pm.ActivityInfo
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.layout.Arrangement
@@ -13,9 +11,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import eu.kdvelectronics.upyandroid.ScriptExecCore
 
@@ -24,22 +20,6 @@ import eu.kdvelectronics.upyandroid.ScriptExecCore
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CameraScreen() {
-    val activity = LocalContext.current as Activity
-
-    // Locks to one orientation while this screen is visible, restores
-    // on exit. This removes device rotation as a recurring
-    // surface-teardown trigger. Single-Activity app, so this means
-    // saving and restoring requestedOrientation directly, not a
-    // manifest flag, which would lock the whole app rather than just
-    // this screen.
-    DisposableEffect(Unit) {
-        val previousOrientation = activity.requestedOrientation
-        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        onDispose {
-            activity.requestedOrientation = previousOrientation
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(

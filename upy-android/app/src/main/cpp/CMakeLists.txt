@@ -27,6 +27,7 @@ file(GLOB MPY_APRILTAG_SOURCES micropython_embed/apriltag/*.c micropython_embed/
 add_library(upy_engine SHARED
     engine_jni.cpp
     camera_module.cpp
+    camera_jni_bridge.cpp
     display_module.cpp
     imu_module.cpp
     android_module.cpp
@@ -108,12 +109,12 @@ set_target_properties(litert PROPERTIES
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/litert/lib/libLiteRt.so
 )
 
-# camera2ndk/mediandk/android: stable NDK libs for the camera, display,
-# and sensor APIs, no vendoring needed.
+# android: stable NDK lib for the display and sensor APIs, no
+# vendoring needed.
 # This link line's only real purpose is getting AGP to package
 # libLiteRt.so into the APK's jniLibs, which LiteRtShim.kt needs at
 # runtime.
-target_link_libraries(upy_engine log m camera2ndk mediandk android litert)
+target_link_libraries(upy_engine log m android litert)
 
 # Linker map for libupy_engine.so. Doesn't cover what's inside a
 # prebuilt dependency, or what AGP packages into the APK from an AAR's

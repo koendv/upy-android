@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.RemoteException
 import android.view.Surface
+import eu.kdvelectronics.upyandroid.camera.CameraShim
 import eu.kdvelectronics.upyandroid.location.LocationShim
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 
@@ -59,6 +60,25 @@ class EngineService : Service() {
                 // missing permission to the script.
             }
         }
+
+        // Screen lock for an open camera, -1 for none. Kept so a
+        // reconnecting UI gets it again (setShareListener()).
+        @Volatile
+        private var cameraRotation = -1
+
+        @JvmStatic
+        fun setCameraRotation(rotation: Int) {
+            cameraRotation = rotation
+            sendCameraRotation()
+        }
+
+        private fun sendCameraRotation() {
+            try {
+                shareListener?.onCameraOrientation(cameraRotation)
+            } catch (e: RemoteException) {
+                // Main process is gone; a new one gets it on connect.
+            }
+        }
     }
 
     // Constructed in onCreate(), not as a property initializer. filesDir,
@@ -81,6 +101,7 @@ class EngineService : Service() {
         worker = EngineWorker(filesDir.absolutePath, heapSizeMb, applicationContext)
         worker.start()
         LocationShim.init(applicationContext)
+        CameraShim.init(applicationContext)
     }
 
     private val binder = object : IEngine.Stub() {
@@ -113,6 +134,7 @@ class EngineService : Service() {
 
         override fun setShareListener(listener: IEngineShareListener?) {
             shareListener = listener
+            sendCameraRotation()
         }
 
         // Deliberately not queued through worker.taskQueue like every
@@ -148,6 +170,7 @@ class EngineService : Service() {
     // reliance on that assumption.
     // see session-state: EngineService.kt#onDestroy
     override fun onDestroy() {
+        CameraShim.closeOnMain()
         worker.deinit()
         super.onDestroy()
     }

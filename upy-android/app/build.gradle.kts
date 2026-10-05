@@ -429,6 +429,10 @@ dependencies {
     // (19+) is already below this project's own (27). See
     // SESSION_STATE.yaml for the full comparison.
     implementation("com.hivemq:hivemq-mqtt-client:1.4.0")
+    // camera module (camera_module.cpp/CameraShim.kt).
+    implementation("androidx.camera:camera-core:1.6.2")
+    implementation("androidx.camera:camera-camera2:1.6.2")
+    implementation("androidx.camera:camera-lifecycle:1.6.2")
     // HTTP server (HttpServerManager.kt) -- Part 7's last subitem. CIO
     // engine chosen over Netty/Jetty: pure-Kotlin/coroutines, no extra
     // native/reflection-heavy server framework bundled in, matching this

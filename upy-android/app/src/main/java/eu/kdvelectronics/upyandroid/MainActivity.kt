@@ -3,10 +3,13 @@ package eu.kdvelectronics.upyandroid
 import android.Manifest
 import android.content.ContentResolver
 import android.content.Intent
+import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.view.Surface
 import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -110,9 +113,9 @@ class MainActivity : ComponentActivity() {
     // Must be registered unconditionally before STARTED (Android's own
     // requirement for ActivityResultContracts), so this is a field, not
     // something created lazily inside onCreate. The callback is a no-op:
-    // whether the user granted or denied, camera_module.cpp's own
-    // OSError("camera access denied...") remains the actual runtime
-    // signal a script sees on next csi.reset(). This launcher only
+    // whether the user granted or denied, the camera module's own
+    // OSError(EACCES) remains the actual runtime signal a script sees
+    // on its next camera.Camera(). This launcher only
     // covers surfacing the OS's real grant dialog once, automatically.
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
@@ -166,6 +169,9 @@ class MainActivity : ComponentActivity() {
         SshServerManager.applySettings(applicationContext, settingsManager)
         ScriptExecCore.connect(applicationContext)
         maybeRequestCameraPermission()
+        lifecycleScope.launch {
+            ScriptExecCore.cameraRotation.collect { requestedOrientation = screenOrientation(it) }
+        }
         // Not on recreation (rotation, theme): the same share intent
         // would be saved a second time.
         if (savedInstanceState == null) receiveShare(intent)
@@ -376,6 +382,33 @@ class MainActivity : ComponentActivity() {
         // ScriptExecCore singleton.
         ScriptExecCore.setShareRequestListener(null)
         ScriptExecCore.setPermissionRequestListener(null)
+    }
+
+    // Screen orientation showing the display in Surface.ROTATION_*
+    // rotation, for the screen lock while a camera is open. Display
+    // rotation is relative to the device's natural orientation, so the
+    // mapping differs for landscape-natural devices (tablets; untested).
+    private fun screenOrientation(rotation: Int): Int {
+        if (rotation < 0) return ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        @Suppress("DEPRECATION")
+        val current = windowManager.defaultDisplay.rotation
+        val portrait = resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+        val naturalPortrait = portrait == (current == Surface.ROTATION_0 || current == Surface.ROTATION_180)
+        return if (naturalPortrait) {
+            when (rotation) {
+                Surface.ROTATION_90 -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+                Surface.ROTATION_180 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+                Surface.ROTATION_270 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            }
+        } else {
+            when (rotation) {
+                Surface.ROTATION_90 -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                Surface.ROTATION_180 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_LANDSCAPE
+                Surface.ROTATION_270 -> ActivityInfo.SCREEN_ORIENTATION_REVERSE_PORTRAIT
+                else -> ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+        }
     }
 
     // Android cannot distinguish "never asked" from "permanently
