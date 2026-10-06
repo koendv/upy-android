@@ -119,12 +119,12 @@ For a real example session, see [SAMPLE_SESSION.md](doc/SAMPLE_SESSION.md).
 
 | Module | Description |
 |---|---|
-| `camera` | Camera, on CameraX. Grayscale or RGB565. Images upright as the phone is held. Zoom, torch, exposure, focus point, frame rate. |
+| `camera` | Grayscale or RGB565. Zoom, torch, exposure, focus point, frame rate. |
 | `display` | Shows images in the **Camera** screen of the app. |
 | `image` | OpenMV image processing: AprilTags, Data Matrix, circles, rectangles, lines, edges, template matching, HOG, LBP, face and eye detection. |
 | `gif`, `mjpeg` | Video recording. |
 | `android` | Proximity sensor, accelerometer, gyroscope, location, save to gallery, share. |
-| `tflite` | TensorFlow Lite inference on the CPU, or with Android NNAPI (`tflite.set_nnapi(True)`). |
+| `tflite` | TensorFlow Lite inference on CPU or NNAPI. |
 | `litert` | LiteRT inference on the CPU, GPU or NPU. |
 | `ulab` | Arrays, similar to NumPy. |
 | `umqtt` | MQTT client, with TLS. |
