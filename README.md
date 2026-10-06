@@ -23,7 +23,7 @@ The phone sends results over Wi-Fi or USB:
 
 - MQTT (`umqtt`, with TLS). For example, to an MQTT broker or an ESP32.
 - SSH shell on port 2222. Password login.
-- HTTP file server on port 8080.
+- HTTP file server on port 8080, read-only. Use the HTTP file server only on a trusted network.
 - adb over USB. Run scripts from a PC.
 
 ### Install

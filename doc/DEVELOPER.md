@@ -117,7 +117,18 @@ ssh -p 2222 user@<phone-ip>      # MicroPython shell
 sftp -P 2222 user@<phone-ip>     # only files in the app's file store
 ```
 
-The HTTP file server is on port 8080.
+The HTTP file server is on port 8080, read-only.
+
+- `/media` lists the images and videos that scripts saved to the gallery. `/media/<token>` downloads one.
+- `/files/<path>` downloads a file from the app's file store. Enable **private files** in **Settings** first.
+
+Login uses Digest authentication, so the password does not cross the network. Any user name works.
+
+```bash
+curl --digest -u user:<password> http://<phone-ip>:8080/media
+```
+
+The connection is plain HTTP. Anyone on the same network can read the files, and can try to guess a weak password. Use the HTTP file server only on a trusted network, with a long password that differs from the SSH password. To send images encrypted, publish them over MQTT with TLS.
 
 ## Upstream code and patches
 
