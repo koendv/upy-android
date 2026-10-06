@@ -28,8 +28,8 @@ Requirements: Android 8.1 or later (API 27), 64-bit ARM (`arm64-v8a`).
 These settings depend on the phone brand. The names can be different on your phone.
 
 - **Install the APK.** Allow **Install unknown apps** for your browser or file manager.
-- **Keep scripts running.** Some phones stop apps in the background. For upy-android, set battery usage to **No restrictions** and allow **Autostart** if your phone has this setting. The camera only works while upy-android is on the screen.
 - **USB debugging.** Needed for adb. Open **Settings > About phone** and tap **Build number** 7 times. Then enable **USB debugging** in **Developer options**.
+- The camera only works while upy-android is on the screen.
 
 ### One minute on-boarding
 
