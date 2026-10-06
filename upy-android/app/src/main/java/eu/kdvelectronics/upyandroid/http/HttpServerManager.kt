@@ -6,12 +6,13 @@ import android.util.Log
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 import io.ktor.http.ContentType
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.auth.DigestAlgorithm
 import io.ktor.server.application.call
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.UserIdPrincipal
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.basic
+import io.ktor.server.auth.digest
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.EmbeddedServer
 import io.ktor.server.engine.embeddedServer
@@ -21,9 +22,12 @@ import io.ktor.server.response.respondSource
 import io.ktor.server.response.respondText
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
+import io.ktor.util.StatelessHmacNonceManager
 import kotlinx.io.asSource
 import java.io.File
 import java.io.FileNotFoundException
+import java.security.MessageDigest
+import java.security.SecureRandom
 
 // see session-state: HttpServerManager.kt#HttpServerManager
 object HttpServerManager {
@@ -58,21 +62,24 @@ object HttpServerManager {
                 }
             }
             install(Authentication) {
-                basic("http-password") {
+                // Digest, not Basic: the password does not cross the network.
+                // Any user name; nonces expire, signed with a per-start key.
+                digest("http-password") {
                     realm = "upy-android"
-                    validate { credentials ->
-                        // Empty http_password means "not configured".
-                        // Deny every request rather than treat it as
-                        // "no auth required". Matches this project's
-                        // own fail-closed default posture (see
-                        // AdbExecProvider.kt's UID check).
+                    nonceManager = StatelessHmacNonceManager(ByteArray(32).also { SecureRandom().nextBytes(it) })
+                    // Android has no SHA-512/256, Ktor's first default. MD5
+                    // first: Python's urllib reads only the first challenge.
+                    algorithms = listOf(DigestAlgorithm.MD5, DigestAlgorithm.SHA_256)
+                    digestProvider { userName, realm, algorithm ->
+                        // Empty http_password means "not configured": deny every request.
                         val configured = settingsManager.httpPassword
-                        if (configured.isNotEmpty() && credentials.password == configured) {
-                            UserIdPrincipal(credentials.name)
-                        } else {
+                        if (configured.isEmpty()) {
                             null
+                        } else {
+                            MessageDigest.getInstance(algorithm.hashName).digest("$userName:$realm:$configured".toByteArray(Charsets.UTF_8))
                         }
                     }
+                    validate { credentials -> UserIdPrincipal(credentials.userName) }
                 }
             }
             routing {
