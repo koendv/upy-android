@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -42,6 +43,8 @@ import eu.kdvelectronics.upyandroid.model.MicroFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import my.nanihadesuka.compose.LazyVerticalGridScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 
 /**
  * File explorer for the app's sandboxed storage: browse, create, rename,
@@ -280,29 +283,36 @@ fun ExplorerScreen(
             }
         }
     ) { padding ->
-        LazyVerticalGrid(
-            columns = GridCells.Adaptive(80.dp),
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(8.dp)
+        val gridState = rememberLazyGridState()
+        LazyVerticalGridScrollbar(
+            state = gridState,
+            settings = ScrollbarSettings.Default,
+            modifier = Modifier.fillMaxSize().padding(padding),
         ) {
-            items(files.size) { i ->
-                val file = files[i]
-                FileItem(
-                    file = file,
-                    onClick = {
-                        if (file.isDirectory) path = file.fullPath
-                        else {
+            LazyVerticalGrid(
+                state = gridState,
+                columns = GridCells.Adaptive(80.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(8.dp)
+            ) {
+                items(files.size) { i ->
+                    val file = files[i]
+                    FileItem(
+                        file = file,
+                        onClick = {
+                            if (file.isDirectory) path = file.fullPath
+                            else {
+                                selected = file
+                                showOptions = true
+                            }
+                        },
+                        onLongClick = {
                             selected = file
                             showOptions = true
                         }
-                    },
-                    onLongClick = {
-                        selected = file
-                        showOptions = true
-                    }
-                )
+                    )
+                }
             }
         }
     }

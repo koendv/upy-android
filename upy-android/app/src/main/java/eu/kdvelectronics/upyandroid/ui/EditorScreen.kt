@@ -43,6 +43,8 @@ import eu.kdvelectronics.upyandroid.model.MicroFile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import my.nanihadesuka.compose.ColumnScrollbar
+import my.nanihadesuka.compose.ScrollbarSettings
 
 /**
  * Code editor: run, save, undo, redo. Plain monospace text with line
@@ -153,24 +155,28 @@ private fun CodeEditor(state: TextFieldState, modifier: Modifier = Modifier) {
         color = MaterialTheme.colorScheme.onSurface,
     )
     val lineCount = state.text.count { it == '\n' } + 1
-    Row(modifier.verticalScroll(rememberScrollState()).padding(8.dp)) {
-        Text(
-            text = (1..lineCount).joinToString("\n"),
-            style = style.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End),
-            modifier = Modifier.padding(end = 8.dp),
-        )
-        BoxWithConstraints(Modifier.weight(1f)) {
-            BasicTextField(
-                state = state,
-                modifier = Modifier.horizontalScroll(rememberScrollState()).widthIn(min = maxWidth),
-                textStyle = style,
-                lineLimits = TextFieldLineLimits.MultiLine(),
-                keyboardOptions = KeyboardOptions(
-                    capitalization = KeyboardCapitalization.None,
-                    autoCorrectEnabled = false,
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+    val scrollState = rememberScrollState()
+    // Always shown: a swipe on the text field does not make it appear.
+    ColumnScrollbar(state = scrollState, settings = ScrollbarSettings.Default.copy(alwaysShowScrollbar = true), modifier = modifier) {
+        Row(Modifier.verticalScroll(scrollState).padding(8.dp)) {
+            Text(
+                text = (1..lineCount).joinToString("\n"),
+                style = style.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End),
+                modifier = Modifier.padding(end = 8.dp),
             )
+            BoxWithConstraints(Modifier.weight(1f)) {
+                BasicTextField(
+                    state = state,
+                    modifier = Modifier.horizontalScroll(rememberScrollState()).widthIn(min = maxWidth),
+                    textStyle = style,
+                    lineLimits = TextFieldLineLimits.MultiLine(),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = KeyboardCapitalization.None,
+                        autoCorrectEnabled = false,
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                )
+            }
         }
     }
 }
