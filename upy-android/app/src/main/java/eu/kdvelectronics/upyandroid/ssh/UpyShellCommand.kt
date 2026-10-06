@@ -6,6 +6,7 @@ import org.apache.sshd.server.Environment
 import org.apache.sshd.server.ExitCallback
 import org.apache.sshd.server.channel.ChannelSession
 import org.apache.sshd.server.command.Command
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
@@ -52,6 +53,15 @@ class UpyShellCommand(private val context: Context) : Command {
         thread?.interrupt()
     }
 
+    private fun writeByte(b: Int) {
+        try {
+            output.write(b)
+            output.flush()
+        } catch (e: IOException) {
+            // client disconnected
+        }
+    }
+
     private fun write(s: String) {
         try {
             output.write(s.toByteArray(Charsets.UTF_8))
@@ -63,7 +73,8 @@ class UpyShellCommand(private val context: Context) : Command {
 
     private fun runLoop() {
         write("upy shell\r\nblank line runs the buffer, ctrl+c interrupts, ctrl+d resets, exit/quit closes.\r\n>>> ")
-        val lineBuf = StringBuilder()
+        // UTF-8 bytes of the line being typed, decoded on Enter.
+        val lineBuf = ByteArrayOutputStream()
         val bufferedLines = StringBuilder()
         try {
             while (running) {
@@ -73,36 +84,45 @@ class UpyShellCommand(private val context: Context) : Command {
                     0x03 -> { // Ctrl+C
                         write("\r\n^C\r\n")
                         ScriptExecCore.interrupt(context)
-                        lineBuf.setLength(0)
+                        lineBuf.reset()
                         bufferedLines.setLength(0)
                         write(">>> ")
                     }
                     0x04 -> { // Ctrl+D
                         write("\r\n")
                         ScriptExecCore.reset(context)
-                        lineBuf.setLength(0)
+                        lineBuf.reset()
                         bufferedLines.setLength(0)
                         write("(reset)\r\n>>> ")
                     }
                     '\r'.code, '\n'.code -> {
                         write("\r\n")
-                        val trimmed = lineBuf.toString().trim().lowercase()
+                        // Invalid UTF-8 becomes U+FFFD.
+                        val line = String(lineBuf.toByteArray(), Charsets.UTF_8)
+                        val trimmed = line.trim().lowercase()
                         if (bufferedLines.isEmpty() && (trimmed == "exit" || trimmed == "quit")) {
                             // see session-state: UpyShellCommand.kt#UpyShellCommand
                             write("bye\r\n")
                             running = false
-                        } else if (lineBuf.isEmpty() && bufferedLines.isNotEmpty()) {
+                        } else if (lineBuf.size() == 0 && bufferedLines.isNotEmpty()) {
                             submitAsync(bufferedLines.toString())
                             bufferedLines.setLength(0)
                         } else {
-                            bufferedLines.append(lineBuf).append('\n')
-                            lineBuf.setLength(0)
+                            bufferedLines.append(line).append('\n')
+                            lineBuf.reset()
                             write("... ")
                         }
                     }
                     0x7f, 0x08 -> { // backspace/DEL
-                        if (lineBuf.isNotEmpty()) {
-                            lineBuf.deleteCharAt(lineBuf.length - 1)
+                        // Removes one whole UTF-8 character, erases one column.
+                        if (lineBuf.size() > 0) {
+                            val bytes = lineBuf.toByteArray()
+                            var cut = bytes.size - 1
+                            while (cut > 0 && (bytes[cut].toInt() and 0xC0) == 0x80) {
+                                cut--
+                            }
+                            lineBuf.reset()
+                            lineBuf.write(bytes, 0, cut)
                             write("\b \b")
                         }
                     }
@@ -113,10 +133,10 @@ class UpyShellCommand(private val context: Context) : Command {
                         }
                     }
                     else -> {
-                        if (b in 0x20..0x7e) {
-                            val ch = b.toChar()
-                            lineBuf.append(ch)
-                            write(ch.toString())
+                        // Printable ASCII, tab, and UTF-8 multi-byte characters.
+                        if (b == 0x09 || b in 0x20..0x7e || b >= 0x80) {
+                            lineBuf.write(b)
+                            writeByte(b)
                         }
                     }
                 }
