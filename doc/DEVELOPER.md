@@ -5,7 +5,7 @@
 - interface between user interface and interpreter is AIDL.
 - interface between interpreter and Android is JNI.
 - The MicroPython file system is in the app's private storage.
-- `arm64-v8a` only. An arm32 build is possible but out of scope: it would roughly double the release test matrix.
+- `arm64-v8a` only. An arm32 build is possible but out of scope: the release test matrix would double.
 
 ## Build
 
@@ -72,7 +72,7 @@ Tested on a REDMI Note 15 5G. In **Developer options**, enable **USB debugging**
 
 ### adb exec
 
-adb exec runs MicroPython scripts on the phone from a PC. adb exec is a content provider in the app; programmers and AI agents use it for development and testing.
+adb exec runs MicroPython scripts on the phone from a PC. adb exec is a content provider in the app; programmers and AI agents use adb exec for development and testing.
 
 adb exec is remote code execution by design. Anyone with ADB access to the device can run arbitrary MicroPython. Leave adb exec off unless developing.
 

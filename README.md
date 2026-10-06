@@ -33,16 +33,16 @@ These settings depend on the phone brand. The names can be different on your pho
 
 ### One minute on-boarding
 
-Start up the application.
-Give camera permission when asked.
-Notice the four icons: _Command_, _Files_, _Camera_, _Settings_. Choose _Files_.
-In the Files screen, choose _examples_ -> _find\_line\_segments.py_ . 
-A pop-up window appears. Choose _Run_. The display shows fps (frames per second).
-Choose _Camera_. Point the phone camera at objects.
-The camera image is shown; superimposed are line segments in red.
-To stop, choose the icon of a square in the upper right corner.
+- Start up the application.
+- Give camera permission when asked.
+- Notice the four icons: _Command_, _Files_, _Camera_, _Settings_. Choose _Files_.
+- In the Files screen, choose _examples_ -> _find\_line\_segments.py_ . 
+- A pop-up window appears. Choose _Run_. The display shows fps (frames per second).
+- Choose _Camera_. Point the phone camera at objects.
+- The camera image is shown; superimposed are line segments in red.
+- To stop, choose the icon of a square in the upper right corner.
 
-### Example
+### Example Script
 
 This script prints the id and center of every [AprilTag](doc/apriltags.pdf) the camera sees. The **Camera** screen shows the image, with a box around each tag:
 
@@ -74,7 +74,7 @@ The phone sends results over Wi-Fi or USB:
 SSH, HTTP, adb:
 
 - enable and set passwords in the Settings screen.
-- default is off
+- default is not enabled
 
 ### Programming
 
@@ -113,7 +113,7 @@ Agree on the plan before the agent writes code. Use these steps:
 5. "Do you need additional data?"
 6. "Proceed."
 
-For a real example session, see [doc/SAMPLE_SESSION.md](doc/SAMPLE_SESSION.md).
+For a real example session, see [SAMPLE_SESSION.md](doc/SAMPLE_SESSION.md).
 
 ### Modules
 
@@ -149,7 +149,7 @@ Working prototype. Programmed with AI assistance, not fully audited. Moderate yo
 
 ### Development
 
-Building, the adb test setup and other developer notes: [doc/DEVELOPER.md](doc/DEVELOPER.md).
+Building, the adb test setup and other developer notes: [DEVELOPER.md](doc/DEVELOPER.md).
 
 ### License
 
