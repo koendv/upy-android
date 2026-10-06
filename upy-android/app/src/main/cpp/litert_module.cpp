@@ -38,7 +38,7 @@ extern const mp_obj_type_t litert_options_type;
 
 namespace {
 
-void raise_os_error(int errno_, const char *msg) {
+MP_NORETURN void raise_os_error(int errno_, const char *msg) {
     mp_obj_t args[2] = {
         MP_OBJ_NEW_SMALL_INT(errno_),
         mp_obj_new_str(msg, strlen(msg)),
@@ -49,7 +49,7 @@ void raise_os_error(int errno_, const char *msg) {
 // msg is a malloc'd (strdup'd) string from litert_jni_bridge.cpp,
 // describing a real Kotlin/JNI exception. Copied into a new MicroPython
 // str (which copies internally) before being freed here.
-void raise_os_error_free(int errno_, char *msg) {
+MP_NORETURN void raise_os_error_free(int errno_, char *msg) {
     mp_obj_t args[2] = {
         MP_OBJ_NEW_SMALL_INT(errno_),
         mp_obj_new_str(msg, strlen(msg)),
