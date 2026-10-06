@@ -4,11 +4,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Redo
-import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -100,10 +96,10 @@ fun EditorScreen(
                 },
                 actions = {
                     IconButton(onClick = { codeState.undo() }) {
-                        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = "Undo")
+                        Symbol(SymbolIcon.UNDO, contentDescription = "Undo")
                     }
                     IconButton(onClick = { codeState.redo() }) {
-                        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = "Redo")
+                        Symbol(SymbolIcon.REDO, contentDescription = "Redo")
                     }
                 }
             )

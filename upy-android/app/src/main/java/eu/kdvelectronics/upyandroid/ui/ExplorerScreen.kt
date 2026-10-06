@@ -15,15 +15,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -41,7 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import eu.kdvelectronics.upyandroid.fileprovider.openWith
 import eu.kdvelectronics.upyandroid.fileprovider.shareFile
@@ -220,11 +212,11 @@ fun ExplorerScreen(
                         showOptions = false
                         path = file.fullPath
                     })
-                    if (file?.isFile == true) OptionRow(Icons.Filled.OpenInNew, "Open with", onClick = {
+                    if (file?.isFile == true) OptionRow(SymbolIcon.OPEN_IN_NEW, "Open with", onClick = {
                         showOptions = false
                         openWith(context, file.fullPath, shareMimeType(file.name))
                     })
-                    if (file?.isFile == true) OptionRow(Icons.Filled.Share, "Share", onClick = {
+                    if (file?.isFile == true) OptionRow(SymbolIcon.SHARE, "Share", onClick = {
                         showOptions = false
                         shareFile(context, file.fullPath, shareMimeType(file.name))
                     })
@@ -256,9 +248,11 @@ fun ExplorerScreen(
                             onClick = { up() },
                             enabled = path.isNotEmpty(),
                         )
-                        TooltipIconButton(label = "Import", onClick = { importPicker.launch("*/*") }) {
-                            Icon(Icons.Filled.UploadFile, contentDescription = "Import")
-                        }
+                        TooltipIconButton(
+                            icon = SymbolIcon.UPLOAD_FILE,
+                            label = "Import",
+                            onClick = { importPicker.launch("*/*") },
+                        )
                         TooltipIconButton(
                             icon = SymbolIcon.NOTE_ADD,
                             label = "New file",
@@ -330,21 +324,6 @@ private fun OptionRow(icon: Int, label: String, onClick: () -> Unit) {
     }
 }
 
-// Same row with a Material icon, for symbols missing from the subsetted
-// icon font (Share).
-@Composable
-private fun OptionRow(icon: ImageVector, label: String, onClick: () -> Unit) {
-    TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Icon(icon, contentDescription = null, modifier = Modifier.padding(end = 12.dp))
-            Text(label)
-        }
-    }
-}
-
 // MIME type for sharing or opening a file: Android's table by extension; .py as
 // text/plain so editors and messengers accept it; else a plain binary.
 private fun shareMimeType(name: String): String {
@@ -366,8 +345,8 @@ private fun FileItem(
             .padding(4.dp)
             .combinedClickable(onClick = onClick, onLongClick = onLongClick)
     ) {
-        Icon(
-            imageVector = if (file.isDirectory) Icons.Filled.Folder else Icons.Filled.Description,
+        Symbol(
+            if (file.isDirectory) SymbolIcon.FOLDER else SymbolIcon.DESCRIPTION,
             contentDescription = file.name,
             modifier = Modifier.padding(8.dp)
         )

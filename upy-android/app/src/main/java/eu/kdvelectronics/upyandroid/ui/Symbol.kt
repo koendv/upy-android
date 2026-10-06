@@ -59,6 +59,12 @@ object SymbolIcon {
     const val FOLDER_OPEN = 0xe2c8
     const val VERTICAL_ALIGN_BOTTOM = 0xe258
     const val CONTENT_COPY = 0xe14d
+    const val OPEN_IN_NEW = 0xe89e
+    const val SHARE = 0xe80d
+    const val UPLOAD_FILE = 0xe9fc
+    const val DESCRIPTION = 0xe873
+    const val UNDO = 0xe166
+    const val REDO = 0xe15a
 }
 
 private val symbolFontFamily = FontFamily(Font(R.font.upy_symbols))
