@@ -1,9 +1,11 @@
 # Developer Notes
 
 - Uses MicroPython `ports/embed`, not `ports/unix`.
-- Two processes: the user interface and the MicroPython interpreter.
+- Two processes: user interface and MicroPython interpreter.
+- interface between user interface and interpreter is AIDL.
+- interface between interpreter and Android is JNI.
 - The MicroPython file system is in the app's private storage.
-- `arm64-v8a` only.
+- `arm64-v8a` only. An arm32 build is possible but out of scope: it would roughly double the release test matrix.
 
 ## Build
 
@@ -22,7 +24,7 @@ cd upy-android
 # -> app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The first build downloads a lot:
+The first build downloads:
 
 - MicroPython, OpenMV, ulab and AprilTag from GitHub (`native-bringup/fetch-upstream.sh`).
 - Libraries from Maven Central and Google Maven.
@@ -56,7 +58,8 @@ Gradle dependency locking is on (`upy-android/app/gradle.lockfile`). After addin
 Enable **USB debugging** on the phone (see [Phone settings](../README.md#phone-settings) in the README). Then:
 
 ```bash
-adb install -r upy-android/app/build/outputs/apk/debug/app-debug.apk
+cd upy-android/app/build/outputs/apk/debug/
+adb install -r app-debug.apk
 ```
 
 ### Xiaomi: installing over USB
@@ -69,7 +72,9 @@ Tested on a REDMI Note 15 5G. In **Developer options**, enable **USB debugging**
 
 ### adb exec
 
-adb exec runs MicroPython scripts on the phone from a PC over USB. adb exec is a content provider in the app. People and AI agents can both use adb exec, for development and for testing.
+adb exec runs MicroPython scripts on the phone from a PC. adb exec is a content provider in the app; programmers and AI agents use it for development and testing.
+
+adb exec is remote code execution by design. Anyone with ADB access to the device can run arbitrary MicroPython. Leave adb exec off unless developing.
 
 To enable adb exec: in upy-android, open **Settings** and enable **adb exec**. Then start with:
 
@@ -127,8 +132,6 @@ Login uses Digest authentication, so the password does not cross the network. An
 ```bash
 curl --digest -u user:<password> http://<phone-ip>:8080/media
 ```
-
-The connection is plain HTTP. Anyone on the same network can read the files, and can try to guess a weak password. Use the HTTP file server only on a trusted network, with a long password that differs from the SSH password. To send images encrypted, publish them over MQTT with TLS.
 
 ## Upstream code and patches
 

@@ -17,15 +17,6 @@ A phone has advantages over a microcontroller camera board:
 - a GPU and NPU for neural networks
 - Wi-Fi, a screen and a battery
 
-### Connecting to your hardware
-
-The phone sends results over Wi-Fi or USB:
-
-- MQTT (`umqtt`, with TLS). For example, to an MQTT broker or an ESP32.
-- SSH shell on port 2222. Password login.
-- HTTP file server on port 8080, read-only. Use the HTTP file server only on a trusted network.
-- adb over USB. Run scripts from a PC.
-
 ### Install
 
 Download the APK from [Releases](https://github.com/koendv/upy-android/releases) and install it.
@@ -39,6 +30,17 @@ These settings depend on the phone brand. The names can be different on your pho
 - **Install the APK.** Allow **Install unknown apps** for your browser or file manager.
 - **Keep scripts running.** Some phones stop apps in the background. For upy-android, set battery usage to **No restrictions** and allow **Autostart** if your phone has this setting. The camera only works while upy-android is on the screen.
 - **USB debugging.** Needed for adb. Open **Settings > About phone** and tap **Build number** 7 times. Then enable **USB debugging** in **Developer options**.
+
+### One minute on-boarding
+
+Start up the application.
+Give camera permission when asked.
+Notice the four icons: _Command_, _Files_, _Camera_, _Settings_. Choose _Files_.
+In the Files screen, choose _examples_ -> _find\_line\_segments.py_ . 
+A pop-up window appears. Choose _Run_. The display shows fps (frames per second).
+Choose _Camera_. Point the phone camera at objects.
+The camera image is shown; superimposed are line segments in red.
+To stop, choose the icon of a square in the upper right corner.
 
 ### Example
 
@@ -60,7 +62,23 @@ while True:
 
 More example scripts are in `/examples` on the phone.
 
+### Connecting
+
+The phone sends results over Wi-Fi or USB:
+
+- MQTT (`umqtt`, with TLS). For example, to an MQTT broker or an ESP32.
+- SSH shell on port 2222. Password login.
+- HTTP file server on port 8080, read-only.
+- adb over USB. Run scripts from a PC.
+
+SSH, HTTP, adb:
+
+- enable and set passwords in the Settings screen.
+- default is off
+
 ### Programming
+
+Distinguish between manual coding, and AI-assisted "coding by intent".
 
 #### Programming by hand
 
