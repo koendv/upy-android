@@ -1,0 +1,24 @@
+name: Delete old workflow runs
+
+on:
+  schedule:
+    - cron: '43 4 1 * *'   # 04:43 UTC, 1st of month — off-minute, avoids stampede
+  workflow_dispatch:        # manual trigger button
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      # General CI/automation: prune after 14 days, always keep 5
+      - name: Delete general workflow runs
+        uses: Mattraks/delete-workflow-runs@v2
+        with:
+          token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          retain_days: 14
+          keep_minimum_runs: 5
+          dry_run: false
