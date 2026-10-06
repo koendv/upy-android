@@ -367,16 +367,12 @@ dependencies {
     // where Material's own guidance prefers a rail over a bottom bar).
     implementation("androidx.compose.material3:material3-adaptive-navigation-suite:1.4.0")
     implementation("androidx.activity:activity-compose:1.13.0")
-    // File explorer + editor screens (2026-09-16), see SESSION_STATE.yaml.
-    // material-icons-core (bundled with material3) only has a small
-    // default set -- Folder/Description/UploadFile/CreateNewFolder/
-    // Undo/Redo all need the extended pack.
-    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.9.8")
-    // Nemo Code Editor (MIT, https://github.com/Ma7moud3ly/nemo-editor) --
-    // same author as micro-repl, same version they depend on. Verified
-    // MIT-licensed before adding (see NOTICE.html).
-    implementation("io.github.ma7moud3ly:nemo-editor:1.0.4")
+    // Pinned: these versions used to come in through nemo-editor.
+    implementation("androidx.annotation:annotation:1.10.0")
+    implementation("androidx.collection:collection:1.6.0")
+    implementation("androidx.tracing:tracing:2.0.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     // LazyColumnScrollbar (MIT, https://github.com/nanihadesuka/LazyColumnScrollbar) --
     // TerminalScreen's own scrollbar; spike-tested on-device against
     // real mixed-height terminal output before adopting, see

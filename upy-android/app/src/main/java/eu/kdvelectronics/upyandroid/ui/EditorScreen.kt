@@ -1,11 +1,24 @@
 package eu.kdvelectronics.upyandroid.ui
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -18,27 +31,29 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.model.MicroFile
-import io.ma7moud3ly.nemo.NemoCodeEditor
-import io.ma7moud3ly.nemo.model.Language
-import io.ma7moud3ly.nemo.model.rememberCodeState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Code editor: same functionality as micro-repl's own editor (run /
- * save / new / undo / redo, syntax highlighting via the same nemo-editor
- * library micro-repl itself depends on, MIT, see NOTICE.html) minus its
- * theme picker (dropped, out of scope for now).
+ * Code editor: run, save, undo, redo. Plain monospace text with line
+ * numbers, no wrapping, no syntax highlighting.
  * Saves locally via [FilesManager], not to a remote board.
  *
  * @param file The file being edited, or null for a new/blank script.
  * @param path The directory a new file should be saved into (used only when [file] is null).
  */
-@OptIn(ExperimentalMaterial3Api::class)
+// undoState is still experimental in Compose foundation.
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun EditorScreen(
     filesManager: FilesManager,
@@ -48,16 +63,17 @@ fun EditorScreen(
     onBack: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val codeState = rememberCodeState(code = "", language = Language.PYTHON)
+    val codeState = rememberTextFieldState()
     var loaded by remember { mutableStateOf(file == null) }
     var savedText by remember { mutableStateOf("") }
     var showSaveAs by remember { mutableStateOf(false) }
-    val isDirty = codeState.code != savedText
+    val isDirty = codeState.text.toString() != savedText
 
     LaunchedEffect(file) {
         if (file != null) {
             val content = withContext(Dispatchers.IO) { filesManager.read(file) }
-            codeState.updateText(content)
+            codeState.setTextAndPlaceCursorAtEnd(content)
+            codeState.undoState.clearHistory()
             savedText = content
             loaded = true
         }
@@ -65,8 +81,9 @@ fun EditorScreen(
 
     fun doSave(target: MicroFile) {
         coroutineScope.launch(Dispatchers.IO) {
-            filesManager.write(target, codeState.code)
-            savedText = codeState.code
+            val text = codeState.text.toString()
+            filesManager.write(target, text)
+            savedText = text
         }
     }
 
@@ -95,10 +112,10 @@ fun EditorScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { codeState.undo() }) {
+                    IconButton(onClick = { codeState.undoState.undo() }, enabled = codeState.undoState.canUndo) {
                         Symbol(SymbolIcon.UNDO, contentDescription = "Undo")
                     }
-                    IconButton(onClick = { codeState.redo() }) {
+                    IconButton(onClick = { codeState.undoState.redo() }, enabled = codeState.undoState.canRedo) {
                         Symbol(SymbolIcon.REDO, contentDescription = "Redo")
                     }
                 }
@@ -106,7 +123,7 @@ fun EditorScreen(
         },
         bottomBar = {
             Row(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                TextButton(onClick = { onRun(codeState.code) }) { Text("Run") }
+                TextButton(onClick = { onRun(codeState.text.toString()) }) { Text("Run") }
                 TextButton(onClick = { save() }) {
                     Text(if (isDirty) "Save*" else "Save")
                 }
@@ -114,11 +131,45 @@ fun EditorScreen(
         }
     ) { padding ->
         if (loaded) {
-            NemoCodeEditor(
+            CodeEditor(
                 state = codeState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
+            )
+        }
+    }
+}
+
+// Line numbers left, text right. One vertical scroll for both keeps the
+// numbers in line; same style, so same line height. Horizontal scroll
+// on the text only: long lines do not wrap.
+@Composable
+private fun CodeEditor(state: TextFieldState, modifier: Modifier = Modifier) {
+    val style = TextStyle(
+        fontFamily = FontFamily.Monospace,
+        fontSize = 14.sp,
+        lineHeight = 20.sp,
+        color = MaterialTheme.colorScheme.onSurface,
+    )
+    val lineCount = state.text.count { it == '\n' } + 1
+    Row(modifier.verticalScroll(rememberScrollState()).padding(8.dp)) {
+        Text(
+            text = (1..lineCount).joinToString("\n"),
+            style = style.copy(color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.End),
+            modifier = Modifier.padding(end = 8.dp),
+        )
+        BoxWithConstraints(Modifier.weight(1f)) {
+            BasicTextField(
+                state = state,
+                modifier = Modifier.horizontalScroll(rememberScrollState()).widthIn(min = maxWidth),
+                textStyle = style,
+                lineLimits = TextFieldLineLimits.MultiLine(),
+                keyboardOptions = KeyboardOptions(
+                    capitalization = KeyboardCapitalization.None,
+                    autoCorrectEnabled = false,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
             )
         }
     }
