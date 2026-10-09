@@ -3,8 +3,8 @@
 # adb exec, and compares each script's output with the .exp file next to
 # it. Test scripts are upy-android/examples/*_selftest/*.py and
 # upy-android/tests/*.py. Markers in each script's header set its tier,
-# fixtures and whether it runs on the PC ("runs: host"); see
-# upy-android/tests/README.md.
+# fixtures, whether it runs on the PC ("runs: host") and whether it runs
+# only on request ("needs: --micropython"); see upy-android/tests/README.md.
 #
 # Exit code is 1 only if a required test fails. A known-failure test that
 # passes is reported as "unexpectedly passed", not as an error.
@@ -16,6 +16,7 @@
 # Usage:
 #   tools/run-tests.py                 # required and known-failure tests
 #   tools/run-tests.py --manual        # also manual tests
+#   tools/run-tests.py --micropython   # also MicroPython's own test suite
 #   tools/run-tests.py --only litert   # one test, by name
 #   tools/run-tests.py --list          # list tests with their tier
 #   tools/run-tests.py --record --only litert   # write litert's .exp
@@ -36,7 +37,9 @@ TEST_GLOBS = [
 ]
 TIERS = ("required", "known-failure", "manual")
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+NEEDS = ("--micropython",)
 HOST_TIMEOUT = 300  # seconds
+LONG_HOST_TIMEOUT = 3600  # seconds, for "needs: --micropython"; basics takes about 30 minutes
 
 
 class Test:
@@ -49,6 +52,7 @@ class Test:
         self.reason = ""
         self.fixtures = []  # (local path, device path)
         self.host = False  # "# runs: host": runs on the PC, passes on exit code 0
+        self.needs = None  # "# needs: --micropython": runs only with that flag, or with --only
         self.problems = []
         self._read_markers()
 
@@ -71,6 +75,12 @@ class Test:
                         self.problems.append("only 'runs: host' is known: %r" % line)
                         continue
                     self.host = True
+                elif body.startswith("needs:"):
+                    flag = body[len("needs:"):].strip()
+                    if flag not in NEEDS:
+                        self.problems.append("only %s is known: %r" % (", ".join("'needs: %s'" % n for n in NEEDS), line))
+                        continue
+                    self.needs = flag
                 elif body.startswith("fixture:"):
                     parts = body[len("fixture:"):].split()
                     if len(parts) != 2:
@@ -94,12 +104,11 @@ def run_host(test, force_record):
     if force_record:
         return "ERROR", "--record: a host check has no .exp"
     env = dict(os.environ, PYTHONPATH=TOOLS_DIR + os.pathsep + os.environ.get("PYTHONPATH", ""))
+    timeout = LONG_HOST_TIMEOUT if test.needs else HOST_TIMEOUT
     try:
-        proc = subprocess.run(
-            [sys.executable, test.path], capture_output=True, text=True, timeout=HOST_TIMEOUT, env=env
-        )
+        proc = subprocess.run([sys.executable, test.path], capture_output=True, text=True, timeout=timeout, env=env)
     except subprocess.TimeoutExpired:
-        return "FAIL", "timed out after %d s" % HOST_TIMEOUT
+        return "FAIL", "timed out after %d s" % timeout
     if proc.returncode == 0:
         return "PASS", None
     return "FAIL", (proc.stdout + proc.stderr).rstrip()
@@ -145,6 +154,7 @@ def run_one(test, force_record):
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--manual", action="store_true", help="also run manual tests")
+    parser.add_argument("--micropython", action="store_true", help="also run MicroPython's own test suite")
     parser.add_argument("--only", metavar="NAME", help="run one test, by name")
     parser.add_argument("--list", action="store_true", help="list tests with their tier")
     parser.add_argument("--record", action="store_true", help="write the current output as .exp")
@@ -165,7 +175,7 @@ def main():
 
     if args.list:
         for t in tests:
-            print("%-18s %-14s %-6s %s" % (t.name, t.tier, "host" if t.host else "device", t.reason))
+            print("%-18s %-14s %-6s %-13s %s" % (t.name, t.tier, "host" if t.host else "device", t.needs or "", t.reason))
         return
 
     if args.only:
@@ -174,7 +184,8 @@ def main():
             sys.stderr.write("unknown test %r -- choices: %s\n" % (args.only, ", ".join(t.name for t in tests)))
             sys.exit(2)
     else:
-        selected = [t for t in tests if t.tier != "manual" or args.manual]
+        given = {"--micropython": args.micropython}
+        selected = [t for t in tests if (t.tier != "manual" or args.manual) and (not t.needs or given[t.needs])]
 
     results = []
     for t in selected:
