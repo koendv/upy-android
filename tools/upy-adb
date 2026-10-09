@@ -18,7 +18,7 @@
 #
 # Usage:
 #   MICROPY_MICROPYTHON=$(pwd)/tools/upy-adb python3 <run-tests.py> ...
-# See tools/run-upstream-tests.sh for the full wiring (result dir,
+# See tools/run-micropython-tests.sh for the full wiring (result dir,
 # -j1, etc).
 import os
 import re

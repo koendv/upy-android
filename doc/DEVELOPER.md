@@ -111,7 +111,7 @@ The modules `camera`, `display`, `android` (and its submodules), `tflite` and `l
 The test scripts run over adb. Local test runs use a phone connected over USB; GitHub workflows use an Android emulator. The device needs the app installed and **adb exec** enabled. With more than one device connected, set `ANDROID_SERIAL`.
 
 - `tools/run-tests.py` runs this project's own tests and compares the output with the `.exp` file next to each test. The markers are in [upy-android/tests/README.md](../upy-android/tests/README.md). `--only <name>` runs one test.
-- `tools/run-upstream-tests.sh` runs MicroPython's own test suite on the device, for example `tools/run-upstream-tests.sh -d basics`.
+- `tools/run-micropython-tests.sh` runs MicroPython's own test suite on the device, for example `tools/run-micropython-tests.sh -d basics`.
 
 ### SSH, SFTP and HTTP
 

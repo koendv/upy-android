@@ -6,9 +6,9 @@
 # installed and Settings > adb-exec turned on.
 #
 # Usage:
-#   tools/run-upstream-tests.sh [run-tests.py args...]
-#   tools/run-upstream-tests.sh -d basics        # a real, dependency-free subset to start with
-#   tools/run-upstream-tests.sh basics/int1.py   # test paths are relative to tests/
+#   tools/run-micropython-tests.sh [run-tests.py args...]
+#   tools/run-micropython-tests.sh -d basics        # a real, dependency-free subset to start with
+#   tools/run-micropython-tests.sh basics/int1.py   # test paths are relative to tests/
 #
 # MICROPYTHON_TOP overrides the pinned upstream checkout to test
 # against. Default: the checkout the build fetches (upy-android/upstream/
@@ -19,7 +19,7 @@ cd "$(dirname "$0")/.."
 
 MICROPYTHON_TOP=${MICROPYTHON_TOP:-$(pwd)/upy-android/upstream/micropython}
 if [ ! -f "$MICROPYTHON_TOP/tests/run-tests.py" ]; then
-    echo "run-upstream-tests: $MICROPYTHON_TOP/tests/run-tests.py not found -- set MICROPYTHON_TOP" >&2
+    echo "run-micropython-tests: $MICROPYTHON_TOP/tests/run-tests.py not found -- set MICROPYTHON_TOP" >&2
     exit 1
 fi
 
@@ -41,6 +41,6 @@ if python3 run-tests.py -j1 -r "$RESULT_DIR" "$@"; then
     exit 0
 else
     status=$?
-    echo "run-upstream-tests: failures -- kept results in $RESULT_DIR ($MICROPYTHON_TOP/tests/run-tests.py --print-failures -r $RESULT_DIR to see diffs)" >&2
+    echo "run-micropython-tests: failures -- kept results in $RESULT_DIR ($MICROPYTHON_TOP/tests/run-tests.py --print-failures -r $RESULT_DIR to see diffs)" >&2
     exit $status
 fi
