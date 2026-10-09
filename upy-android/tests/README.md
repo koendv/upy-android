@@ -17,8 +17,11 @@ Markers are comment lines at the top of a test script. The first line that is no
 - `# test: known-failure <reason>`: a known bug. The test runs and a failure is reported, but does not fail the run. If the test passes, the report says "unexpectedly passed": the bug may be fixed, and the test can become required.
 - `# test: manual <reason>`: not run by default. Run with `--manual`.
 - `# fixture: <local> <device>`: copies a file to the phone before the test. `<local>` is relative to the folder of the test script, `<device>` is an absolute path on the phone.
+- `# runs: host`: the script runs on the PC instead of the phone, and talks to the phone through adb exec. The test passes when the script exits with code 0. A host check has no `.exp` file.
 
 Each test script needs one `# test:` line.
+
+A test is named after what it tests.
 
 ## Expected output
 

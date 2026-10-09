@@ -2,8 +2,9 @@
 # Runs this project's tests on a connected phone or emulator through
 # adb exec, and compares each script's output with the .exp file next to
 # it. Test scripts are upy-android/examples/*_selftest/*.py and
-# upy-android/tests/*.py. Markers in each script's header set its tier and
-# fixtures; see upy-android/tests/README.md.
+# upy-android/tests/*.py. Markers in each script's header set its tier,
+# fixtures and whether it runs on the PC ("runs: host"); see
+# upy-android/tests/README.md.
 #
 # Exit code is 1 only if a required test fails. A known-failure test that
 # passes is reported as "unexpectedly passed", not as an error.
@@ -22,6 +23,7 @@ import argparse
 import difflib
 import glob
 import os
+import subprocess
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -33,6 +35,8 @@ TEST_GLOBS = [
     os.path.join(REPO_ROOT, "upy-android", "tests", "*.py"),
 ]
 TIERS = ("required", "known-failure", "manual")
+TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
+HOST_TIMEOUT = 300  # seconds
 
 
 class Test:
@@ -44,6 +48,7 @@ class Test:
         self.tier = None
         self.reason = ""
         self.fixtures = []  # (local path, device path)
+        self.host = False  # "# runs: host": runs on the PC, passes on exit code 0
         self.problems = []
         self._read_markers()
 
@@ -61,6 +66,11 @@ class Test:
                         continue
                     self.tier = words[0]
                     self.reason = words[1] if len(words) > 1 else ""
+                elif body.startswith("runs:"):
+                    if body[len("runs:"):].strip() != "host":
+                        self.problems.append("only 'runs: host' is known: %r" % line)
+                        continue
+                    self.host = True
                 elif body.startswith("fixture:"):
                     parts = body[len("fixture:"):].split()
                     if len(parts) != 2:
@@ -80,7 +90,24 @@ def discover():
     return tests
 
 
+def run_host(test, force_record):
+    if force_record:
+        return "ERROR", "--record: a host check has no .exp"
+    env = dict(os.environ, PYTHONPATH=TOOLS_DIR + os.pathsep + os.environ.get("PYTHONPATH", ""))
+    try:
+        proc = subprocess.run(
+            [sys.executable, test.path], capture_output=True, text=True, timeout=HOST_TIMEOUT, env=env
+        )
+    except subprocess.TimeoutExpired:
+        return "FAIL", "timed out after %d s" % HOST_TIMEOUT
+    if proc.returncode == 0:
+        return "PASS", None
+    return "FAIL", (proc.stdout + proc.stderr).rstrip()
+
+
 def run_one(test, force_record):
+    if test.host:
+        return run_host(test, force_record)
     exp_path = test.path + ".exp"
     if force_record and test.tier == "known-failure":
         return "ERROR", "--record refuses known-failure tests: write the correct output to %s by hand" % exp_path
@@ -138,7 +165,7 @@ def main():
 
     if args.list:
         for t in tests:
-            print("%-14s %-14s %s" % (t.name, t.tier, t.reason))
+            print("%-18s %-14s %-6s %s" % (t.name, t.tier, "host" if t.host else "device", t.reason))
         return
 
     if args.only:
@@ -156,7 +183,7 @@ def main():
             status = {"FAIL": "XFAIL", "PASS": "XPASS"}.get(status, status)
         results.append((t, status))
         label = {"XFAIL": "XFAIL (known failure)", "XPASS": "XPASS (unexpectedly passed)"}.get(status, status)
-        print("%-14s %-14s %s" % (t.name, t.tier, label))
+        print("%-18s %-14s %s" % (t.name, t.tier, label))
         if detail and status in ("FAIL", "ERROR", "RECORDED"):
             print(detail if status == "FAIL" else "  " + detail)
 
