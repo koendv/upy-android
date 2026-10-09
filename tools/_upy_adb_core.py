@@ -13,7 +13,9 @@ ADB_TIMEOUT = 25  # seconds
 # Protocol 2 run replies end with these fields, after output.
 RUN_STATUS = re.compile(r", status=(ok|exception|timeout)(?:, exception=([A-Za-z_][A-Za-z0-9_]*))?$")
 
-# Type name of the uncaught exception that ended the last run, "" if none.
+# Status of the last run ("ok", "exception", "timeout"; "" if the reply had
+# none), and the type name of its uncaught exception, "" if none.
+last_status = ""
 last_exception = ""
 
 
@@ -25,13 +27,15 @@ def adb_cmd():
     return cmd
 
 
-def content_call(method, arg=None):
+def content_call(method, arg=None, extras=()):
     """Returns (output, error): exactly one is not None on a parsed
     reply. Both None never happens. An unparseable or timed-out reply
     is reported as a non-None error string instead."""
     cmd = adb_cmd() + ["exec-out", "content", "call", "--uri", URI, "--method", method]
     if arg is not None:
         cmd += ["--arg", arg]
+    for extra in extras:
+        cmd += ["--extra", extra]
     try:
         proc = subprocess.run(cmd, capture_output=True, timeout=ADB_TIMEOUT)
     except subprocess.TimeoutExpired:
@@ -62,10 +66,11 @@ def content_call(method, arg=None):
 
     if body == "":
         return "", None  # empty Bundle: reset/interrupt ack
-    global last_exception
+    global last_status, last_exception
     if body.startswith("output="):
         output = body[len("output="):]
         m = RUN_STATUS.search(output)
+        last_status = m.group(1) if m else ""
         last_exception = (m.group(2) or "") if m else ""
         return output[: m.start()] if m else output, None
     if body.startswith("error="):
