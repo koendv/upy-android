@@ -1,3 +1,5 @@
+# test: required
+#
 # android.mediastore confidence test. Confirms the JNI/Kotlin bridge
 # (MediaStoreShim.kt, mediastore_jni_bridge.cpp) actually saves real
 # bytes into a real, gallery-visible MediaStore item on this device,

@@ -1,4 +1,4 @@
-# Shared adb-exec plumbing for tools/upy-adb and tools/run-selftests.py.
+# Shared adb-exec plumbing for tools/upy-adb and tools/run-tests.py.
 # Talks to Part 1's AdbExecProvider via `adb exec-out content call`.
 # exec-out, not `adb shell`, avoids PTY/CRLF translation on the reply.
 import base64

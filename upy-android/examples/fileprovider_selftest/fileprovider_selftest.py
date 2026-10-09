@@ -1,3 +1,5 @@
+# test: manual the share sheet must be checked by eye
+#
 # android.fileprovider confidence test. Confirms the JNI/AIDL chain
 # (fileprovider_module.cpp -> EngineService.requestShare() ->
 # IEngineShareListener -> MainActivity's shareRequestListener ->

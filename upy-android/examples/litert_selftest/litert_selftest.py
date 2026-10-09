@@ -1,3 +1,7 @@
+# test: required
+# fixture: ../quant/single_add_default_a8w8_recipe_quantized.tflite /examples/single_add_quant.tflite
+# fixture: ../add_simple/add_simple.tflite /examples/add_simple.tflite
+#
 # litert confidence test (top-level `litert`).
 # litert.CompiledModel.run(*inputs) takes/returns plain array.array
 # directly -- no ndarray, no TensorBuffer, no write_*/read_* methods,

@@ -1,3 +1,7 @@
+# test: required
+# fixture: ../quant/single_add_default_a8w8_recipe_quantized.tflite /examples/single_add_quant.tflite
+# fixture: ../add_simple/add_simple.tflite /examples/add_simple.tflite
+#
 # tflite confidence test (top-level `tflite`). Same fixtures and cases
 # as litert_selftest.py -- see that file's own header comment for
 # what's different between the two modules (dtype range, accelerator

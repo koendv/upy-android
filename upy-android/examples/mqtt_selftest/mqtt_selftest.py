@@ -1,3 +1,5 @@
+# test: manual needs an external broker with a retained "ping" message
+#
 # umqtt confidence test. Confirms the JNI/Kotlin bridge (MqttShim.kt,
 # mqtt_jni_bridge.cpp) actually connects to a real external MQTT broker
 # over a real network, not just that the code compiles.
