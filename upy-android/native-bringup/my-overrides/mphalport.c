@@ -11,7 +11,10 @@
 #include "py/mphal.h"
 #include "micropython_embed.h"
 
-#define MP_EMBED_OUTPUT_BUF_SIZE (32 * 1024)
+// Each run's output goes back over Binder twice (engine -> app -> adb), as
+// UTF-16: 128 KB of text is ~256 KB per transaction, well below Binder's
+// ~1 MB per-process limit.
+#define MP_EMBED_OUTPUT_BUF_SIZE (128 * 1024)
 
 static char mp_embed_output_buf[MP_EMBED_OUTPUT_BUF_SIZE];
 static size_t mp_embed_output_len;
@@ -45,7 +48,7 @@ size_t mp_embed_output_get_len(void) {
 
 // Live output tap (see micropython_embed.h). Deliberately separate from
 // the accumulate-into-mp_embed_output_buf logic above: the chunk callback
-// always sees the full, untruncated write, even once the 32KB
+// always sees the full, untruncated write, even once the 128KB
 // accumulation buffer has filled up (a long-running streamed script's
 // live view isn't bounded by that cap, only the final post-return
 // snapshot is).

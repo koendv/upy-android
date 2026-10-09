@@ -17,8 +17,7 @@ package eu.kdvelectronics.upyandroid.managers
  */
 class TerminalHistoryManager {
     companion object {
-        // Same order of magnitude as mphalport.c's own single-run 32KB
-        // output cap. Bytes, not entry count: a single entry (a typed
+        // Bytes, not entry count: a single entry (a typed
         // or pasted multi-line script) has no inherent size limit, so
         // entry-count capping wouldn't bound worst-case memory the way
         // byte-budget capping does.

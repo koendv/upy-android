@@ -27,7 +27,7 @@ state:
   - run blocks until done, or until the optional timeout; interrupt via second call
   - camera needs screen on, unlocked, app in foreground: check status first
 limits:
-  output: max 32 KB; longer output ends with ".[truncated]" (1-4 dots); write large results to a file
+  output: max 128 KB; longer output ends with ".[truncated]" (1-4 dots); write large results to a file
   script: ~96 KB source; send large data in chunks
 env:
   fs: / is app private storage; /examples has samples

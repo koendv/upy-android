@@ -31,8 +31,7 @@ data class Line(val text: String, val complete: Boolean, val bytes: Int)
 // real ring-buffer history algorithm for the eviction pattern -- see
 // session-state.
 object TerminalLog {
-    // Same order of magnitude as mphalport.c's own single-run 32KB
-    // output cap; this is cross-run scrollback, so a multiple of it.
+    // Cross-run scrollback.
     // see session-state: TerminalLog.kt#TerminalLog
     private const val MAX_BYTES = 8 * 32 * 1024
 
