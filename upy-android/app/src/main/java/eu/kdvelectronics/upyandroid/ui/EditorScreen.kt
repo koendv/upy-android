@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.input.InputTransformation
+import androidx.compose.foundation.text.input.TextFieldBuffer
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.rememberTextFieldState
@@ -33,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -229,6 +232,7 @@ private fun CodeEditor(state: TextFieldState, modifier: Modifier = Modifier) {
                     state = state,
                     modifier = Modifier.horizontalScroll(rememberScrollState()).widthIn(min = maxWidth),
                     textStyle = style,
+                    inputTransformation = PythonIndent,
                     lineLimits = TextFieldLineLimits.MultiLine(),
                     keyboardOptions = KeyboardOptions(
                         capitalization = KeyboardCapitalization.None,
@@ -236,6 +240,46 @@ private fun CodeEditor(state: TextFieldState, modifier: Modifier = Modifier) {
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                 )
+            }
+        }
+    }
+}
+
+// Enter copies the indentation of the text before the cursor, plus 4 spaces
+// after a ":" on a line without "#". Backspace in leading spaces removes back
+// to the previous multiple of 4. Only single typed edits: a paste is left alone.
+@OptIn(ExperimentalFoundationApi::class)
+private object PythonIndent : InputTransformation {
+    override fun TextFieldBuffer.transformInput() {
+        if (changes.changeCount != 1 || !originalSelection.collapsed) return
+        val range = changes.getRange(0)
+        val original = changes.getOriginalRange(0)
+        val text = asCharSequence()
+
+        if (original.collapsed && range.length == 1 && text[range.start] == '\n') {
+            val lineStart = text.lastIndexOf('\n', range.start - 1) + 1
+            val line = text.substring(lineStart, range.start)
+            var indent = line.takeWhile { it == ' ' || it == '\t' }
+            if (line.trimEnd().endsWith(":") && '#' !in line) indent += "    "
+            if (indent.isNotEmpty()) {
+                replace(range.end, range.end, indent)
+                selection = TextRange(range.end + indent.length)
+            }
+            return
+        }
+
+        // Backspace (not Delete): the cursor was right after the deleted space.
+        if (range.collapsed && original.length == 1 && originalSelection.start == original.end &&
+            originalText[original.start] == ' '
+        ) {
+            val lineStart = originalText.lastIndexOf('\n', original.start - 1) + 1
+            val column = original.end - lineStart
+            if ((lineStart until original.end).all { originalText[it] == ' ' }) {
+                val extra = (column - 1) % 4
+                if (extra > 0) {
+                    replace(range.start - extra, range.start, "")
+                    selection = TextRange(range.start - extra)
+                }
             }
         }
     }
