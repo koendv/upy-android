@@ -5,7 +5,6 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
@@ -21,7 +20,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,6 +34,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.kdvelectronics.upyandroid.managers.FilesManager
@@ -107,30 +106,46 @@ fun EditorScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(file?.name ?: "untitled") },
+                title = {
+                    Text(
+                        file?.name ?: "untitled",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Symbol(SymbolIcon.ARROW_BACK, contentDescription = "Back")
                     }
                 },
                 actions = {
-                    IconButton(onClick = { codeState.undoState.undo() }, enabled = codeState.undoState.canUndo) {
-                        Symbol(SymbolIcon.UNDO, contentDescription = "Undo")
-                    }
-                    IconButton(onClick = { codeState.undoState.redo() }, enabled = codeState.undoState.canRedo) {
-                        Symbol(SymbolIcon.REDO, contentDescription = "Redo")
-                    }
+                    TooltipIconButton(
+                        icon = SymbolIcon.UNDO,
+                        label = "Undo",
+                        onClick = { codeState.undoState.undo() },
+                        enabled = codeState.undoState.canUndo,
+                    )
+                    TooltipIconButton(
+                        icon = SymbolIcon.REDO,
+                        label = "Redo",
+                        onClick = { codeState.undoState.redo() },
+                        enabled = codeState.undoState.canRedo,
+                    )
+                    // Untitled: always enabled, so Save as is reachable.
+                    TooltipIconButton(
+                        icon = SymbolIcon.SAVE,
+                        label = "Save",
+                        onClick = { save() },
+                        enabled = isDirty || file == null,
+                    )
+                    TooltipIconButton(
+                        icon = SymbolIcon.PLAY_ARROW,
+                        label = "Run",
+                        onClick = { onRun(codeState.text.toString()) },
+                    )
                 }
             )
         },
-        bottomBar = {
-            Row(modifier = Modifier.fillMaxWidth().padding(8.dp)) {
-                TextButton(onClick = { onRun(codeState.text.toString()) }) { Text("Run") }
-                TextButton(onClick = { save() }) {
-                    Text(if (isDirty) "Save*" else "Save")
-                }
-            }
-        }
     ) { padding ->
         if (loaded) {
             CodeEditor(
