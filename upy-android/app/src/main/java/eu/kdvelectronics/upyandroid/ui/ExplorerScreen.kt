@@ -57,7 +57,7 @@ import my.nanihadesuka.compose.ScrollbarSettings
 @Composable
 fun ExplorerScreen(
     filesManager: FilesManager,
-    onEdit: (MicroFile?, path: String) -> Unit,
+    onEdit: (MicroFile) -> Unit,
     onRun: (content: String) -> Unit,
     focus: String? = null,
     onFocusShown: () -> Unit = {},
@@ -209,7 +209,7 @@ fun ExplorerScreen(
                     })
                     if (file?.isFile == true) OptionRow(SymbolIcon.EDIT, "Edit", onClick = {
                         showOptions = false
-                        onEdit(file, path)
+                        onEdit(file)
                     })
                     if (file?.isDirectory == true) OptionRow(SymbolIcon.FOLDER_OPEN, "Open", onClick = {
                         showOptions = false

@@ -186,7 +186,6 @@ class MainActivity : ComponentActivity() {
                 // Routes carry no script data; it is handed over through
                 // these variables instead.
                 var pendingFile = remember { mutableStateOf<MicroFile?>(null) }
-                var pendingPath = remember { mutableStateOf("") }
 
                 val focus = sharedFocus.value
                 LaunchedEffect(focus) {
@@ -259,9 +258,8 @@ class MainActivity : ComponentActivity() {
                         composable(TopLevelDestination.EXPLORER.route) {
                             ExplorerScreen(
                                 filesManager = filesManager,
-                                onEdit = { file, path ->
+                                onEdit = { file ->
                                     pendingFile.value = file
-                                    pendingPath.value = path
                                     navController.navigate("editor")
                                 },
                                 onRun = { content -> runAndShowTerminal(content) },
@@ -270,13 +268,14 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                         composable("editor") {
-                            EditorScreen(
-                                filesManager = filesManager,
-                                file = pendingFile.value,
-                                path = pendingPath.value,
-                                onRun = { content -> runAndShowTerminal(content) },
-                                onBack = { navController.popBackStack() }
-                            )
+                            pendingFile.value?.let { file ->
+                                EditorScreen(
+                                    filesManager = filesManager,
+                                    file = file,
+                                    onRun = { content -> runAndShowTerminal(content) },
+                                    onBack = { navController.popBackStack() }
+                                )
+                            }
                         }
                         composable("about") {
                             AboutScreen(

@@ -55,51 +55,39 @@ import my.nanihadesuka.compose.ScrollbarSettings
  * Code editor: run, save, undo, redo. Plain monospace text with line
  * numbers, no wrapping, no syntax highlighting.
  * Saves locally via [FilesManager], not to a remote board.
- *
- * @param file The file being edited, or null for a new/blank script.
- * @param path The directory a new file should be saved into (used only when [file] is null).
  */
 // undoState is still experimental in Compose foundation.
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun EditorScreen(
     filesManager: FilesManager,
-    file: MicroFile?,
-    path: String,
+    file: MicroFile,
     onRun: (content: String) -> Unit,
     onBack: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
     val codeState = rememberTextFieldState()
-    var loaded by remember { mutableStateOf(file == null) }
+    var loaded by remember { mutableStateOf(false) }
     var savedText by remember { mutableStateOf("") }
-    var showSaveAs by remember { mutableStateOf(false) }
     var showLeave by remember { mutableStateOf(false) }
-    var leaveAfterSave by remember { mutableStateOf(false) }
     val isDirty = codeState.text.toString() != savedText
 
     LaunchedEffect(file) {
-        if (file != null) {
-            val content = withContext(Dispatchers.IO) { filesManager.read(file) }
-            codeState.setTextAndPlaceCursorAtEnd(content)
-            codeState.undoState.clearHistory()
-            savedText = content
-            loaded = true
-        }
+        val content = withContext(Dispatchers.IO) { filesManager.read(file) }
+        codeState.setTextAndPlaceCursorAtEnd(content)
+        codeState.undoState.clearHistory()
+        savedText = content
+        loaded = true
     }
 
     // then() runs after the write: leaving earlier would cancel it.
-    fun doSave(target: MicroFile, then: () -> Unit = {}) {
+    fun save(then: () -> Unit = {}) {
         val text = codeState.text.toString()
         coroutineScope.launch {
-            withContext(Dispatchers.IO) { filesManager.write(target, text) }
+            withContext(Dispatchers.IO) { filesManager.write(file, text) }
             savedText = text
             then()
         }
-    }
-
-    fun save() {
-        if (file != null) doSave(file) else showSaveAs = true
     }
 
     fun leave() {
@@ -115,12 +103,7 @@ fun EditorScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showLeave = false
-                    if (file != null) {
-                        doSave(file) { onBack() }
-                    } else {
-                        leaveAfterSave = true
-                        showSaveAs = true
-                    }
+                    save { onBack() }
                 }) { Text("Save") }
             },
             dismissButton = {
@@ -135,28 +118,12 @@ fun EditorScreen(
         )
     }
 
-    NameDialog(
-        show = showSaveAs,
-        title = "Save as",
-        initial = "main.py",
-        onDismiss = {
-            showSaveAs = false
-            leaveAfterSave = false
-        },
-        onOk = { name ->
-            showSaveAs = false
-            doSave(MicroFile(name = name, path = path, isDirectory = false)) {
-                if (leaveAfterSave) onBack()
-            }
-        }
-    )
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Text(
-                        file?.name ?: "untitled",
+                        file.name,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -179,12 +146,11 @@ fun EditorScreen(
                         onClick = { codeState.undoState.redo() },
                         enabled = codeState.undoState.canRedo,
                     )
-                    // Untitled: always enabled, so Save as is reachable.
                     TooltipIconButton(
                         icon = SymbolIcon.SAVE,
                         label = "Save",
                         onClick = { save() },
-                        enabled = isDirty || file == null,
+                        enabled = isDirty,
                     )
                     TooltipIconButton(
                         icon = SymbolIcon.PLAY_ARROW,
