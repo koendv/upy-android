@@ -1,5 +1,6 @@
 package eu.kdvelectronics.upyandroid.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,10 +17,12 @@ import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -68,6 +71,8 @@ fun EditorScreen(
     var loaded by remember { mutableStateOf(file == null) }
     var savedText by remember { mutableStateOf("") }
     var showSaveAs by remember { mutableStateOf(false) }
+    var showLeave by remember { mutableStateOf(false) }
+    var leaveAfterSave by remember { mutableStateOf(false) }
     val isDirty = codeState.text.toString() != savedText
 
     LaunchedEffect(file) {
@@ -80,11 +85,13 @@ fun EditorScreen(
         }
     }
 
-    fun doSave(target: MicroFile) {
-        coroutineScope.launch(Dispatchers.IO) {
-            val text = codeState.text.toString()
-            filesManager.write(target, text)
+    // then() runs after the write: leaving earlier would cancel it.
+    fun doSave(target: MicroFile, then: () -> Unit = {}) {
+        val text = codeState.text.toString()
+        coroutineScope.launch {
+            withContext(Dispatchers.IO) { filesManager.write(target, text) }
             savedText = text
+            then()
         }
     }
 
@@ -92,14 +99,52 @@ fun EditorScreen(
         if (file != null) doSave(file) else showSaveAs = true
     }
 
+    fun leave() {
+        if (isDirty) showLeave = true else onBack()
+    }
+
+    BackHandler(enabled = isDirty) { showLeave = true }
+
+    if (showLeave) {
+        AlertDialog(
+            onDismissRequest = { showLeave = false },
+            title = { Text("Save changes?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    showLeave = false
+                    if (file != null) {
+                        doSave(file) { onBack() }
+                    } else {
+                        leaveAfterSave = true
+                        showSaveAs = true
+                    }
+                }) { Text("Save") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { showLeave = false }) { Text("Cancel") }
+                    TextButton(onClick = {
+                        showLeave = false
+                        onBack()
+                    }) { Text("Discard") }
+                }
+            },
+        )
+    }
+
     NameDialog(
         show = showSaveAs,
         title = "Save as",
         initial = "main.py",
-        onDismiss = { showSaveAs = false },
+        onDismiss = {
+            showSaveAs = false
+            leaveAfterSave = false
+        },
         onOk = { name ->
             showSaveAs = false
-            doSave(MicroFile(name = name, path = path, isDirectory = false))
+            doSave(MicroFile(name = name, path = path, isDirectory = false)) {
+                if (leaveAfterSave) onBack()
+            }
         }
     )
 
@@ -114,7 +159,7 @@ fun EditorScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = { leave() }) {
                         Symbol(SymbolIcon.ARROW_BACK, contentDescription = "Back")
                     }
                 },
