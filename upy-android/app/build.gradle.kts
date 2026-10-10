@@ -36,13 +36,9 @@ android {
 
     defaultConfig {
         applicationId = "eu.kdvelectronics.upyandroid"
-        // Originally bumped 26 -> 27 for android.tf.info()'s hw_nnapi
-        // field (libneuralnetworks.so link), back when that module still
-        // existed -- android.tf/android.rt have since been deleted (see
-        // git history/SESSION_STATE.yaml), but nothing left in the build
-        // needs a lower floor either, so it stays at 27 rather than
-        // churning it back down without a real reason to.
-        minSdk = 27
+        // 28 (Android 9): APK signing key rotation (scheme v3) works
+        // from here on.
+        minSdk = 28
         targetSdk = 37
         versionCode = appVersionCode
         versionName = appVersion
@@ -108,6 +104,11 @@ android {
     // SSHD (Part 8) -- both sshd-core and sshd-common ship their own
     // copy of this plain, non-functional license-attribution text file.
     packaging {
+        // Compressed, as below minSdk 28: the APK is downloaded, and
+        // uncompressed dex would add about 25 MB.
+        dex {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/io.netty.versions.properties"
