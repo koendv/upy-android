@@ -1,5 +1,5 @@
-# workflow to build upy-android's app-debug.apk (or a debug-key-signed
-# app-release.apk), modeled on arm_can_tool's own build.yml
+# workflow to build upy-android's app-debug.apk or app-release.apk,
+# modeled on arm_can_tool's own build.yml
 
 on:
   workflow_dispatch:

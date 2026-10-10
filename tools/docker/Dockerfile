@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 
-# Build upy-android's upy-debug.apk (or a simple debug-key-signed
-# upy-release.apk) inside Docker. MicroPython running as an Android app.
+# Build upy-android's upy-debug.apk or upy-release.apk inside Docker.
+# MicroPython running as an Android app.
 #
 # Only upy-android/'s own sources are in this repo. Every third-party
 # dependency (MicroPython, OpenMV, ulab, LiteRT) is fetched by the Gradle
