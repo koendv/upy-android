@@ -1,0 +1,7 @@
+# MicroPython test-suite exceptions, read by micropython_basics.py.
+# known-failure <test> <reason>: runs; a failure does not fail the check.
+# skip <test> <reason>: not run.
+known-failure basics/io_iobase.py            print(file=...) needs SYS_STDFILES, off in this port
+skip          basics/array_int_repr.py       needs unittest, not on the phone
+skip          basics/array_limits_intbig.py  needs unittest, not on the phone
+skip          basics/fun_code_lnotab.py      needs unittest, not on the phone
