@@ -49,7 +49,7 @@ class AdbExecProvider : ContentProvider() {
         return when (method) {
             "help" -> handleHelp()
             "status" -> handleStatus()
-            "run" -> handleRun(arg, extras?.getInt("timeout", 0) ?: 0)
+            "run" -> handleRun(arg, extras?.getInt("timeout", 0) ?: 0, extras?.getBoolean("reset", false) ?: false)
             "reset" -> {
                 ScriptExecCore.reset(appContext)
                 Bundle()
@@ -111,7 +111,7 @@ class AdbExecProvider : ContentProvider() {
     }
 
     // see session-state: AdbExecProvider.kt#handleRun
-    private fun handleRun(arg: String?, timeoutSeconds: Int): Bundle {
+    private fun handleRun(arg: String?, timeoutSeconds: Int, resetFirst: Boolean): Bundle {
         if (arg.isNullOrEmpty()) {
             return Bundle().apply { putString("error", "missing_arg - run needs --arg <base64 script>") }
         }
@@ -138,7 +138,7 @@ class AdbExecProvider : ContentProvider() {
             null
         }
         val result = try {
-            ScriptExecCore.run(appContext, decoded, label = "adb-exec")
+            ScriptExecCore.run(appContext, decoded, label = "adb-exec", resetFirst = resetFirst)
         } finally {
             timer?.cancel()
         }
@@ -147,6 +147,7 @@ class AdbExecProvider : ContentProvider() {
             is ScriptExecCore.RunResult.Disconnected -> Bundle().apply { putString("error", "disconnected") }
             is ScriptExecCore.RunResult.Ok -> Bundle().apply {
                 putString("output", result.output)
+                if (resetFirst) putString("reset", "done")
                 when {
                     result.exception.isEmpty() -> putString("status", "ok")
                     timedOut.get() && result.exception == "KeyboardInterrupt" -> putString("status", "timeout")
@@ -162,7 +163,7 @@ class AdbExecProvider : ContentProvider() {
     companion object {
         // Bump on any change to methods, args or reply format. Also in
         // res/raw/adb_help.yaml.
-        const val PROTOCOL_VERSION = 2
+        const val PROTOCOL_VERSION = 3
     }
 
     override fun query(

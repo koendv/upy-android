@@ -10,13 +10,17 @@ PACKAGE = "eu.kdvelectronics.upyandroid"
 URI = "content://%s.exec" % PACKAGE
 ADB_TIMEOUT = 25  # seconds
 
-# Protocol 2 run replies end with these fields, after output.
-RUN_STATUS = re.compile(r", status=(ok|exception|timeout)(?:, exception=([A-Za-z_][A-Za-z0-9_]*))?$")
+# A run reply is output, then short fields (status, exception, reset) in
+# any order: a Bundle prints its keys in hash order, and "output" has the
+# lowest hash.
+RUN_FIELD = re.compile(r", (status|exception|reset)=([A-Za-z_][A-Za-z0-9_]*)$")
 
 # Status of the last run ("ok", "exception", "timeout"; "" if the reply had
-# none), and the type name of its uncaught exception, "" if none.
+# none), the type name of its uncaught exception ("" if none), and whether
+# the interpreter was reset first ("done" or "").
 last_status = ""
 last_exception = ""
+last_reset = ""
 
 
 def adb_cmd():
@@ -66,27 +70,33 @@ def content_call(method, arg=None, extras=()):
 
     if body == "":
         return "", None  # empty Bundle: reset/interrupt ack
-    global last_status, last_exception
+    global last_status, last_exception, last_reset
     if body.startswith("output="):
         output = body[len("output="):]
-        m = RUN_STATUS.search(output)
-        last_status = m.group(1) if m else ""
-        last_exception = (m.group(2) or "") if m else ""
-        return output[: m.start()] if m else output, None
+        fields = {}
+        while True:
+            m = RUN_FIELD.search(output)
+            if not m or m.group(1) in fields:
+                break
+            fields[m.group(1)] = m.group(2)
+            output = output[: m.start()]
+        last_status = fields.get("status", "")
+        last_exception = fields.get("exception", "")
+        last_reset = fields.get("reset", "")
+        return output, None
     if body.startswith("error="):
         return None, body[len("error="):]
     return None, "unparseable adb reply body: %r" % body
 
 
 def run_script(src_text, reset_first=True):
-    """Reset (optional) + run a script's source text on-device. Returns
-    (output, error) same shape as content_call."""
-    if reset_first:
-        _, reset_err = content_call("reset")
-        if reset_err is not None:
-            return None, "reset failed: %s" % reset_err
+    """Reset (optional) + run a script's source text on-device, in one
+    call. Returns (output, error) same shape as content_call."""
     b64 = base64.b64encode(src_text.encode("utf-8")).decode("ascii")
-    return content_call("run", b64)
+    output, error = content_call("run", b64, ("reset:b:true",) if reset_first else ())
+    if error is None and reset_first and last_reset != "done":
+        return None, "app too old for reset in run (adb exec protocol 3): update the app"
+    return output, error
 
 
 def stage_fixture(local_path, device_filename):

@@ -1,18 +1,18 @@
 name: upy-android adb exec
 source: https://github.com/koendv/upy-android
-protocol: 2
+protocol: 3
 runtime: MicroPython ports/embed, OpenMV subset
 model: each run executes one whole script; no REPL
-call: "adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method <method> [--arg <arg>] [--extra timeout:i:<seconds>]"
+call: "adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method <method> [--arg <arg>] [--extra timeout:i:<seconds>] [--extra reset:b:true]"
 reply:
   ok: "Result: Bundle[{output=<text>}]"
-  run: "Result: Bundle[{output=<text>, status=ok|exception|timeout, exception=<type name, only with status=exception>}]"
+  run: "Result: Bundle[{output=<text>, then status=ok|exception|timeout, exception=<type name, only with status=exception>, reset=done <only with extra reset>, in any order}]"
   ack: "Result: Bundle[{}]"
   error: "Result: Bundle[{error=<code>}]"
 methods:
   help: this page
   status: protocol, app version, commit, build date, engine connected, busy, screen, foreground, camera available (else why not)
-  run: {arg: base64 utf-8 script, extra timeout (seconds, optional): interrupt after it, returns: stdout, traceback, status}
+  run: {arg: base64 utf-8 script, extra timeout (seconds, optional): interrupt after it, extra reset (optional): fresh interpreter first, returns: stdout, traceback, status}
   reset: fresh interpreter
   interrupt: stop running script
 errors:

@@ -1,8 +1,8 @@
 # test: required
 # runs: host
 #
-# adb exec protocol 2, checked from the PC: status, run status and
-# exception, timeout, interrupt, output limit, NUL and UTF-8.
+# adb exec protocol 3, checked from the PC: status, run status and
+# exception, reset in run, timeout, interrupt, output limit, NUL and UTF-8.
 # Loops stop by themselves after 10 s, so a broken timeout or interrupt
 # fails the check instead of hanging it.
 import base64
@@ -31,7 +31,7 @@ def run(script, extras=()):
 core.content_call("reset")
 
 status, error = core.content_call("status")
-fields = ("protocol: 2", "app:", "commit:", "built:", "engine: connected", "busy:", "screen:", "foreground:", "camera:")
+fields = ("protocol: 3", "app:", "commit:", "built:", "engine: connected", "busy:", "screen:", "foreground:", "camera:")
 missing = [f for f in fields if error is not None or f not in status]
 check("status fields", not missing, "missing %s" % missing)
 
@@ -40,6 +40,12 @@ check("run ok", (out, err, st, exc) == ("hi\n", None, "ok", ""), repr((out, err,
 
 out, err, st, exc = run("1/0")
 check("run exception", (st, exc) == ("exception", "ZeroDivisionError"), repr((st, exc)))
+
+run("kept = 1")
+out, err, st, exc = run("print(kept)")
+check("run keeps globals", (out, st, core.last_reset) == ("1\n", "ok", ""), repr((out, st, core.last_reset)))
+out, err, st, exc = run("print(kept)", extras=("reset:b:true",))
+check("run with reset", (exc, core.last_reset) == ("NameError", "done"), repr((exc, core.last_reset)))
 
 t0 = time.time()
 out, err, st, exc = run(LOOP_10S, extras=("timeout:i:2",))

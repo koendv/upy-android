@@ -1,6 +1,7 @@
 package eu.kdvelectronics.upyandroid
 
 import android.content.Context
+import android.os.RemoteException
 import android.view.Surface
 import eu.kdvelectronics.upyandroid.managers.BoardManager
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
@@ -71,12 +72,22 @@ object ScriptExecCore {
     // is acquired (e.g. "adb-exec"/"ssh") -- done here, not by the
     // caller before calling run(), so a Busy rejection never leaves an
     // orphaned header with no output behind it.
-    fun run(context: Context, code: String, label: String? = null): RunResult {
+    // resetFirst: fresh interpreter before the script, inside the busy
+    // check, so a script started elsewhere is never reset. reset()
+    // returns once the interpreter is fresh.
+    fun run(context: Context, code: String, label: String? = null, resetFirst: Boolean = false): RunResult {
         if (!inFlight.compareAndSet(0, 1)) {
             return RunResult.Busy
         }
         try {
             ensureConnected(context)
+            if (resetFirst) {
+                try {
+                    boardManager?.reset()
+                } catch (re: RemoteException) {
+                    return RunResult.Disconnected
+                }
+            }
             if (label != null) {
                 TerminalLog.append("\n>>> ($label)\n$code\n")
             }
