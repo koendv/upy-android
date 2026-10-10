@@ -68,6 +68,11 @@
 #define MICROPY_READER_POSIX                     (0)
 #define MICROPY_READER_VFS                       (1)
 #define MICROPY_PY_OS                            (1)
+// os.uname().machine and sys.implementation._machine are
+// "<board> with <mcu>".
+#define MICROPY_PY_OS_UNAME                      (1)
+#define MICROPY_HW_BOARD_NAME                    "upy-android"
+#define MICROPY_HW_MCU_NAME                      "arm64-v8a"
 // MICROPY_VFS_POSIX requires this (extmod/vfs_posix.c has a #error otherwise).
 #define MICROPY_ENABLE_FINALISER                 (1)
 // Defaults to (1) already (py/mpconfig.h) but made explicit rather than
