@@ -79,9 +79,11 @@ out, err, st, exc = run("print('é中\U0001F600', len('é中\U0001F600'))")
 check("UTF-8", out == "é中\U0001F600 3\n", repr(out))
 
 out, err, st, exc = run("for n in range(1600): print('%06d ' % n + 'x' * 56)")
+out = out or ""
 check("100 KB output", len(out) == 1600 * 64 and "truncated" not in out, "%d chars" % len(out or ""))
 
 out, err, st, exc = run("for n in range(3200): print('%06d ' % n + 'x' * 56)")
+out = out or ""
 check("200 KB truncated", out.endswith("[truncated]") and len(out) <= 128 * 1024, "%d chars, ends %r" % (len(out or ""), (out or "")[-20:]))
 
 sys.exit(1 if failures else 0)

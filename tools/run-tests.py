@@ -100,6 +100,32 @@ def discover():
     return tests
 
 
+def check_device():
+    """Stops the run if the app cannot be reached; warns if the app was
+    built from another commit than the repo's HEAD."""
+    status, error = core.content_call("status")
+    if error is not None:
+        if error.startswith("disabled"):
+            print("adb exec disabled: enable it in the app's Settings")
+        else:
+            print("cannot reach the app through adb: %s" % error)
+            print("connect a phone, or set ANDROID_SERIAL")
+        sys.exit(2)
+    app = ""
+    for line in status.splitlines():
+        if line.startswith("commit: "):
+            app = line[len("commit: "):]
+    try:
+        head = subprocess.run(["git", "rev-parse", "--short=7", "HEAD"], cwd=REPO_ROOT,
+                              capture_output=True, text=True, check=True).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return
+    if app.split("-")[0] != head:
+        print("warning: app built from %s, repo at %s" % (app or "unknown", head))
+    elif app.endswith("-dirty"):
+        print("warning: app built from %s with uncommitted changes" % app)
+
+
 def run_host(test, force_record):
     if force_record:
         return "ERROR", "--record: a host check has no .exp"
@@ -177,6 +203,8 @@ def main():
         for t in tests:
             print("%-18s %-14s %-6s %-13s %s" % (t.name, t.tier, "host" if t.host else "device", t.needs or "", t.reason))
         return
+
+    check_device()
 
     if args.only:
         selected = [t for t in tests if t.name == args.only]
