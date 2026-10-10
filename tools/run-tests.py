@@ -1,17 +1,6 @@
 #!/usr/bin/env python3
 # Runs this project's tests on a connected phone or emulator through
-# adb exec, and compares each script's output with the .exp file next to
-# it. Test scripts are upy-android/examples/*_selftest/*.py and
-# upy-android/tests/*.py. Markers in each script's header set its tier,
-# fixtures, whether it runs on the PC ("runs: host") and whether it runs
-# only on request ("needs: --micropython"); see upy-android/tests/README.md.
-#
-# Exit code is 1 only if a required test fails. A known-failure test that
-# passes is reported as "unexpectedly passed", not as an error.
-#
-# A missing .exp is an error. --record writes the current output as the
-# .exp (read it before trusting it); it refuses known-failure tests, whose
-# .exp must hold the correct output, written by hand.
+# adb exec. See doc/DEVELOPER.md, Test scripts.
 #
 # Usage:
 #   tools/run-tests.py                 # required and known-failure tests
