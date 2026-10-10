@@ -39,7 +39,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import eu.kdvelectronics.upyandroid.fileprovider.shareFile
-import eu.kdvelectronics.upyandroid.http.HttpServerManager
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
@@ -154,18 +153,10 @@ class MainActivity : ComponentActivity() {
         settingsManager = SettingsManager(this)
         seedDemoScriptsIfNeeded()
         seedRomIfNeeded()
-        // Lives in this (default/UI) process, not :engine. See
-        // HttpServerManager.kt's own header comment. A process-wide
-        // singleton (not a per-Activity instance): deliberately never
-        // stopped in onDestroy(), like AdbExecProvider's own
-        // BoardManager, so it should keep serving for as long as this
-        // process is alive, not just while MainActivity itself is on
-        // screen, including across an Activity recreation triggered
-        // by a config change (e.g. a system theme switch), which a
-        // per-Activity instance got wrong (see its own header comment).
-        HttpServerManager.applySettings(applicationContext, settingsManager)
-        // Same lifecycle reasoning as HttpServerManager above. Also
-        // never stopped in onDestroy(), also a process-wide singleton.
+        // Lives in this (default/UI) process, not :engine. A process-wide
+        // singleton, never stopped in onDestroy(): it keeps serving while
+        // this process is alive, also across an Activity recreation
+        // (rotation, theme switch).
         SshServerManager.applySettings(applicationContext, settingsManager)
         ScriptExecCore.connect(applicationContext)
         maybeRequestCameraPermission()
@@ -246,7 +237,6 @@ class MainActivity : ComponentActivity() {
                                 settingsManager = settingsManager,
                                 onSettingsChanged = {
                                     ScriptExecCore.pushSettings()
-                                    HttpServerManager.applySettings(applicationContext, settingsManager)
                                     SshServerManager.applySettings(applicationContext, settingsManager)
                                 },
                                 onOpenAbout = { navController.navigate("about") },

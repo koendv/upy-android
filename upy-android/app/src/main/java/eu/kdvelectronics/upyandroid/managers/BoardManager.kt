@@ -173,7 +173,7 @@ class BoardManager(
      * Called on every successful connect (before onStatusChanges sees
      * Connected, see [onServiceConnected]) and again from the
      * Settings screen whenever the user changes a setting while
-     * connected. sshPassword/httpPassword are deliberately never put
+     * connected. sshPassword is deliberately never put
      * into this Bundle, see IEngine.aidl#setSettings. heap_size_mb is
      * deliberately not here either. That is read once, locally, by
      * EngineService.onCreate() only; see Engine.kt#nativeSetSettings.
@@ -182,8 +182,6 @@ class BoardManager(
         val s = SettingsManager(context)
         val bundle = Bundle().apply {
             putBoolean("ssh_enabled", s.sshEnabled)
-            putBoolean("http_server_enabled", s.httpServerEnabled)
-            putBoolean("http_private_files_enabled", s.httpPrivateFilesEnabled)
             putBoolean("adb_exec_enabled", s.adbExecEnabled)
         }
         try {

@@ -30,7 +30,7 @@ size_t g_heap_size = 0;
 bool g_initialized = false;
 
 std::mutex g_settings_mutex;
-SettingsSnapshot g_settings_snapshot = {kDefaultHeapSizeMb, false, false, false, false};
+SettingsSnapshot g_settings_snapshot = {kDefaultHeapSizeMb, false, false};
 
 // see session-state: engine_jni.cpp#allocate_heap
 void allocate_heap(int heap_size_mb) {
@@ -215,13 +215,9 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeSetSettings(
     JNIEnv *, jobject,
-    jboolean sshEnabled, jboolean httpServerEnabled,
-    jboolean httpPrivateFilesEnabled,
-    jboolean adbExecEnabled) {
+    jboolean sshEnabled, jboolean adbExecEnabled) {
     std::lock_guard<std::mutex> lock(g_settings_mutex);
     g_settings_snapshot.ssh_enabled = sshEnabled;
-    g_settings_snapshot.http_server_enabled = httpServerEnabled;
-    g_settings_snapshot.http_private_files_enabled = httpPrivateFilesEnabled;
     g_settings_snapshot.adb_exec_enabled = adbExecEnabled;
 }
 

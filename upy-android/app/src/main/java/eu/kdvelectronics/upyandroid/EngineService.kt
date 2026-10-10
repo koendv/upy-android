@@ -156,8 +156,6 @@ class EngineService : Service() {
             // onCreate() above. See Engine.kt#nativeSetSettings.
             Engine.nativeSetSettings(
                 settings.getBoolean("ssh_enabled", false),
-                settings.getBoolean("http_server_enabled", false),
-                settings.getBoolean("http_private_files_enabled", false),
                 settings.getBoolean("adb_exec_enabled", false),
             )
         }

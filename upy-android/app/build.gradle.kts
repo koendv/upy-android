@@ -425,18 +425,6 @@ dependencies {
     implementation("androidx.camera:camera-core:1.6.2")
     implementation("androidx.camera:camera-camera2:1.6.2")
     implementation("androidx.camera:camera-lifecycle:1.6.2")
-    // HTTP server (HttpServerManager.kt) -- Part 7's last subitem. CIO
-    // engine chosen over Netty/Jetty: pure-Kotlin/coroutines, no extra
-    // native/reflection-heavy server framework bundled in, matching this
-    // project's own "reuse a known-good, tested platform library"
-    // reasoning without pulling in more than this single-connection-at-
-    // a-time, same-LAN-only v1 scope actually needs. ktor-server-auth:
-    // HTTP Basic auth gate (http_password). ktor-server-status-pages:
-    // maps a 404/403 to a real HTTP status instead of a raw exception.
-    implementation("io.ktor:ktor-server-core:3.6.0")
-    implementation("io.ktor:ktor-server-cio:3.6.0")
-    implementation("io.ktor:ktor-server-auth:3.6.0")
-    implementation("io.ktor:ktor-server-status-pages:3.6.0")
     // SSH server (Part 8) -- Apache MINA SSHD, the standard actively-
     // maintained JVM SSH server library with real shell-channel support
     // (confirmed choice, see the plan's own Part 8 design). Latest

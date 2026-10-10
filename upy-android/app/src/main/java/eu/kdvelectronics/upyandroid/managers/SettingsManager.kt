@@ -45,24 +45,6 @@ class SettingsManager(context: Context) {
         get() = prefs.getString(KEY_SSH_PASSWORD, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SSH_PASSWORD, value).apply()
 
-    var httpServerEnabled: Boolean
-        get() = prefs.getBoolean(KEY_HTTP_SERVER_ENABLED, false)
-        set(value) = prefs.edit().putBoolean(KEY_HTTP_SERVER_ENABLED, value).apply()
-
-    // Never pushed into :engine, never readable from a script.
-    // See BoardManager.kt#pushSettings.
-    var httpPassword: String
-        get() = prefs.getString(KEY_HTTP_PASSWORD, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_HTTP_PASSWORD, value).apply()
-
-    // Gated behind httpServerEnabled in the UI (SettingsScreen.kt
-    // disables this row's toggle unless the base server is on). The
-    // stored value itself doesn't enforce that, since a base-server-off
-    // + private-files-on combination is meaningless, not unsafe.
-    var httpPrivateFilesEnabled: Boolean
-        get() = prefs.getBoolean(KEY_HTTP_PRIVATE_FILES_ENABLED, false)
-        set(value) = prefs.edit().putBoolean(KEY_HTTP_PRIVATE_FILES_ENABLED, value).apply()
-
     // Last bundled-demo-scripts version actually copied into the VFS's
     // own /examples/ directory. See MainActivity's own
     // seedDemoScriptsIfNeeded(). 0 (never seeded) on a fresh install.
@@ -89,9 +71,6 @@ class SettingsManager(context: Context) {
         private const val MAX_HEAP_SIZE_MB = 512
         private const val KEY_SSH_ENABLED = "ssh_enabled"
         private const val KEY_SSH_PASSWORD = "ssh_password"
-        private const val KEY_HTTP_SERVER_ENABLED = "http_server_enabled"
-        private const val KEY_HTTP_PASSWORD = "http_password"
-        private const val KEY_HTTP_PRIVATE_FILES_ENABLED = "http_private_files_enabled"
         private const val KEY_DEMO_SCRIPTS_VERSION = "demo_scripts_version"
         private const val KEY_ROM_VERSION = "rom_version"
     }

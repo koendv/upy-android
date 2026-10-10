@@ -50,8 +50,6 @@ object SymbolIcon {
     const val MEMORY = 0xe322
     const val TERMINAL_2 = 0xfff8e
     const val PASSWORD_2 = 0xf4a9
-    const val PUBLIC = 0xe80b
-    const val LOCK = 0xe899
     const val ADB = 0xe60e
     const val EDIT = 0xf097
     const val DELETE = 0xe92e

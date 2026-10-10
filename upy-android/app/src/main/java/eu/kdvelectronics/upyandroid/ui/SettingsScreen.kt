@@ -36,7 +36,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import eu.kdvelectronics.upyandroid.MainActivity
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
-import eu.kdvelectronics.upyandroid.http.HttpServerManager
 import eu.kdvelectronics.upyandroid.ssh.SshServerManager
 
 private val ICON_SIZE = 20.dp
@@ -77,9 +76,6 @@ fun SettingsScreen(
     var showRestartDialog by remember { mutableStateOf(false) }
     var sshEnabled by remember { mutableStateOf(settingsManager.sshEnabled) }
     var sshPassword by remember { mutableStateOf(settingsManager.sshPassword) }
-    var httpServerEnabled by remember { mutableStateOf(settingsManager.httpServerEnabled) }
-    var httpPassword by remember { mutableStateOf(settingsManager.httpPassword) }
-    var httpPrivateFilesEnabled by remember { mutableStateOf(settingsManager.httpPrivateFilesEnabled) }
     var adbExecEnabled by remember { mutableStateOf(settingsManager.adbExecEnabled) }
     // Settings is a peer nav-suite tab, not a screen with its own Back
     // button. The old "only prompt on Back" trigger is gone, since a
@@ -156,37 +152,6 @@ fun SettingsScreen(
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
-
-            SettingsRow("Enable HTTP server (port ${HttpServerManager.HTTP_PORT})", httpServerEnabled, icon = SymbolIcon.PUBLIC) {
-                httpServerEnabled = it
-                settingsManager.httpServerEnabled = it
-                if (!it) {
-                    httpPrivateFilesEnabled = false
-                    settingsManager.httpPrivateFilesEnabled = false
-                }
-                onSettingsChanged()
-            }
-            OutlinedTextField(
-                value = httpPassword,
-                onValueChange = {
-                    httpPassword = it
-                    settingsManager.httpPassword = it
-                },
-                label = { Text("HTTP password") },
-                leadingIcon = { Symbol(SymbolIcon.PASSWORD_2, contentDescription = null, size = ICON_SIZE) },
-                visualTransformation = PasswordVisualTransformation(),
-                modifier = Modifier.fillMaxWidth()
-            )
-            SettingsRow(
-                "Serve private files over HTTP",
-                httpPrivateFilesEnabled,
-                icon = SymbolIcon.LOCK,
-                enabled = httpServerEnabled
-            ) {
-                httpPrivateFilesEnabled = it
-                settingsManager.httpPrivateFilesEnabled = it
-                onSettingsChanged()
-            }
 
             SettingsRow("Enable adb exec", adbExecEnabled, icon = SymbolIcon.ADB) {
                 adbExecEnabled = it

@@ -47,7 +47,7 @@ const char android_help_text[] =
     "  android.fileprovider: share(path, mime_type=\"application/octet-stream\") -- open Android's share sheet for a file; fire-and-forget, no return value, silently does nothing if no app window is focused\n"
     "  android.location: GPS/network location; see android.location.help()\n"
     "functions:\n"
-    "  android.settings() -- dict snapshot of app settings (heap_size_mb, ssh_enabled, http_server_enabled, http_private_files_enabled, adb_exec_enabled); read-only here, set from the app UI\n"
+    "  android.settings() -- dict snapshot of app settings (heap_size_mb, ssh_enabled, adb_exec_enabled); read-only here, set from the app UI\n"
     "see_also: camera.help(), display.help()\n"
 ;
 mp_obj_t android_help() {

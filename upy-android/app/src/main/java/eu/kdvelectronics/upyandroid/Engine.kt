@@ -46,8 +46,6 @@ object Engine {
     // nativeInit and engine_jni.cpp#nativeSetSettings for why.
     external fun nativeSetSettings(
         sshEnabled: Boolean,
-        httpServerEnabled: Boolean,
-        httpPrivateFilesEnabled: Boolean,
         adbExecEnabled: Boolean,
     )
 }
