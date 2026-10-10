@@ -40,16 +40,23 @@ jobs:
             -t upy-android-tools \
             -f tools/docker/Dockerfile .
 
-      # SIGNING_KEYSTORE: base64 of the signing key, for debug and release.
-      # Without it, Gradle signs with a random key (forks).
+      # SIGNING_KEYSTORE: base64 of the release keystore, for debug and
+      # release builds; SIGNING_KEYSTORE_PASSWORD: its password. Without
+      # both, Gradle signs with a random key (forks).
       - name: docker build
         env:
           SIGNING_KEYSTORE: ${{ secrets.SIGNING_KEYSTORE }}
+          UPY_STORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
         run: |
           secret=()
           if [ -n "$SIGNING_KEYSTORE" ]; then
+            if [ -z "$UPY_STORE_PASSWORD" ]; then
+              echo "::error::SIGNING_KEYSTORE is set, SIGNING_KEYSTORE_PASSWORD is not"
+              exit 1
+            fi
             echo "$SIGNING_KEYSTORE" | base64 -d > "$RUNNER_TEMP/signing.keystore"
-            secret=(--secret id=signing_keystore,src="$RUNNER_TEMP/signing.keystore")
+            secret=(--secret id=signing_keystore,src="$RUNNER_TEMP/signing.keystore"
+                    --secret id=signing_password,env=UPY_STORE_PASSWORD)
           fi
           docker build --target build \
             "${secret[@]}" \

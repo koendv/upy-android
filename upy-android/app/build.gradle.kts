@@ -62,23 +62,34 @@ android {
         }
     }
 
+    // The release key, when the Gradle properties upyStoreFile,
+    // upyKeyAlias and upyStorePassword are set (~/.gradle/gradle.properties,
+    // or ORG_GRADLE_PROJECT_* in Docker). Without it, the debug key.
+    signingConfigs {
+        providers.gradleProperty("upyStoreFile").orNull?.let { path ->
+            create("upy") {
+                storeFile = file(path)
+                storePassword = providers.gradleProperty("upyStorePassword").get()
+                keyAlias = providers.gradleProperty("upyKeyAlias").get()
+                keyPassword = storePassword
+            }
+        }
+    }
+    val signing = signingConfigs.findByName("upy") ?: signingConfigs.getByName("debug")
+
     buildTypes {
+        debug {
+            signingConfig = signing
+        }
         release {
-            isMinifyEnabled = false
-            // Debug-key-signed, not a production signing identity --
-            // this project has no dedicated release key. Simple choice:
-            // makes assembleRelease's output genuinely installable
-            // (Android refuses to install an unsigned APK) without
-            // introducing keystore/secret management. See NOTICE.html/
-            // README for the "prototype/datapoint" framing this matches.
-            //
             // If this is ever turned on: litert-api's own proguard.txt
             // only keeps @UsedByReflection-annotated members, NOT
             // JniHandle -- the raw-handle-extraction trick in
             // litert_jni_bridge.cpp (GetFieldID(JniHandle, "handle",
             // "J")) would silently break if R8 renames/removes that
             // field. Not fixed here; inert while this stays false.
-            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = false
+            signingConfig = signing
         }
     }
 
