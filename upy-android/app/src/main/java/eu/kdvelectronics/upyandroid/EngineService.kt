@@ -123,8 +123,10 @@ class EngineService : Service() {
 
         override fun interrupt() = worker.interrupt()
         // A reset ends the script, so its location updates end too.
+        // Interrupt first, or the reset waits until the script ends.
         override fun reset() {
             LocationShim.stop()
+            worker.interrupt()
             worker.reset()
         }
 
