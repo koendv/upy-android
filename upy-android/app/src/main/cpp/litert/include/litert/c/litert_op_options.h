@@ -270,6 +270,8 @@ LiteRtStatus LiteRtBuilderBuildPackOpOption(LiteRtBuilder builder, LiteRtOp op,
 //
 //==============================================================================
 LiteRtStatus LiteRtGetOneHotAxisOption(LiteRtOp op, int32_t* axis);
+LiteRtStatus LiteRtBuilderBuildOneHotOpOption(LiteRtBuilder builder,
+                                              LiteRtOp op, int32_t* axis);
 
 //==============================================================================
 //
@@ -332,6 +334,16 @@ LiteRtStatus LiteRtGetSplitVNumSplitsOption(LiteRtOp op, int32_t* num_splits);
 
 //==============================================================================
 //
+// Build option APIs for LiteRt SplitV op.
+//  Options:
+// - num_splits : int32_t
+//
+//==============================================================================
+LiteRtStatus LiteRtBuilderBuildSplitVOpOption(LiteRtBuilder builder,
+                                              LiteRtOp op, int32_t* num_splits);
+
+//==============================================================================
+//
 // Get option APIs for LiteRt SHLO Composite op.
 //  Options:
 // - name : string
@@ -351,6 +363,10 @@ LiteRtStatus LiteRtGetSHLOCompositeOpAttributes(LiteRtOp op,
                                                 const uint8_t** attributes,
                                                 int32_t* attributes_size);
 LiteRtStatus LiteRtGetSHLOCompositeOpVersion(LiteRtOp op, int32_t* version);
+LiteRtStatus LiteRtBuilderBuildShloCompositeOpOption(
+    LiteRtBuilder builder, LiteRtOp op, const char* name,
+    const int32_t* decomposition_subgraph_index, const int32_t* version,
+    const uint8_t* attributes, LiteRtParamIndex attributes_size);
 
 //==============================================================================
 //

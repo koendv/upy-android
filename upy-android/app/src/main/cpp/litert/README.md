@@ -23,7 +23,7 @@ time, not committed.
 | `include/litert/c/*.h` | LiteRT source, tag `v<litert.version>`, `litert/c/` (top level only) |
 | `include/litert/build_common/build_config.h` | stand-in, written by the update script (see below) |
 | `include/LITERT_VERSION` | the LiteRT version these headers belong to |
-| `lib/` | not committed: `libLiteRt.so` and `libLiteRtClGlAccelerator.so`, extracted from the `litert` AAR on every build (`extractLitert` in `app/build.gradle.kts`) |
+| `lib/` | not committed: `libLiteRt.so` from the `litert` AAR and `libLiteRtClGlAccelerator.so` from the `litert-gpu` AAR, extracted on every build (`extractLitert` in `app/build.gradle.kts`) |
 
 - Only `litert/c/` is needed. `litert_module.cpp` includes
   `litert/c/{litert_common,litert_environment,litert_model,litert_model_types}.h`,

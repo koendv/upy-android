@@ -129,7 +129,7 @@ android {
 
     // libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate) is staged
     // into src/main/jniLibs/arm64-v8a/ by the stageLitertDelegate task
-    // below, from the litert AAR (see the litert-api dependency's own
+    // below, from the litert-gpu AAR (see the litert-api dependency's own
     // comment below for why that AAR is not a normal dependency).
     // LiteRtEnvironment dlopen()s it by name at runtime, so it must
     // ship in the APK. AGP scans jniLibs/<abi>/ by convention. See
@@ -205,9 +205,10 @@ val genCascades = tasks.register<Exec>("genCascades") {
 }
 
 // LiteRT: C headers are committed (src/main/cpp/litert/include/, see the
-// README.md there); the two .so files come from the litert AAR. A separate
-// configuration, so AGP never merges this AAR (it shares its namespace
-// with litert-api).
+// README.md there); libLiteRt.so comes from the litert AAR,
+// libLiteRtClGlAccelerator.so from the litert-gpu AAR. A separate
+// configuration, so AGP never merges these AARs: only their .so files are
+// used.
 val litertVersion: String = upstreamProperties.getProperty("litert.version")
 val litertHeadersVersion = file("src/main/cpp/litert/include/LITERT_VERSION").readText().trim()
 if (litertHeadersVersion != litertVersion) {
@@ -224,12 +225,14 @@ val litertNative: Configuration by configurations.creating {
 
 dependencies {
     litertNative("com.google.ai.edge.litert:litert:$litertVersion@aar")
+    litertNative("com.google.ai.edge.litert:litert-gpu:$litertVersion@aar")
 }
 
 // libLiteRt.so: linked by CMakeLists.txt. libLiteRtClGlAccelerator.so:
 // loaded at runtime by name, so it is also staged in jniLibs/ to ship.
-val extractLitert = tasks.register<Copy>("extractLitert") {
-    from({ zipTree(litertNative.singleFile) }) {
+// Sync, not Copy: a library no longer in the AARs must not linger here.
+val extractLitert = tasks.register<Sync>("extractLitert") {
+    from({ litertNative.files.map { zipTree(it) } }) {
         include("jni/arm64-v8a/*.so")
         eachFile { path = name }
     }
@@ -240,10 +243,13 @@ val extractLitert = tasks.register<Copy>("extractLitert") {
 // LiteRT's third-party notices, from the AAR, so they match the shipped
 // version. Input to genLicenses below.
 val litertNoticesDir = layout.buildDirectory.dir("litert-notices")
-val extractLitertNotices = tasks.register<Copy>("extractLitertNotices") {
-    from({ zipTree(litertNative.singleFile) }) {
+val extractLitertNotices = tasks.register<Sync>("extractLitertNotices") {
+    // The litert-gpu AAR carries the same notices file.
+    from({ zipTree(litertNative.files.single { it.name == "litert-$litertVersion.aar" }) }) {
         include("THIRD_PARTY_NOTICE.txt")
     }
+    // The AAR stores it read-only, which blocks the next upgrade's copy.
+    filePermissions { unix("rw-r--r--") }
     into(litertNoticesDir)
 }
 
@@ -265,7 +271,7 @@ val genLicenses = tasks.register<Exec>("genLicenses") {
     doFirst { stale.forEach { it.delete() } }
 }
 
-val stageLitertDelegate = tasks.register<Copy>("stageLitertDelegate") {
+val stageLitertDelegate = tasks.register<Sync>("stageLitertDelegate") {
     dependsOn(extractLitert)
     from(layout.projectDirectory.file("src/main/cpp/litert/lib/libLiteRtClGlAccelerator.so"))
     into(layout.projectDirectory.dir("src/main/jniLibs/arm64-v8a"))
@@ -396,18 +402,12 @@ dependencies {
     // re-deriving it. Accepted APK-size cost (Guava;
     // isMinifyEnabled=false strips nothing).
     //
-    // NOT also com.google.ai.edge.litert:litert:2.2.0 (the artifact this
-    // project used to depend on for android.tf's classic API surface,
-    // which this dependency doesn't provide) -- both AARs declare the
-    // same namespace ("com.google.ai.edge.litert"), and AGP refuses to
-    // merge two libraries sharing one namespace. Resolved by not
-    // depending on litert:2.2.0 at all: its only two .so's
-    // (libLiteRt.so, libLiteRtClGlAccelerator.so) are already covered
-    // by CMakeLists.txt's own `litert` IMPORTED target (auto-packaged
-    // by AGP, confirmed present in the built APK) and by the
-    // stageLitertDelegate task, respectively. Both are extracted from the
-    // litert AAR through the separate litertNative configuration, which
-    // AGP never merges. This is still the project's
+    // NOT also com.google.ai.edge.litert:litert or litert-gpu as normal
+    // dependencies: only their .so files are used. libLiteRt.so is
+    // CMakeLists.txt's own `litert` IMPORTED target (auto-packaged by
+    // AGP), libLiteRtClGlAccelerator.so is staged by stageLitertDelegate.
+    // Both are extracted through the separate litertNative configuration,
+    // which AGP never merges. This is still the project's
     // first prebuilt-binary native dependency (see NOTICE.html) --
     // everything else vendored is compiled from source.
     // ai-delivery (Play AI-pack model download, pulls in Play services
