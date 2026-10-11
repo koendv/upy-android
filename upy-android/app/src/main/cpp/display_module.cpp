@@ -86,9 +86,17 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
     int32_t logical_w = transpose ? src->h : src->w;
     int32_t logical_h = transpose ? src->w : src->h;
 
-    int factor = upscale_factor(logical_w, logical_h, buffer.width, buffer.height);
-    int32_t scaled_w = logical_w * factor;
-    int32_t scaled_h = logical_h * factor;
+    // Larger than the buffer: draw every step-th pixel.
+    int32_t step = 1;
+    while (logical_w > buffer.width * step || logical_h > buffer.height * step) {
+        step *= 2;
+    }
+    int32_t out_w = logical_w / step;
+    int32_t out_h = logical_h / step;
+
+    int factor = upscale_factor(out_w, out_h, buffer.width, buffer.height);
+    int32_t scaled_w = out_w * factor;
+    int32_t scaled_h = out_h * factor;
     int32_t off_x = (buffer.width - scaled_w) / 2;
     int32_t off_y = (buffer.height - scaled_h) / 2;
 
@@ -100,9 +108,11 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
     bool flip_x = transpose ? hint_vflip : hint_hmirror;
     bool flip_y = transpose ? hint_hmirror : hint_vflip;
 
-    for (int32_t ly = 0; ly < logical_h; ly++) {
+    for (int32_t oy = 0; oy < out_h; oy++) {
+        int32_t ly = oy * step;
         int32_t hy = self->vflip ? (logical_h - 1 - ly) : ly;
-        for (int32_t lx = 0; lx < logical_w; lx++) {
+        for (int32_t ox = 0; ox < out_w; ox++) {
+            int32_t lx = ox * step;
             int32_t hx = self->hmirror ? (logical_w - 1 - lx) : lx;
 
             int32_t read_x, read_y;
@@ -125,8 +135,8 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
             }
             uint32_t rgba = 0xFF000000u | ((uint32_t) b << 16) | ((uint32_t) g << 8) | r;
 
-            int32_t dst_y0 = off_y + ly * factor;
-            int32_t dst_x0 = off_x + lx * factor;
+            int32_t dst_y0 = off_y + oy * factor;
+            int32_t dst_x0 = off_x + ox * factor;
             for (int32_t dy = 0; dy < factor; dy++) {
                 uint32_t *row = pixels + (size_t) (dst_y0 + dy) * buffer.stride + dst_x0;
                 for (int32_t dx = 0; dx < factor; dx++) {
@@ -184,7 +194,7 @@ const char display_help_text[] =
     "  draws to the app's on-screen camera-preview Surface; the name is carried over from OpenMV's API, there is no real SPI bus involved\n"
     "methods:\n"
     "  write(image, x=0, y=0, hint=0): draw an image_t (e.g. from camera.Camera().snapshot()) to the screen\n"
-    "    image is upscaled by the largest integer factor (2x/4x/8x) that still fits the surface, letterboxed/pillarboxed in opaque black\n"
+    "    image is scaled by the largest power of two (..., 1/4x, 1/2x, 1x, 2x, 4x, 8x) that fits the surface, letterboxed/pillarboxed in opaque black\n"
     "    hint: OpenMV's IMAGE_HINT_HMIRROR / IMAGE_HINT_VFLIP / IMAGE_HINT_TRANSPOSE bits, combined with the vflip/hmirror set at construction\n"
     "    no-op (returns None) if no Surface is currently attached, i.e. the app isn't showing the camera screen\n"
     "see_also: camera.help(), android.help()\n"
