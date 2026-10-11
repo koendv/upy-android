@@ -10,7 +10,7 @@ import org.apache.sshd.server.keyprovider.SimpleGeneratorHostKeyProvider
 import org.apache.sshd.sftp.server.SftpSubsystemFactory
 import java.io.File
 
-// see session-state: SshServerManager.kt#SshServerManager
+// SSH shell and SFTP on port 2222, running while SSH is enabled in Settings.
 object SshServerManager {
     private const val TAG = "SshServerManager"
     const val SSH_PORT = 2222
@@ -19,7 +19,6 @@ object SshServerManager {
     @Volatile
     private var server: SshServer? = null
 
-    // see session-state: SshServerManager.kt#SshServerManager
     @Synchronized
     fun applySettings(context: Context, settingsManager: SettingsManager) {
         val shouldRun = settingsManager.sshEnabled
@@ -33,14 +32,14 @@ object SshServerManager {
 
     private fun start(context: Context, settingsManager: SettingsManager) {
         Log.i(TAG, "starting SSH server on port $SSH_PORT")
-        // see session-state: SshServerManager.kt#SshServerManager
+        // SSHD's home folder ("~") is the app's file store.
         PathUtils.setUserHomeFolderResolver { context.filesDir.toPath() }
         val sshd = SshServer.setUpDefaultServer()
         sshd.port = SSH_PORT
-        // see session-state: SshServerManager.kt#SshServerManager
+        // Host key in no_backup/, not in the file store.
         sshd.keyPairProvider = SimpleGeneratorHostKeyProvider(File(context.noBackupFilesDir, HOST_KEY_FILE_NAME).toPath())
         sshd.passwordAuthenticator = { _, password, _ ->
-            // see session-state: SshServerManager.kt#SshServerManager
+            // No password set: every login is refused.
             val configured = settingsManager.sshPassword
             configured.isNotEmpty() && password == configured
         }

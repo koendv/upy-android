@@ -11,7 +11,9 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 
-// see session-state: UpyShellCommand.kt#UpyShellCommand
+// One SSH shell session: lines are collected until a blank line, then run
+// through ScriptExecCore. Ctrl+C interrupts, Ctrl+D resets, exit or quit
+// ends the session.
 class UpyShellCommand(private val context: Context) : Command {
     private lateinit var input: InputStream
     private lateinit var output: OutputStream
@@ -21,7 +23,7 @@ class UpyShellCommand(private val context: Context) : Command {
     @Volatile
     private var running = true
 
-    // see session-state: UpyShellCommand.kt#UpyShellCommand
+    // True while this session's script runs; a second one is refused.
     @Volatile
     private var submitting = false
 
@@ -34,7 +36,7 @@ class UpyShellCommand(private val context: Context) : Command {
     }
 
     override fun setErrorStream(errorStream: OutputStream) {
-        // see session-state: UpyShellCommand.kt#UpyShellCommand
+        // Not used: everything goes to the output stream.
     }
 
     override fun setExitCallback(callback: ExitCallback) {
@@ -101,7 +103,6 @@ class UpyShellCommand(private val context: Context) : Command {
                         val line = String(lineBuf.toByteArray(), Charsets.UTF_8)
                         val trimmed = line.trim().lowercase()
                         if (bufferedLines.isEmpty() && (trimmed == "exit" || trimmed == "quit")) {
-                            // see session-state: UpyShellCommand.kt#UpyShellCommand
                             write("bye\r\n")
                             running = false
                         } else if (lineBuf.size() == 0 && bufferedLines.isNotEmpty()) {
@@ -148,9 +149,7 @@ class UpyShellCommand(private val context: Context) : Command {
         exitCallback?.onExit(0)
     }
 
-    // see session-state: UpyShellCommand.kt#submitAsync
     private fun submitAsync(code: String) {
-        // see session-state: UpyShellCommand.kt#submitAsync
         if (submitting) {
             write("[a script is already running on this session]\r\n>>> ")
             return
