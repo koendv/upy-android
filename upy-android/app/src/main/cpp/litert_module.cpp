@@ -11,7 +11,10 @@
 // the process, not two.
 
 #include <cstdlib>
+#include <cstdio>
 #include <cstring>
+
+#include <sys/system_properties.h>
 
 extern "C" {
 #include "py/runtime.h"
@@ -659,8 +662,12 @@ const char litert_help_text[] =
     "  OSError(EINVAL): construction with a closed/wrong-type Environment or Options, a call on a closed CompiledModel, a bad tensor index, or a dtype outside dtypes_supported\n"
     "  OSError(EIO): compile, buffer creation, write, run, or read failure (Kotlin/JNI exception text is forwarded)\n"
     "  ValueError: wrong number of run() arguments\n"
-    "notes:\n"
-    "  accelerator-capable (CPU/GPU/NPU via litert.Accelerator) -- see tflite.help() for a plain CPU-only, non-Kotlin alternative\n"
+    "functions:\n"
+    "  version(): \"LITERT,MAKER,MODEL\", e.g. \"2.3.0,Mediatek,MT6878\"; LiteRT version and chip, the argument of tools/litert-npu.py\n"
+    "accelerators:\n"
+    "  GPU: built in\n"
+    "  NPU: not built in; with Settings > \"Load accelerators from /litert/\" on and the folder /litert/ present, LiteRT loads the NPU runtime from /litert/ (native code); tools/litert-npu.py fetches it; the setting applies at app start\n"
+    "  an accelerator that does not load falls back to the CPU without an error; compare run() timing with Accelerator.CPU\n"
     "see_also: tflite.help()\n"
 ;
 mp_obj_t litert_help() {
@@ -668,9 +675,35 @@ mp_obj_t litert_help() {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(litert_help_obj, litert_help);
 
+// System property for version(); "," and " " become "_", empty is "unknown".
+void soc_property(const char *name, char value[PROP_VALUE_MAX]) {
+    if (__system_property_get(name, value) == 0) {
+        strcpy(value, "unknown");
+    }
+    for (char *c = value; *c; c++) {
+        if (*c == ',' || *c == ' ') {
+            *c = '_';
+        }
+    }
+}
+
+// "LITERT,MAKER,MODEL", e.g. "2.3.0,Mediatek,MT6878": the argument of
+// tools/litert-npu.py.
+mp_obj_t litert_version() {
+    char maker[PROP_VALUE_MAX];
+    char model[PROP_VALUE_MAX];
+    soc_property("ro.soc.manufacturer", maker);
+    soc_property("ro.soc.model", model);
+    char s[16 + 2 * PROP_VALUE_MAX];
+    int n = snprintf(s, sizeof(s), "%s,%s,%s", UPY_LITERT_VERSION, maker, model);
+    return mp_obj_new_str(s, n);
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(litert_version_obj, litert_version);
+
 const mp_rom_map_elem_t litert_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_litert)},
     {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&litert_help_obj)},
+    {MP_ROM_QSTR(MP_QSTR_version), MP_ROM_PTR(&litert_version_obj)},
     {MP_ROM_QSTR(MP_QSTR_Environment), MP_ROM_PTR(&litert_environment_type)},
     {MP_ROM_QSTR(MP_QSTR_CompiledModel), MP_ROM_PTR(&litert_compiled_model_type)},
     {MP_ROM_QSTR(MP_QSTR_Options), MP_ROM_PTR(&litert_options_type)},

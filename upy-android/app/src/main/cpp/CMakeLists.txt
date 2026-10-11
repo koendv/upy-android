@@ -74,6 +74,11 @@ target_compile_definitions(upy_engine PRIVATE
     ULAB_CONFIG_FILE="ulab_config.h"
 )
 
+# For litert.version(). Gradle checks it against upstream.properties.
+file(STRINGS litert/include/LITERT_VERSION UPY_LITERT_VERSION LIMIT_COUNT 1)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS litert/include/LITERT_VERSION)
+target_compile_definitions(upy_engine PRIVATE UPY_LITERT_VERSION="${UPY_LITERT_VERSION}")
+
 target_compile_options(upy_engine PRIVATE
     -Wall
     -Og
