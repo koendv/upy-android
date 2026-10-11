@@ -65,6 +65,7 @@ object SymbolIcon {
     const val SAVE = 0xe161
     const val SPEED_2 = 0xfff38
     const val SPEED_4 = 0xfff36
+    const val INFO = 0xe88e
 }
 
 private val symbolFontFamily = FontFamily(Font(R.font.upy_symbols))

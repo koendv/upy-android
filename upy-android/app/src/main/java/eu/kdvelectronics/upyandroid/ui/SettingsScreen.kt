@@ -186,6 +186,7 @@ fun SettingsScreen(
                     .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                Symbol(SymbolIcon.INFO, contentDescription = null, modifier = Modifier.padding(end = 12.dp), size = ICON_SIZE)
                 Text("About", modifier = Modifier.weight(1f))
                 Text(">")
             }
