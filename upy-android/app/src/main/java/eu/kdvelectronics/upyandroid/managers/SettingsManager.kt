@@ -39,6 +39,12 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_SSH_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_SSH_ENABLED, value).apply()
 
+    // Native code from files/litert/ (DispatchLibraryDir and
+    // CompilerPluginLibraryDir). Read once, at :engine start.
+    var litertDirEnabled: Boolean
+        get() = prefs.getBoolean(KEY_LITERT_DIR_ENABLED, false)
+        set(value) = prefs.edit().putBoolean(KEY_LITERT_DIR_ENABLED, value).apply()
+
     // Never pushed into :engine (see BoardManager.kt#pushSettings), but
     // stored in plain text: a script can read the settings file through
     // os.VfsPosix, which is not a security boundary.
@@ -72,6 +78,7 @@ class SettingsManager(context: Context) {
         private const val MAX_HEAP_SIZE_MB = 512
         private const val KEY_SSH_ENABLED = "ssh_enabled"
         private const val KEY_SSH_PASSWORD = "ssh_password"
+        private const val KEY_LITERT_DIR_ENABLED = "litert_dir_enabled"
         private const val KEY_DEMO_SCRIPTS_VERSION = "demo_scripts_version"
         private const val KEY_ROM_VERSION = "rom_version"
     }

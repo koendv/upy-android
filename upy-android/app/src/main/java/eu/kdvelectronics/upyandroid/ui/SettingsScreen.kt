@@ -39,8 +39,13 @@ import androidx.compose.ui.unit.dp
 import eu.kdvelectronics.upyandroid.MainActivity
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 import eu.kdvelectronics.upyandroid.ssh.SshServerManager
+import java.io.File
 
 private val ICON_SIZE = 20.dp
+
+// (setting, setting and folder there) as :engine started with them.
+// Captured on the first Settings visit in this process, before any change.
+private var litertAtStart: Pair<Boolean, Boolean>? = null
 
 // Kills :engine and restarts the app: a new heap size needs a new process.
 private fun restartApp(context: Context) {
@@ -60,8 +65,8 @@ private fun restartApp(context: Context) {
 // inline dialog: there are too many settings for a dialog.
 // onSettingsChanged fires after every edit so the caller can push the
 // new snapshot into a live :engine connection immediately (see
-// BoardManager.kt#pushSettings). heap_size_mb takes effect only after an
-// app restart (restartApp), not on Reset.
+// BoardManager.kt#pushSettings). heap_size_mb and litert_dir_enabled take
+// effect only after an app restart (restartApp), not on Reset.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -79,6 +84,11 @@ fun SettingsScreen(
     var sshEnabled by remember { mutableStateOf(settingsManager.sshEnabled) }
     var sshPassword by remember { mutableStateOf(settingsManager.sshPassword) }
     var adbExecEnabled by remember { mutableStateOf(settingsManager.adbExecEnabled) }
+    val (initialLitertDirEnabled, litertDirInUse) = litertAtStart ?: Pair(
+        settingsManager.litertDirEnabled,
+        settingsManager.litertDirEnabled && File(context.filesDir, "litert").isDirectory,
+    ).also { litertAtStart = it }
+    var litertDirEnabled by remember { mutableStateOf(settingsManager.litertDirEnabled) }
     // Settings is a peer nav-suite tab, not a screen with its own Back
     // button. The old "only prompt on Back" trigger is gone, since a
     // tab switch/system-back gesture no longer routes through any
@@ -161,6 +171,24 @@ fun SettingsScreen(
                 onSettingsChanged()
             }
 
+            SettingsRow(
+                "Load accelerators from /litert/",
+                litertDirEnabled,
+                icon = if (litertDirInUse) SymbolIcon.SPEED_4 else SymbolIcon.SPEED_2,
+            ) {
+                litertDirEnabled = it
+                settingsManager.litertDirEnabled = it
+            }
+            if (litertDirEnabled != initialLitertDirEnabled) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Restart to apply", modifier = Modifier.weight(1f))
+                    TextButton(onClick = { showRestartDialog = true }) { Text("Restart") }
+                }
+            }
+
             // Same "About phone"-style row real Android Settings puts at
             // the bottom of its own list. Navigates to a non-peer
             // detail screen (AboutScreen), same tier as EditorScreen.
@@ -180,7 +208,7 @@ fun SettingsScreen(
     if (showRestartDialog) {
         AlertDialog(
             onDismissRequest = { showRestartDialog = false },
-            title = { Text("Restart with new heap size?") },
+            title = { Text("Restart the app?") },
             confirmButton = {
                 TextButton(onClick = { restartApp(context) }) { Text("OK") }
             },

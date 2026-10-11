@@ -8,7 +8,21 @@ import com.google.ai.edge.litert.CompiledModel
 import com.google.ai.edge.litert.Environment
 import com.google.ai.edge.litert.TensorBuffer
 
-fun createEnvironment(): Environment = Environment.create()
+// Set once in EngineService.onCreate(), before the worker thread starts.
+private var litertDir: String? = null
+
+fun setLitertDir(dir: String) {
+    litertDir = dir
+}
+
+// An accelerator that does not load falls back to CPU silently.
+fun createEnvironment(): Environment {
+    val dir = litertDir ?: return Environment.create()
+    return Environment.create(mapOf(
+        Environment.Option.DispatchLibraryDir to dir,
+        Environment.Option.CompilerPluginLibraryDir to dir,
+    ))
+}
 
 // acceleratorValue is Accelerator's own .value int (NONE=0, CPU=1,
 // GPU=2, NPU=3), not an enum. An Int is JNI-simple, an enum isn't.

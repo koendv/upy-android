@@ -7,8 +7,10 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.view.Surface
 import eu.kdvelectronics.upyandroid.camera.CameraShim
+import eu.kdvelectronics.upyandroid.litert.setLitertDir
 import eu.kdvelectronics.upyandroid.location.LocationShim
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
+import java.io.File
 
 // Runs in the :engine process (android:process=":engine" in the
 // manifest). A native fault here does not take down the main app
@@ -96,6 +98,10 @@ class EngineService : Service() {
         // heap is allocated once, in nativeInit().
         val heapSizeMb = SettingsManager(applicationContext).heapSizeMb
         worker = EngineWorker(filesDir.absolutePath, heapSizeMb, applicationContext)
+        val litertDir = File(filesDir, "litert")
+        if (SettingsManager(applicationContext).litertDirEnabled && litertDir.isDirectory) {
+            setLitertDir(litertDir.path)
+        }
         worker.start()
         LocationShim.init(applicationContext)
         CameraShim.init(applicationContext)
