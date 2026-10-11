@@ -16,7 +16,9 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -31,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -90,15 +91,15 @@ fun SettingsScreen(
         settingsManager.litertDirEnabled && File(context.filesDir, "litert").isDirectory,
     ).also { litertAtStart = it }
     var litertDirEnabled by remember { mutableStateOf(settingsManager.litertDirEnabled) }
-    // Settings is a peer nav-suite tab, not a screen with its own Back
-    // button. The old "only prompt on Back" trigger is gone, since a
-    // tab switch/system-back gesture no longer routes through any
-    // handler this screen owns. Re-homed as an inline row, always
-    // visible whenever the field differs from the running process's
-    // own heap size, regardless of how (or whether) the user then
-    // leaves this screen. Can't be silently skipped by any particular
-    // exit path, since it isn't tied to one.
     val heapSizeChanged = heapSizeMb.toIntOrNull() != initialHeapSizeMb
+    val litertDirChanged = litertDirEnabled != initialLitertDirEnabled
+    val restartReason = when {
+        heapSizeChanged && litertDirChanged -> "Restart for the new heap size and accelerators"
+        heapSizeChanged -> "Restart for the new heap size"
+        litertDirChanged && litertDirEnabled -> "Restart to load the accelerators"
+        litertDirChanged -> "Restart to stop loading the accelerators"
+        else -> ""
+    }
 
     Scaffold(
         topBar = {
@@ -124,28 +125,8 @@ fun SettingsScreen(
                 label = { Text("Heap size (MB) -- takes effect after the app is restarted") },
                 leadingIcon = { Symbol(SymbolIcon.MEMORY, contentDescription = null, size = ICON_SIZE) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    // Restores the old Back-button trigger's actual effect
-                    // (an automatic confirm prompt), not just the always-
-                    // visible reminder row below. Losing focus is this
-                    // screen's own equivalent of "the user is done editing
-                    // this field", now that there's no Back button to hook.
-                    .onFocusChanged { focusState ->
-                        if (!focusState.isFocused && heapSizeChanged) {
-                            showRestartDialog = true
-                        }
-                    }
+                modifier = Modifier.fillMaxWidth()
             )
-            if (heapSizeChanged) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Restart to apply the new heap size", modifier = Modifier.weight(1f))
-                    TextButton(onClick = { showRestartDialog = true }) { Text("Restart") }
-                }
-            }
 
             SettingsRow("Enable SSH (port ${SshServerManager.SSH_PORT})", sshEnabled, icon = SymbolIcon.TERMINAL_2) {
                 sshEnabled = it
@@ -180,15 +161,20 @@ fun SettingsScreen(
                 litertDirEnabled = it
                 settingsManager.litertDirEnabled = it
             }
-            if (litertDirEnabled != initialLitertDirEnabled) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Restart to apply", modifier = Modifier.weight(1f))
-                    TextButton(onClick = { showRestartDialog = true }) { Text("Restart") }
+
+            // Always there: also gets out of a script stuck in native
+            // code, since restartApp kills :engine. Filled while a
+            // setting waits for it.
+            if (restartReason.isEmpty()) {
+                OutlinedButton(onClick = { showRestartDialog = true }, modifier = Modifier.padding(top = 16.dp)) {
+                    Text("Restart")
+                }
+            } else {
+                Button(onClick = { showRestartDialog = true }, modifier = Modifier.padding(top = 16.dp)) {
+                    Text("Restart")
                 }
             }
+            Text(restartReason)
 
             // Same "About phone"-style row real Android Settings puts at
             // the bottom of its own list. Navigates to a non-peer
