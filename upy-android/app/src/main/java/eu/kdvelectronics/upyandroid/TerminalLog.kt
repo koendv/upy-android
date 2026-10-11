@@ -12,6 +12,9 @@ import kotlinx.coroutines.flow.asStateFlow
 // the next append() call may extend it further).
 data class Line(val text: String, val complete: Boolean, val bytes: Int)
 
+// Not a data class: StateFlow compares by identity, not line by line.
+class Snapshot(val lines: List<Line>)
+
 // App-wide (default/UI process), not tied to MainActivity's own
 // ViewModel/lifecycle. AdbExecProvider and the SSH shell
 // (SshServerManager.kt) both live in this same process and need to
@@ -39,7 +42,7 @@ object TerminalLog {
     private val buffer = ArrayDeque<Line>()
     private var totalBytes = 0
 
-    private val _lines = MutableStateFlow<List<Line>>(emptyList())
+    private val _lines = MutableStateFlow(Snapshot(emptyList()))
     val lines = _lines.asStateFlow()
 
     @Synchronized
@@ -89,7 +92,7 @@ object TerminalLog {
 
     private fun publish() {
         // A reference copy of at most MAX_LINES Line objects, not a content copy.
-        _lines.value = buffer.toList()
+        _lines.value = Snapshot(buffer.toList())
     }
 
     @Synchronized

@@ -180,7 +180,7 @@ fun TerminalScreen(
     var input by viewModel.terminalInput
     // Process-wide, not per-ViewModel. See TerminalLog.kt's own
     // header comment (adb-exec/SSH both write into this same log).
-    val lines by TerminalLog.lines.collectAsState()
+    val log by TerminalLog.lines.collectAsState()
     val listState = rememberLazyListState()
     // Shared across every row so they all scroll horizontally in sync,
     // not independently -- rows never wrap (see the Text below), so a
@@ -204,13 +204,13 @@ fun TerminalScreen(
             val maxChars = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { info ->
                 // getOrNull, not []: after clear() or front-eviction,
                 // layoutInfo's indices can briefly exceed lines.size.
-                lines.getOrNull(info.index)?.text?.length ?: 0
+                log.lines.getOrNull(info.index)?.text?.length ?: 0
             } ?: 0
             (maxChars * glyphAdvancePx).toInt()
         }
     }
-    LaunchedEffect(lines.isEmpty()) {
-        if (lines.isEmpty()) horizontalScrollState.scrollTo(0)
+    LaunchedEffect(log.lines.isEmpty()) {
+        if (log.lines.isEmpty()) horizontalScrollState.scrollTo(0)
     }
     // Explicit toggle, default on, not implicit at-bottom detection --
     // matches Arduino IDE's own monitorModel.autoscroll. see session-state.
@@ -240,7 +240,7 @@ fun TerminalScreen(
     LaunchedEffect(autoscroll) {
         if (!autoscroll) return@LaunchedEffect
         var timerActive = false
-        snapshotFlow { lines.size }.collect {
+        snapshotFlow { log.lines.size }.collect {
             if (!timerActive) {
                 timerActive = true
                 launch {
@@ -259,7 +259,7 @@ fun TerminalScreen(
                     // (10 updates/sec) without paying for a frame-time
                     // improvement that doesn't exist. see session-state.
                     delay(100)
-                    if (autoscroll && lines.isNotEmpty()) listState.scrollToItem(lines.size - 1)
+                    if (autoscroll && log.lines.isNotEmpty()) listState.scrollToItem(log.lines.size - 1)
                     timerActive = false
                 }
             }
@@ -317,7 +317,7 @@ fun TerminalScreen(
                     modifier = Modifier.fillMaxSize(),
                 ) {
                     LazyColumn(state = listState, modifier = Modifier.fillMaxWidth()) {
-                        items(lines) { line ->
+                        items(log.lines) { line ->
                             // Fixed-height, non-wrapping rows -- matches
                             // Arduino IDE's own itemSize={18}/whiteSpace:
                             // nowrap choice, sidestepping LazyColumnScrollbar's
@@ -344,7 +344,7 @@ fun TerminalScreen(
                 }
             }
             // maxValue only updates when a row is laid out, so it goes stale after clear().
-            if (lines.isNotEmpty()) {
+            if (log.lines.isNotEmpty()) {
                 HorizontalScrollbar(state = horizontalScrollState, modifier = Modifier.padding(top = 2.dp))
             }
 
@@ -388,7 +388,7 @@ fun TerminalScreen(
                     // Line.text excludes its trailing \n (see
                     // TerminalLog.kt), joinToString adds it back.
                     onClick = {
-                        val text = lines.joinToString("\n") { it.text }
+                        val text = log.lines.joinToString("\n") { it.text }
                         coroutineScope.launch {
                             clipboard.setClipEntry(ClipEntry(ClipData.newPlainText("terminal", text)))
                         }
