@@ -43,8 +43,12 @@ import java.io.File
 
 private val ICON_SIZE = 20.dp
 
-// (setting, setting and folder there) as :engine started with them.
-// Captured on the first Settings visit in this process, before any change.
+// Settings as :engine started with them, compared against the live
+// fields to show "Restart". Captured on the first Settings visit in this
+// process, before any change; not per screen open, which would lose a
+// change made before leaving Settings.
+private var heapSizeMbAtStart: Int? = null
+// (setting, setting and folder there)
 private var litertAtStart: Pair<Boolean, Boolean>? = null
 
 // Kills :engine and restarts the app: a new heap size needs a new process.
@@ -75,10 +79,7 @@ fun SettingsScreen(
     onOpenAbout: () -> Unit,
 ) {
     val context = LocalContext.current
-    // Captured once, at screen open: the heap size the currently
-    // running :engine process actually started with. Compared against
-    // the live field below to decide whether a restart is relevant.
-    val initialHeapSizeMb = remember { settingsManager.heapSizeMb }
+    val initialHeapSizeMb = heapSizeMbAtStart ?: settingsManager.heapSizeMb.also { heapSizeMbAtStart = it }
     var heapSizeMb by remember { mutableStateOf(settingsManager.heapSizeMb.toString()) }
     var showRestartDialog by remember { mutableStateOf(false) }
     var sshEnabled by remember { mutableStateOf(settingsManager.sshEnabled) }
