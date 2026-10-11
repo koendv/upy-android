@@ -1,7 +1,6 @@
 package eu.kdvelectronics.upyandroid
 
 import android.content.Context
-import android.os.RemoteException
 import android.view.Surface
 import eu.kdvelectronics.upyandroid.managers.BoardManager
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
@@ -81,12 +80,8 @@ object ScriptExecCore {
         }
         try {
             ensureConnected(context)
-            if (resetFirst) {
-                try {
-                    boardManager?.reset()
-                } catch (re: RemoteException) {
-                    return RunResult.Disconnected
-                }
+            if (resetFirst && boardManager?.reset() != true) {
+                return RunResult.Disconnected
             }
             if (label != null) {
                 TerminalLog.append("\n>>> ($label)\n$code\n")

@@ -244,12 +244,28 @@ class BoardManager(
         }
     }
 
+    // Silent when the engine is gone: nothing left to interrupt.
     fun interrupt() {
-        engine?.interrupt()
+        try {
+            engine?.interrupt()
+        } catch (re: RemoteException) {
+        }
     }
 
-    fun reset() {
-        engine?.reset()
+    // False when there is no engine or it died during the reset.
+    fun reset(): Boolean {
+        val e = engine
+        if (e == null) {
+            onStatusChanges?.invoke(ConnectionStatus.Disconnected("not connected to engine"))
+            return false
+        }
+        return try {
+            e.reset()
+            true
+        } catch (re: RemoteException) {
+            onStatusChanges?.invoke(ConnectionStatus.Disconnected("engine process disconnected during reset"))
+            false
+        }
     }
 
     /**
