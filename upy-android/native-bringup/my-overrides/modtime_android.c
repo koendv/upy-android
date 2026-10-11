@@ -1,5 +1,4 @@
 // upy-android: real Android time-of-day support for the `time` module.
-// See session-state: modtime_android.c#mp_time_time_get
 
 #include <time.h>
 
@@ -96,8 +95,8 @@ static mp_obj_t mod_time_mktime(mp_obj_t tuple_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mod_time_mktime_obj, mod_time_mktime);
 
-// Deliberately not using MICROPY_PY_TIME_GMTIME_LOCALTIME_MKTIME (see
-// session-state: modtime_android.c#mp_time_time_get). These three are
+// Deliberately not using MICROPY_PY_TIME_GMTIME_LOCALTIME_MKTIME: these
+// use the C library, so localtime() follows the phone's time zone. They are
 // added to the module's globals table via this extra-globals hook
 // instead, same mechanism ports/unix uses for the same reason.
 #define MICROPY_PY_TIME_EXTRA_GLOBALS \

@@ -6,12 +6,8 @@
 // revisiting, not that the stub needs quiet fallback behavior that
 // would hide the surprise.
 //
-// framebuffer.h/.c's own stubs used to live here too, under the same
-// "assumed unreachable" reasoning -- that assumption was wrong (real,
-// legitimate callers in py_helper.c/py_image.c reach them) and has been
-// reversed: framebuffer.c is now a real, trimmed port (see its own
-// header comment), used by camera_module.cpp to decouple continuous
-// camera capture from on-demand snapshot() reads. See session-state.
+// framebuffer.c is a real, trimmed port instead (see its own header
+// comment): py_helper.c/py_image.c do call it.
 #include <stdio.h>
 #include <stdlib.h>
 #include "omv_csi.h"

@@ -23,8 +23,7 @@
  *
  * Framebuffer functions.
  *
- * upy-android: trimmed real port, not a from-scratch replacement -- see
- * session-state: framebuffer.c#UPY_ANDROID_TRIMMED_FRAMEBUFFER_C. Removed:
+ * upy-android: trimmed real port, not a from-scratch replacement. Removed:
  * framebuffer_init0() (linker-script memory regions this port doesn't
  * have; camera_module.cpp owns and initializes its own single instance
  * directly). framebuffer_update_preview()'s real body is replaced with a

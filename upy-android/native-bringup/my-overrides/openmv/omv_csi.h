@@ -1,5 +1,5 @@
 // upy-android OpenMV support layer. Stub replacement for OpenMV's
-// common/omv_csi.h. See session-state: omv_csi.h#UPY_ANDROID_STUB_OMV_CSI_H
+// common/omv_csi.h.
 #ifndef UPY_ANDROID_STUB_OMV_CSI_H
 #define UPY_ANDROID_STUB_OMV_CSI_H
 

@@ -84,13 +84,7 @@ void mp_embed_exec_str(const char *src) {
         // is literally named is_repl and independently controls whether
         // bare top-level expression statements get auto-printed like a
         // real >>> prompt, regardless of the MP_PARSE_FILE_INPUT parse
-        // mode above. Was `true` (upstream's own embedding example is a
-        // REPL tool, where that's correct); left uncaught here, every
-        // non-None top-level expression statement's result was silently
-        // being auto-printed for the whole life of this port -- never
-        // noticed because no script happened to have one until
-        // find_line_segments.py's `img.draw_line(l, ...)` (returns self,
-        // for chaining) as a bare loop-body statement. see session-state.
+        // mode above.
         mp_obj_t module_fun = mp_compile(&parse_tree, source_name, false);
         mp_call_function_0(module_fun);
         nlr_pop();

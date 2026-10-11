@@ -1,6 +1,4 @@
-# External reference clones (micropython, termux-app, micro-repl) — not
-# this project's own source. Re-clone via the commands documented in
-# SESSION_STATE.yaml (upstream_sources section).
+# External reference clones, not this project's own source.
 upstream/
 
 # Build outputs / caches

@@ -1,5 +1,5 @@
 // upy-android OpenMV support layer. Stub replacement for ARM's
-// CMSIS-DSP arm_math.h. See session-state: arm_math.h#UPY_ANDROID_STUB_ARM_MATH_H
+// CMSIS-DSP arm_math.h.
 #ifndef UPY_ANDROID_STUB_ARM_MATH_H
 #define UPY_ANDROID_STUB_ARM_MATH_H
 
@@ -35,7 +35,6 @@ static inline uint32_t __USADA8(uint32_t x, uint32_t y, uint32_t acc) {
     return acc + __USAD8(x, y);
 }
 
-// See session-state: arm_math.h#__USAT
 static inline int32_t __USAT(int32_t val, uint32_t sat) {
     int32_t max = (int32_t) ((1UL << sat) - 1);
     if (val > max) {

@@ -8,7 +8,9 @@
 # build itself, at the versions pinned in upy-android/upstream.properties,
 # so a Docker build and a local ./gradlew build run the same steps.
 #
-# see session-state: Dockerfile#openmv_vendoring_audit
+# OpenMV files this port changes or adds are in
+# native-bringup/my-overrides/openmv/; native-bringup/openmv-manifest.tsv
+# lists the ones fetched unchanged.
 #
 # Used in:
 # - github workflows

@@ -1,7 +1,6 @@
 /* upy-android engine port configuration.
  * Based on MicroPython's ports/embed/examples/embedding config, extended for
- * the Android engine (REPL + core stdlib, crash-mitigation requirements from
- * project memory).
+ * the Android engine.
  */
 
 // Include common MicroPython embed configuration.

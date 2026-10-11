@@ -1,5 +1,5 @@
 // upy-android OpenMV support layer. Android replacement for OpenMV's
-// common/umalloc.c. See session-state: umalloc_android.c#uma_malloc
+// common/umalloc.c.
 #include <stdlib.h>
 #include <android/log.h>
 #include "py/runtime.h"
@@ -39,9 +39,8 @@ void *uma_realloc(void *ptr, size_t size, uint32_t flags) {
     return p;
 }
 
-// Added for framebuffer_resize() (see session-state: camera framebuffer
-// decoupling plan) -- align is ignored, matching every other uma_* shim
-// here: glibc/Bionic malloc already returns at least 16-byte-aligned
+// Added for framebuffer_resize() -- align is ignored, matching every
+// other uma_* shim here: glibc/Bionic malloc already returns at least 16-byte-aligned
 // blocks, and nothing on Android manually invalidates dcache lines the
 // way framebuffer.c's own __DCACHE_PRESENT-gated code would on a Cortex-M
 // board (that macro is never defined here), so stricter alignment buys

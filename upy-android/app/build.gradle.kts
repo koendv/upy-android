@@ -112,7 +112,7 @@ android {
     // for applet-style classpath scanning; io.netty.versions.properties
     // is a diagnostic version-reporting file) -- safe to drop entirely.
     // META-INF/DEPENDENCIES is the same story again for Apache MINA
-    // SSHD (Part 8) -- both sshd-core and sshd-common ship their own
+    // SSHD -- both sshd-core and sshd-common ship their own
     // copy of this plain, non-functional license-attribution text file.
     packaging {
         // Compressed, as below minSdk 28: the APK is downloaded, and
@@ -373,7 +373,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
-    // Part 10 -- four peer nav destinations (Command/Files/Camera/
+    // Four peer nav destinations (Command/Files/Camera/
     // Settings), NavigationBar/NavigationRail auto-selected by
     // WindowSizeClass (the Tab A7 hits "expanded" width in landscape,
     // where Material's own guidance prefers a rail over a bottom bar).
@@ -386,23 +386,14 @@ dependencies {
     implementation("androidx.tracing:tracing:2.0.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
     // LazyColumnScrollbar (MIT, https://github.com/nanihadesuka/LazyColumnScrollbar) --
-    // TerminalScreen's own scrollbar; spike-tested on-device against
-    // real mixed-height terminal output before adopting, see
-    // session-state. Compose Multiplatform-only as of 3.0.0, so this
-    // pulls in a parallel org.jetbrains.compose.* dependency tree
-    // alongside this project's own androidx.compose.* (BOM
-    // 2026.09.00) -- resolved cleanly in the spike (this project
-    // already pins Kotlin 2.4.20, matching this library's own
-    // requirement exactly), a real but accepted added-dependency cost.
+    // TerminalScreen's own scrollbar. Compose Multiplatform-only as of
+    // 3.0.0, so it pulls in a parallel org.jetbrains.compose.* dependency
+    // tree next to this project's androidx.compose.*: an accepted cost.
     implementation("com.github.nanihadesuka.LazyColumnScrollbar:lazycolumnscrollbar:3.0.0")
     // LiteRT's Kotlin/Java API (android.litert module, see
     // litert_module.cpp/LiteRtShim.kt) -- reuses Google's own tested
     // setup/buffer-type-resolution/accelerator-option logic rather than
-    // re-deriving it, the way rt_module.cpp had to (and got wrong twice
-    // along the way: the dynamic-dim bug, the "options not optional"
-    // bug -- see SESSION_STATE.yaml). Real, permanent dependency now --
-    // previously added only for a throwaway diagnostic and fully
-    // reverted afterward. Accepted APK-size cost (Guava;
+    // re-deriving it. Accepted APK-size cost (Guava;
     // isMinifyEnabled=false strips nothing).
     //
     // NOT also com.google.ai.edge.litert:litert:2.2.0 (the artifact this
@@ -424,24 +415,21 @@ dependencies {
     implementation("com.google.ai.edge.litert:litert-api:$litertVersion") {
         exclude(group = "com.google.android.play", module = "ai-delivery")
     }
-    // umqtt module (umqtt_module.cpp/MqttShim.kt) -- Part 7. Chosen over
+    // umqtt module (mqtt_module.cpp/MqttShim.kt). Chosen over
     // Eclipse Paho Android: Paho Android has zero tagged GitHub releases
     // (Maven-only publishing), 241 open issues/29 open PRs, and a dual
     // EPL-1.0/EDL-1.0 license (not this project's usual MIT/Apache-2.0).
     // HiveMQ's client is Apache-2.0, actively released, a plain library
     // call with no Service+bound-service ceremony, and its stated minSdk
-    // (19+) is already below this project's own (27). See
-    // SESSION_STATE.yaml for the full comparison.
+    // (19+) is below this project's own.
     implementation("com.hivemq:hivemq-mqtt-client:1.4.0")
     // camera module (camera_module.cpp/CameraShim.kt).
     implementation("androidx.camera:camera-core:1.6.2")
     implementation("androidx.camera:camera-camera2:1.6.2")
     implementation("androidx.camera:camera-lifecycle:1.6.2")
-    // SSH server (Part 8) -- Apache MINA SSHD, the standard actively-
-    // maintained JVM SSH server library with real shell-channel support
-    // (confirmed choice, see the plan's own Part 8 design). Latest
-    // stable GA per Maven Central metadata (3.0.0 is still milestone-
-    // only, per this project's own preference for stable releases).
+    // SSH server: Apache MINA SSHD, the standard actively-maintained
+    // JVM SSH server library with real shell-channel support. Stable
+    // releases only, no milestones.
     implementation("org.apache.sshd:sshd-core:2.19.0")
     implementation("org.apache.sshd:sshd-sftp:2.19.0")
 }

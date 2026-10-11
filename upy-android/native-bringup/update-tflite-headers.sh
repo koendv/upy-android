@@ -7,9 +7,8 @@
 #
 # Why from the LiteRT repo, not upstream TensorFlow: tflite_module.cpp
 # links the same libLiteRt.so litert_module.cpp already links (one
-# process, one copy of TFLite -- see session-state for the symbol-
-# collision reasoning). libLiteRt.so is built from LiteRT's OWN copy of
-# the TFLite source (tag v<litert.version>), which has since renamed the
+# process, one copy of TFLite). libLiteRt.so is built from LiteRT's OWN
+# copy of the TFLite source (tag v<litert.version>), which has since renamed the
 # public include path from tensorflow/lite/... to tflite/.... Headers
 # from a different TensorFlow Lite release would not reliably match the
 # actual binary's ABI.
@@ -29,9 +28,9 @@ git clone --quiet --depth 1 --branch "v${LITERT_VERSION}" \
     --filter=blob:none --sparse \
     https://github.com/google-ai-edge/LiteRT "$WORK_DIR/LiteRT"
 # This set is the real #include closure of tflite/c/c_api.h, confirmed by
-# preprocessing it (clang -E -M), not guessed from directory listings --
-# see session-state. Re-run that check on every version bump: a future
-# release could add a new transitive header.
+# preprocessing it (clang -E -M), not guessed from directory listings.
+# Re-run that check on every version bump: a future release could add a
+# new transitive header.
 git -C "$WORK_DIR/LiteRT" sparse-checkout set --quiet --no-cone \
     '/tflite/c/c_api.h' \
     '/tflite/builtin_ops.h' \

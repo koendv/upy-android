@@ -1,5 +1,5 @@
 # Shared adb-exec plumbing for tools/upy-adb and tools/run-tests.py.
-# Talks to Part 1's AdbExecProvider via `adb exec-out content call`.
+# Talks to the app's AdbExecProvider via `adb exec-out content call`.
 # exec-out, not `adb shell`, avoids PTY/CRLF translation on the reply.
 import base64
 import os
@@ -102,9 +102,8 @@ def run_script(src_text, reset_first=True):
 def stage_fixture(local_path, device_filename):
     """Writes a local file onto the device's own VFS root (the app's
     private files dir) from inside the engine, which has full VFS
-    access. Not via `adb push` + `run-as ... cat`: SESSION_STATE
-    records that failing on the Tab A7 with a real SELinux runas_app
-    denial on an absolute-path write. Returns (ok, error)."""
+    access. Not via `adb push` + `run-as ... cat`: that failed on a test
+    device with an SELinux denial. Returns (ok, error)."""
     with open(local_path, "rb") as f:
         data = f.read()
     b64 = base64.b64encode(data).decode("ascii")

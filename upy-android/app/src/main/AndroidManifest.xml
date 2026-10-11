@@ -1,18 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Used by the camera module inside :engine, not the main
-         process - see project memory / SESSION_STATE.yaml. required
+    <!-- Used by the camera module inside :engine. required
          false: most Android devices have a camera, but this app should
          not refuse to install on one that genuinely lacks any. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
-    <!-- umqtt (Part 7) is the first module in this project that needs a
-         real network socket: HiveMQ MQTT Client opens a plain TCP
-         connection to a user-specified broker. No other module needs
-         this (mediastore/fileprovider/litert/tf/rt are all purely
-         on-device). -->
+    <!-- Network sockets: umqtt (HiveMQ MQTT client) and the SSH server. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <!-- android.location; asked on first use by a script. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
@@ -45,8 +40,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Separate process for crash isolation (see project memory:
-             single-APK, engine in a separate process). exported="false"
+        <!-- Separate process for crash isolation. exported="false"
              is correct and sufficient here: same-app-only binding,
              no cross-app signature permission needed. -->
         <service
@@ -54,7 +48,7 @@
             android:process=":engine"
             android:exported="false" />
 
-        <!-- android.fileprovider (Part 7). Exposes the same VFS root
+        <!-- android.fileprovider. Exposes the same VFS root
              Explorer/Import/Export already treat as user-visible via a
              content:// URI, for sharing a script-produced file into
              another app's ACTION_SEND target. exported="false" plus

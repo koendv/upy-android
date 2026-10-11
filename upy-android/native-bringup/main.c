@@ -1,8 +1,8 @@
 /* upy-android native bring-up smoke test.
  * Based on MicroPython's ports/embed/examples/embedding/main.c, extended to
- * exercise the crash-mitigation requirements from project memory:
- *  - MICROPY_STACK_CHECK actually catching deep recursion (requirement #1)
- *  - a real GC heap size, not the 8KB demo size (requirement #6)
+ * exercise:
+ *  - MICROPY_STACK_CHECK actually catching deep recursion
+ *  - a real GC heap size, not the 8KB demo size
  */
 
 #include "port/micropython_embed.h"
@@ -217,7 +217,7 @@ static const char *example_16 =
 
 // Barcode/QR/keypoint test: zbar.c (find_barcodes, LGPL-2.1+),
 // qrcode.c/quirc (find_qrcodes, MIT), orb.c+fast.c (find_keypoints,
-// both BSD-3-Clause, agast.c dropped, see SESSION_STATE.yaml) all
+// both BSD-3-Clause, agast.c not vendored) all
 // newly vendored. No real barcode/QR image data available in this
 // smoke test, so find_barcodes()/find_qrcodes() are only proven to run
 // cleanly (empty result, not a crash) on a blank image. Genuine
@@ -226,8 +226,8 @@ static const char *example_16 =
 // corners, same idea as example_15's find_blobs() test.
 // corner_detector=image.CORNER_FAST is required explicitly. py_image.c's
 // allowed_args default is CORNER_AGAST, hardcoded, unconditional. Since
-// agast.c is deliberately not vendored (dropped, see
-// SESSION_STATE.yaml), that default now points at a detector that was
+// agast.c is deliberately not vendored, that default now points at a
+// detector that was
 // never compiled in, so kpts silently stays empty unless FAST is
 // requested by name.
 // Canvas size: orb_find_keypoints() (orb.c) computes
