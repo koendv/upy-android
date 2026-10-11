@@ -34,6 +34,7 @@ object TerminalLog {
     // Cross-run scrollback.
     // see session-state: TerminalLog.kt#TerminalLog
     private const val MAX_BYTES = 8 * 32 * 1024
+    private const val MAX_LINES = 5000
 
     private val buffer = ArrayDeque<Line>()
     private var totalBytes = 0
@@ -74,23 +75,20 @@ object TerminalLog {
         totalBytes += pieceBytes
     }
 
-    // Evicts oldest whole lines first, same FIFO front-eviction pattern
-    // as TerminalHistoryManager's own byte cap. buffer.size > 1 guards
-    // against evicting a single pathological still-growing line (e.g.
-    // print(huge_string, end='') never produces a '\n') out from under
-    // itself -- once it's the only line left, let it keep growing
-    // rather than corrupt/lose the in-progress line.
+    // Evicts oldest whole lines first, until both caps hold. Same FIFO
+    // front-eviction pattern as TerminalHistoryManager's own byte cap.
+    // buffer.size > 1 guards against evicting a single pathological
+    // still-growing line (e.g. print(huge_string, end='') never produces
+    // a '\n') out from under itself -- once it's the only line left, let
+    // it keep growing rather than corrupt/lose the in-progress line.
     private fun enforceCap() {
-        while (buffer.size > 1 && totalBytes > MAX_BYTES) {
+        while (buffer.size > 1 && (totalBytes > MAX_BYTES || buffer.size > MAX_LINES)) {
             totalBytes -= buffer.removeFirst().bytes
         }
     }
 
     private fun publish() {
-        // A reference-copy of a short list (at most a few hundred Line
-        // objects even at the full cap), not the O(current-total-size)
-        // content copy the old String-based takeLast() approach did --
-        // cheap enough per chunk, no explicit throttling needed.
+        // A reference copy of at most MAX_LINES Line objects, not a content copy.
         _lines.value = buffer.toList()
     }
 
