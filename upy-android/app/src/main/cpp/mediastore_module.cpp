@@ -1,6 +1,5 @@
 // upy-android native mediastore module (android.mediastore).
-// micropython android port only. Write-only, see mediastore_module.h's
-// own header comment.
+// micropython android port only. Saves and deletes, no read access.
 
 extern "C" {
 #include "py/obj.h"
@@ -65,9 +64,33 @@ mp_obj_t mediastore_save_image(size_t n_args, const mp_obj_t *pos_args, mp_map_t
 }
 static MP_DEFINE_CONST_FUN_OBJ_KW(mediastore_save_image_obj, 2, mediastore_save_image);
 
+// android.mediastore.delete(uri): removes an item, normally one
+// save_image() returned. Only MediaStore URIs: ContentResolver.delete()
+// would also accept other providers' URIs, the app's FileProvider included.
+mp_obj_t mediastore_delete(mp_obj_t uri_in) {
+    const char *uri = mp_obj_str_get_str(uri_in);
+    if (strncmp(uri, "content://media/", 16) != 0) {
+        mp_raise_ValueError(MP_ERROR_TEXT("android.mediastore: not a MediaStore URI"));
+    }
+    int count = 0;
+    char *out_err = nullptr;
+    if (!mediastore_bridge_delete(uri, &count, &out_err)) {
+        char buf[192];
+        snprintf(buf, sizeof(buf), "android.mediastore: %s", out_err ? out_err : "unknown error");
+        free(out_err);
+        raise_os_error(MP_EIO, buf);
+    }
+    if (count == 0) {
+        raise_os_error(MP_ENOENT, "android.mediastore: no such item");
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(mediastore_delete_obj, mediastore_delete);
+
 const mp_rom_map_elem_t mediastore_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_mediastore)},
     {MP_ROM_QSTR(MP_QSTR_save_image), MP_ROM_PTR(&mediastore_save_image_obj)},
+    {MP_ROM_QSTR(MP_QSTR_delete), MP_ROM_PTR(&mediastore_delete_obj)},
 };
 MP_DEFINE_CONST_DICT(mediastore_globals, mediastore_globals_table);
 

@@ -43,6 +43,12 @@ bool mediastore_bridge_save_image(const uint8_t *data, size_t len,
                                    const char *display_name, const char *mime_type,
                                    char **out_uri, char **out_err);
 
+// Deletes the MediaStore item at uri. On success, *out_count is the
+// number of items deleted (0: not found) and the function returns true.
+// On failure, returns false and sets *out_err (malloc'd, owned by the
+// caller).
+bool mediastore_bridge_delete(const char *uri, int *out_count, char **out_err);
+
 #ifdef __cplusplus
 }
 #endif

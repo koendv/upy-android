@@ -1,3 +1,4 @@
 android.mediastore selftest
 uri starts with content://: True
+deleted: True
 PASS

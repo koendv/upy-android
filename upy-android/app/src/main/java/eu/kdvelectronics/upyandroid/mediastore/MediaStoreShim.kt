@@ -1,14 +1,15 @@
 @file:JvmName("MediaStoreShim")
 // Thin JNI-facing glue for android.mediastore (mediastore_module.cpp/
 // mediastore_jni_bridge.cpp), same "flat top-level functions, JNI-
-// simple parameter/return types" shape as LiteRtShim.kt. Write-only:
-// scripts save script-produced media into shared, gallery-visible
+// simple parameter/return types" shape as LiteRtShim.kt. Save and
+// delete: scripts save script-produced media into shared, gallery-visible
 // MediaStore collections instead of the private VFS. No read access
 // (would need READ_MEDIA_IMAGES, a different use case, not requested).
 package eu.kdvelectronics.upyandroid.mediastore
 
 import android.content.ContentValues
 import android.content.Context
+import android.net.Uri
 import android.provider.MediaStore
 import java.io.IOException
 
@@ -27,3 +28,9 @@ fun saveImage(context: Context, data: ByteArray, displayName: String, mimeType: 
         ?: throw IOException("MediaStore openOutputStream() returned null")
     return uri.toString()
 }
+
+// Deletes a MediaStore item, normally one saveImage() returned. Returns
+// the number of items deleted. An item that no longer exists throws
+// SecurityException (Android 16).
+fun delete(context: Context, uri: String): Int =
+    context.contentResolver.delete(Uri.parse(uri), null, null)

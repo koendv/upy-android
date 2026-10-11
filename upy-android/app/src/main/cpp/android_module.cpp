@@ -40,7 +40,7 @@ const char android_help_text[] =
     "submodules:\n"
     "  android.proximity: distance_cm() -- proximity sensor reading in cm; OSError(ENODEV) if no sensor\n"
     "  android.imu: acceleration_mg()/angular_rate_mdps()/roll()/pitch()/sleep(enable) -- accelerometer/gyroscope\n"
-    "  android.mediastore: save_image(data, name, mime_type=\"image/jpeg\") -- save bytes to the device's shared Photos/gallery; returns the new content:// URI\n"
+    "  android.mediastore: save_image(data, name, mime_type=\"image/jpeg\") -- save bytes to the device's shared Photos/gallery; returns the new content:// URI; delete(uri) -- remove an item save_image() returned\n"
     "  android.fileprovider: share(path, mime_type=\"application/octet-stream\") -- open Android's share sheet for a file; fire-and-forget, no return value, silently does nothing if no app window is focused\n"
     "  android.location: GPS/network location; see android.location.help()\n"
     "functions:\n"

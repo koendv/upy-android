@@ -17,6 +17,7 @@ jobject g_context = nullptr;  // global ref, the application Context
 
 jclass g_shim_class = nullptr;
 jmethodID g_mid_save_image = nullptr;
+jmethodID g_mid_delete = nullptr;
 
 // Same per-call JNIEnv* lookup as litert_jni_bridge.cpp's own current_env().
 JNIEnv *current_env() {
@@ -60,6 +61,8 @@ extern "C" void mediastore_bridge_init_impl(void *jni_env, void *application_con
 
     g_mid_save_image = env->GetStaticMethodID(g_shim_class, "saveImage",
         "(Landroid/content/Context;[BLjava/lang/String;Ljava/lang/String;)Ljava/lang/String;");
+    g_mid_delete = env->GetStaticMethodID(g_shim_class, "delete",
+        "(Landroid/content/Context;Ljava/lang/String;)I");
 }
 
 extern "C" bool mediastore_bridge_save_image(const uint8_t *data, size_t len,
@@ -88,5 +91,18 @@ extern "C" bool mediastore_bridge_save_image(const uint8_t *data, size_t len,
     *out_uri = strdup(uri_chars);
     env->ReleaseStringUTFChars(juri, uri_chars);
     env->DeleteLocalRef(juri);
+    return true;
+}
+
+extern "C" bool mediastore_bridge_delete(const char *uri, int *out_count, char **out_err) {
+    JNIEnv *env = current_env();
+    jstring juri = env->NewStringUTF(uri);
+    jint count = env->CallStaticIntMethod(g_shim_class, g_mid_delete, g_context, juri);
+    env->DeleteLocalRef(juri);
+    if (env->ExceptionCheck()) {
+        *out_err = describe_and_clear_exception(env);
+        return false;
+    }
+    *out_count = (int) count;
     return true;
 }

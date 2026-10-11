@@ -43,6 +43,14 @@ def main():
         return
 
     print("uri starts with content://: True")
+
+    # Delete it again, so repeated runs leave nothing in the gallery.
+    try:
+        android.mediastore.delete(uri)
+    except OSError as e:
+        print("FAIL: delete:", e)
+        return
+    print("deleted: True")
     print("PASS")
 
 
