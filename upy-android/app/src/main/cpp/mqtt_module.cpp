@@ -1,5 +1,4 @@
 // upy-android native umqtt module.
-// see session-state: mqtt_module.cpp#mqtt_client_make_new
 //
 // API follows micropython-lib umqtt.simple 1.8.1: ssl=True uses TLS
 // with Android's CA certificates; ssl_params other than server_hostname,
@@ -40,7 +39,8 @@ void raise_os_error_free(int errno_, char *msg) {
     nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
 }
 
-// see session-state: mqtt_module.cpp#registry_add
+// Every client is listed here, so mqtt_close_all() can disconnect what a
+// script left open.
 struct MqttHandleNode {
     void *global_ref;
     MqttHandleNode *next;
@@ -71,7 +71,6 @@ void registry_remove(MqttHandleNode *node) {
     }
 }
 
-// see session-state: mqtt_module.cpp#mqtt_client_obj_t
 struct mqtt_client_obj_t {
     mp_obj_base_t base;
     MqttHandleNode *node;  // null once closed
@@ -367,7 +366,8 @@ mp_obj_t mqtt_client_check_msg(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(mqtt_client_check_msg_obj, mqtt_client_check_msg);
 
-// see session-state: mqtt_module.cpp#mqtt_client_wait_msg
+// wait_msg() waits in chunks of this length, checking for Interrupt in
+// between.
 constexpr long kWaitChunkMs = 250;
 
 mp_obj_t mqtt_client_wait_msg(mp_obj_t self_in) {
@@ -453,7 +453,7 @@ const mp_obj_module_t umqtt_simple_module = {
 };
 
 const char umqtt_help_text[] =
-    "module: umqtt (umqtt.simple is the same client)\n"
+    "module: umqtt\n"
     "class: umqtt.MQTTClient(client_id, server, port=0, user=None, password=None, keepalive=0, ssl=False, ssl_params={})\n"
     "  MQTT 3.1.1 client with the API of micropython-lib's umqtt.simple\n"
     "  port=0: 1883, or 8883 with ssl=True\n"
@@ -488,9 +488,7 @@ MP_DEFINE_CONST_DICT(umqtt_module_globals, umqtt_module_globals_table);
 
 }  // namespace
 
-// Top-level module, matches a real/expected module name
-// (umqtt.simple/umqtt.robust from micropython-lib).
-// see session-state: mqtt_module.cpp#mqtt_client_make_new
+// Top-level module umqtt.
 extern "C" const mp_obj_module_t umqtt_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &umqtt_module_globals,
