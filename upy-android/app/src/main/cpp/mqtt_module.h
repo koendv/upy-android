@@ -20,6 +20,10 @@ void mqtt_bridge_init(void *jni_env);
 // the same two places in engine_jni.cpp, before mp_embed_deinit().
 // Disconnects every still-open MQTTClient.
 void mqtt_close_all(void);
+// Puts umqtt.simple into sys.modules, so `from umqtt.simple import
+// MQTTClient` works. Call after every mp_embed_init(): mp_init()
+// empties sys.modules.
+void mqtt_register_submodules(void);
 
 #ifdef __cplusplus
 }

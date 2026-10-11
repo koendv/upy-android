@@ -453,7 +453,7 @@ const mp_obj_module_t umqtt_simple_module = {
 };
 
 const char umqtt_help_text[] =
-    "module: umqtt\n"
+    "module: umqtt (also importable as umqtt.simple)\n"
     "class: umqtt.MQTTClient(client_id, server, port=0, user=None, password=None, keepalive=0, ssl=False, ssl_params={})\n"
     "  MQTT 3.1.1 client with the API of micropython-lib's umqtt.simple\n"
     "  port=0: 1883, or 8883 with ssl=True\n"
@@ -510,4 +510,10 @@ extern "C" void mqtt_close_all(void) {
         g_mqtt_connections = node->next;
         free(node);
     }
+}
+
+extern "C" void mqtt_register_submodules(void) {
+    mp_obj_dict_store(MP_OBJ_FROM_PTR(&MP_STATE_VM(mp_loaded_modules_dict)),
+                      MP_OBJ_NEW_QSTR(qstr_from_str("umqtt.simple")),
+                      MP_OBJ_FROM_PTR(&umqtt_simple_module));
 }

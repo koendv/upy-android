@@ -121,6 +121,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint s
     }
     int stack_top;
     mp_embed_init(g_heap, g_heap_size, &stack_top, static_cast<size_t>(stackSizeBytes), root_path_chars);
+    mqtt_register_submodules();
     env->ReleaseStringUTFChars(rootPath, root_path_chars);
     g_initialized = true;
     return JNI_TRUE;
@@ -186,6 +187,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint 
     const char *root_path_chars = env->GetStringUTFChars(rootPath, nullptr);
     int stack_top;
     mp_embed_init(g_heap, g_heap_size, &stack_top, static_cast<size_t>(stackSizeBytes), root_path_chars);
+    mqtt_register_submodules();
     env->ReleaseStringUTFChars(rootPath, root_path_chars);
     g_initialized = true;
 }
