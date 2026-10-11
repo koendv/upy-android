@@ -3,12 +3,26 @@
 // litert_jni_bridge.cpp).
 package eu.kdvelectronics.upyandroid.litert
 
+import android.content.Context
 import com.google.ai.edge.litert.Accelerator
 import com.google.ai.edge.litert.CompiledModel
 import com.google.ai.edge.litert.Environment
 import com.google.ai.edge.litert.TensorBuffer
 
-fun createEnvironment(): Environment = Environment.create()
+// LiteRT finds the NPU dispatch and compiler plugin libraries in
+// nativeLibraryDir. Set by EngineService.onCreate().
+private var nativeLibraryDir: String? = null
+
+fun initLitert(context: Context) {
+    nativeLibraryDir = context.applicationInfo.nativeLibraryDir
+}
+
+fun createEnvironment(): Environment {
+    val dir = nativeLibraryDir ?: return Environment.create()
+    return Environment.create(
+        mapOf(Environment.Option.DispatchLibraryDir to dir, Environment.Option.CompilerPluginLibraryDir to dir)
+    )
+}
 
 // acceleratorValue is Accelerator's own .value int (NONE=0, CPU=1,
 // GPU=2, NPU=3), not an enum. An Int is JNI-simple, an enum isn't.
