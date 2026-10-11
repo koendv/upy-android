@@ -1,6 +1,5 @@
 package eu.kdvelectronics.upyandroid.ui
 
-import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -36,10 +35,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import eu.kdvelectronics.upyandroid.fileprovider.contentName
 import eu.kdvelectronics.upyandroid.fileprovider.openWith
 import eu.kdvelectronics.upyandroid.fileprovider.shareFile
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.model.MicroFile
+import java.nio.file.InvalidPathException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,12 +72,25 @@ fun ExplorerScreen(
     var showNewFolder by remember { mutableStateOf(false) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
     val context = LocalContext.current
 
     fun refresh() {
         coroutineScope.launch(Dispatchers.IO) {
             val listed = filesManager.listDir(path)
             files = listed
+        }
+    }
+
+    // Runs a file operation off the UI thread, then refreshes the listing.
+    fun fileOp(op: () -> Unit) {
+        coroutineScope.launch(Dispatchers.IO) {
+            try {
+                op()
+            } catch (e: InvalidPathException) {
+                error = "Invalid name"
+            }
+            refresh()
         }
     }
 
@@ -111,17 +125,10 @@ fun ExplorerScreen(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
         uri ?: return@rememberLauncherForActivityResult
-        val name = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            cursor.moveToFirst()
-            if (nameIndex >= 0) cursor.getString(nameIndex) else null
-        } ?: return@rememberLauncherForActivityResult
+        val name = contentName(context, uri)
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: return@rememberLauncherForActivityResult
-        coroutineScope.launch(Dispatchers.IO) {
-            filesManager.writeBinary(if (path.isEmpty()) name else "$path/$name", bytes)
-            refresh()
-        }
+        fileOp { filesManager.writeBinary(if (path.isEmpty()) name else "$path/$name", bytes) }
     }
 
     NameDialog(
@@ -132,10 +139,7 @@ fun ExplorerScreen(
         onOk = { name ->
             showNewFile = false
             val file = MicroFile(name = name, path = path, isDirectory = false)
-            coroutineScope.launch(Dispatchers.IO) {
-                filesManager.newFile(file)
-                refresh()
-            }
+            fileOp { filesManager.newFile(file) }
         }
     )
 
@@ -147,10 +151,7 @@ fun ExplorerScreen(
         onOk = { name ->
             showNewFolder = false
             val file = MicroFile(name = name, path = path, isDirectory = true)
-            coroutineScope.launch(Dispatchers.IO) {
-                filesManager.newDirectory(file)
-                refresh()
-            }
+            fileOp { filesManager.newDirectory(file) }
         }
     )
 
@@ -162,10 +163,7 @@ fun ExplorerScreen(
         onOk = { newName ->
             showRename = false
             val file = selected ?: return@NameDialog
-            coroutineScope.launch(Dispatchers.IO) {
-                filesManager.rename(file, newName)
-                refresh()
-            }
+            fileOp { filesManager.rename(file, newName) }
         }
     )
 
@@ -177,14 +175,21 @@ fun ExplorerScreen(
             confirmButton = {
                 TextButton(onClick = {
                     showDelete = false
-                    if (file != null) coroutineScope.launch(Dispatchers.IO) {
-                        filesManager.remove(file)
-                        refresh()
-                    }
+                    if (file != null) fileOp { filesManager.remove(file) }
                 }) { Text("Delete") }
             },
             dismissButton = {
                 TextButton(onClick = { showDelete = false }) { Text("Cancel") }
+            }
+        )
+    }
+
+    error?.let { message ->
+        AlertDialog(
+            onDismissRequest = { error = null },
+            title = { Text(message) },
+            confirmButton = {
+                TextButton(onClick = { error = null }) { Text("OK") }
             }
         )
     }

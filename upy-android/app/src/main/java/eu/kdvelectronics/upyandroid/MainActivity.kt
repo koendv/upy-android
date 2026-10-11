@@ -8,9 +8,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
-import android.provider.OpenableColumns
 import android.view.Surface
-import android.webkit.MimeTypeMap
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,6 +36,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import eu.kdvelectronics.upyandroid.fileprovider.contentName
 import eu.kdvelectronics.upyandroid.fileprovider.shareFile
 import eu.kdvelectronics.upyandroid.managers.FilesManager
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
@@ -314,7 +313,7 @@ class MainActivity : ComponentActivity() {
                     uris.filter { it.scheme == ContentResolver.SCHEME_CONTENT }.mapNotNull { uri ->
                         try {
                             val input = contentResolver.openInputStream(uri) ?: return@mapNotNull null
-                            input.use { saveShared(sharedName(uri)) { out -> input.copyTo(out) } }
+                            input.use { saveShared(contentName(this@MainActivity, uri)) { out -> input.copyTo(out) } }
                         } catch (e: Exception) {
                             null // unreadable (revoked, removed): skip it, save the rest
                         }
@@ -323,22 +322,6 @@ class MainActivity : ComponentActivity() {
             }
             saved.firstOrNull()?.let { sharedFocus.value = it }
         }
-    }
-
-    // The sender's display name without any directory part, else
-    // "shared" plus an extension from the MIME type.
-    private fun sharedName(uri: Uri): String {
-        val display = try {
-            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
-                if (c.moveToFirst()) c.getString(0) else null
-            }
-        } catch (e: Exception) {
-            null
-        }
-        val name = display?.substringAfterLast('/')?.substringAfterLast('\\')?.trim()
-        if (!name.isNullOrEmpty() && name != "." && name != "..") return name
-        val ext = contentResolver.getType(uri)?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) } ?: "bin"
-        return "shared.$ext"
     }
 
     // Writes a new file in the VFS root; an existing name becomes

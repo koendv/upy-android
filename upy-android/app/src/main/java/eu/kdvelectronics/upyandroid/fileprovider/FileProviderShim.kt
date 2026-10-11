@@ -3,6 +3,9 @@ package eu.kdvelectronics.upyandroid.fileprovider
 
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import java.io.File
 
@@ -45,4 +48,21 @@ fun openWith(context: Context, path: String, mimeType: String) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
     }
     context.startActivity(Intent.createChooser(intent, null))
+}
+
+// A received content URI's display name without any directory part,
+// else "shared" plus an extension from the MIME type.
+fun contentName(context: Context, uri: Uri): String {
+    val resolver = context.contentResolver
+    val display = try {
+        resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        }
+    } catch (e: Exception) {
+        null
+    }
+    val name = display?.substringAfterLast('/')?.substringAfterLast('\\')?.trim()
+    if (!name.isNullOrEmpty() && name != "." && name != "..") return name
+    val ext = resolver.getType(uri)?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) } ?: "bin"
+    return "shared.$ext"
 }

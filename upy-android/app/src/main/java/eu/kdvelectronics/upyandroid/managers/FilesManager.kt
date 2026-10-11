@@ -2,6 +2,7 @@ package eu.kdvelectronics.upyandroid.managers
 
 import eu.kdvelectronics.upyandroid.model.MicroFile
 import java.io.File
+import java.nio.file.InvalidPathException
 
 /**
  * Local file operations rooted at [root], the same directory
@@ -60,12 +61,18 @@ class FilesManager(private val root: File) {
     }
 
     fun rename(file: MicroFile, newName: String): MicroFile {
-        val src = resolve(file.fullPath)
-        val dst = File(src.parentFile, newName)
-        src.renameTo(dst)
-        return file.copy(name = newName)
+        val renamed = file.copy(name = newName)
+        resolve(file.fullPath).renameTo(resolve(renamed.fullPath))
+        return renamed
     }
 
-    private fun resolve(path: String): File =
-        if (path.isEmpty()) root else File(root, path)
+    private val rootPath = root.canonicalFile.toPath()
+
+    // Throws InvalidPathException for a path outside root, e.g. "../x".
+    private fun resolve(path: String): File {
+        if (path.isEmpty()) return root
+        val file = File(root, path)
+        if (!file.canonicalFile.toPath().startsWith(rootPath)) throw InvalidPathException(path, "outside root")
+        return file
+    }
 }
