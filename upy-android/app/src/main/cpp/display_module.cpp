@@ -58,6 +58,9 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
 
     auto *self = static_cast<display_obj_t *>(MP_OBJ_TO_PTR(pos_args[0]));
     image_t *src = (image_t *) py_image_cobj(pos_args[1]);
+    if (src->pixfmt != PIXFORMAT_GRAYSCALE && src->pixfmt != PIXFORMAT_RGB565) {
+        mp_raise_ValueError(MP_ERROR_TEXT("display: GRAYSCALE or RGB565 image required; use to_grayscale() or to_rgb565()"));
+    }
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 2, pos_args + 2, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
@@ -194,6 +197,7 @@ const char display_help_text[] =
     "  draws to the app's on-screen camera-preview Surface; the name is carried over from OpenMV's API, there is no real SPI bus involved\n"
     "methods:\n"
     "  write(image, x=0, y=0, hint=0): draw an image_t (e.g. from camera.Camera().snapshot()) to the screen\n"
+    "    image must be GRAYSCALE or RGB565, else ValueError; convert with to_grayscale() or to_rgb565()\n"
     "    image is scaled by the largest power of two (..., 1/4x, 1/2x, 1x, 2x, 4x, 8x) that fits the surface, letterboxed/pillarboxed in opaque black\n"
     "    hint: OpenMV's IMAGE_HINT_HMIRROR / IMAGE_HINT_VFLIP / IMAGE_HINT_TRANSPOSE bits, combined with the vflip/hmirror set at construction\n"
     "    no-op (returns None) if no Surface is currently attached, i.e. the app isn't showing the camera screen\n"
