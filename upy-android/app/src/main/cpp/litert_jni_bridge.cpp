@@ -2,7 +2,6 @@
 // call each, through LiteRtShim.kt. See litert_jni_bridge.h's own
 // header comment for why litert_module.cpp never sees a real
 // jobject/JNIEnv*.
-// see session-state: litert_jni_bridge.cpp#hot_path_mechanism
 
 #include "litert_jni_bridge.h"
 
@@ -38,7 +37,7 @@ jmethodID g_mid_close_environment = nullptr;
 jmethodID g_mid_close_compiled_model = nullptr;
 jmethodID g_mid_close_tensor_buffer = nullptr;
 
-// see session-state: litert_jni_bridge.cpp#threading
+// Only called on the engine worker thread, which stays attached to the JVM.
 JNIEnv *current_env() {
     JNIEnv *env = nullptr;
     g_jvm->GetEnv((void **) &env, JNI_VERSION_1_6);
@@ -179,7 +178,6 @@ extern "C" bool litert_bridge_create_compiled_model(void *env_global_ref, const 
 
 namespace {
 
-// see session-state: litert_jni_bridge.h#litert_bridge_kotlin_read_int8
 bool create_buffers(jmethodID mid, void *model_global_ref, long **out_handles,
                      void ***out_global_refs, size_t *out_count, char **out_err) {
     JNIEnv *env = current_env();
@@ -235,7 +233,6 @@ extern "C" bool litert_bridge_kotlin_write_int8(void *buf_global_ref, const int8
     return true;
 }
 
-// see session-state: litert_jni_bridge.h#litert_bridge_kotlin_read_int8
 extern "C" bool litert_bridge_kotlin_read_int8(void *buf_global_ref, int8_t **out_data,
                                                 size_t *out_len, char **out_err) {
     JNIEnv *env = current_env();

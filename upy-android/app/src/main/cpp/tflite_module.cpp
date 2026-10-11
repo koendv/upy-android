@@ -10,7 +10,6 @@
 // I/O is plain array.array: a MicroPython builtin (no new dependency)
 // whose typecodes cover the real TfLiteType range directly, raw bytes
 // copied straight into/out of the tensor.
-// see session-state: tflite_module.cpp#module_design
 
 #include <cstdlib>
 #include <cstring>
@@ -71,12 +70,12 @@ void registry_remove(TfLiteModel *model, TfLiteInterpreter *interp) {
 }
 
 // No quantization abstraction, no implicit conversion -- a tensor's
-// dtype must exactly match the array's typecode, byte for byte (see
-// session-state). Covers the real, practical TfLiteType range; bool is
-// represented as plain 0/1 uint8 bytes (array.array has no bool
-// typecode of its own). float16/float64/complex/string/resource/
-// variant are out of scope -- rare in this context, not a hard
-// technical limit, can be added if a real model needs one.
+// dtype must exactly match the array's typecode, byte for byte. Covers
+// the real, practical TfLiteType range; bool is represented as plain 0/1
+// uint8 bytes (array.array has no bool typecode of its own).
+// float16/float64/complex/string/resource/variant are out of scope --
+// rare in this context, not a hard technical limit, can be added if a
+// real model needs one.
 struct DtypeEntry {
     TfLiteType tfl;
     char typecode;
@@ -225,8 +224,7 @@ static MP_DEFINE_CONST_FUN_OBJ_2(tflite_model_output_shape_obj, tflite_model_out
 
 // Copies array.array `arr_obj`'s buffer into TFLite input tensor
 // `index`. Strict: typecode and byte size must match exactly, no
-// conversion -- no quantization abstraction, no implicit cast (see
-// session-state).
+// conversion -- no quantization abstraction, no implicit cast.
 void copy_input(TfLiteInterpreter *interp, int32_t index, mp_obj_t arr_obj) {
     if (!mp_obj_is_type(arr_obj, &mp_type_array)) {
         raise_os_error(MP_EINVAL, "tflite: run() arguments must be array.array");
@@ -257,11 +255,10 @@ void copy_input(TfLiteInterpreter *interp, int32_t index, mp_obj_t arr_obj) {
 }
 
 // Allocates a fresh, GC-owned array.array and copies TFLite output
-// tensor into it. Always a copy in v1: wrapping the interpreter's own
-// arena buffer zero-copy would dangle across the next invoke() or
-// close() -- deferred, see session-state. Flat (1-D): shape is a
-// separate query (output_shape()), not carried by run()'s own return
-// value.
+// tensor into it. Always a copy: wrapping the interpreter's own arena
+// buffer zero-copy would dangle across the next invoke() or close().
+// Flat (1-D): shape is a separate query (output_shape()), not carried by
+// run()'s own return value.
 mp_obj_t copy_output(const TfLiteTensor *tensor) {
     const char *name = nullptr;
     char typecode = tfl_typecode(TfLiteTensorType(tensor), &name);

@@ -20,7 +20,6 @@ void litert_bridge_init(void *jni_env);
 // same two places in engine_jni.cpp, before mp_embed_deinit().
 // Destroys every registered TensorBuffer/CompiledModel first, then
 // every Environment last.
-// see session-state: litert_module.cpp#registry_design
 void litert_close_all(void);
 
 #ifdef __cplusplus

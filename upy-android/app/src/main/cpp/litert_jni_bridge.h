@@ -22,15 +22,12 @@ extern "C" {
 // JNIEnv*, calls it, not litert_module.cpp).
 void litert_bridge_init_impl(void *jni_env);
 
-// see session-state: litert_jni_bridge.h#litert_bridge_kotlin_read_int8
-
 bool litert_bridge_create_environment(long *out_handle, void **out_global_ref, char **out_err);
 
 bool litert_bridge_create_compiled_model(void *env_global_ref, const char *path,
                                           int accelerator_value, long *out_handle,
                                           void **out_global_ref, char **out_err);
 
-// see session-state: litert_jni_bridge.h#litert_bridge_kotlin_read_int8
 bool litert_bridge_create_input_buffers(void *model_global_ref, long **out_handles,
                                          void ***out_global_refs,
                                          size_t *out_count, char **out_err);
@@ -41,7 +38,6 @@ bool litert_bridge_create_output_buffers(void *model_global_ref, long **out_hand
 // One JNI call each, through LiteRtShim.
 bool litert_bridge_kotlin_write_int8(void *buf_global_ref, const int8_t *data, size_t len,
                                       char **out_err);
-// see session-state: litert_jni_bridge.h#litert_bridge_kotlin_read_int8
 bool litert_bridge_kotlin_read_int8(void *buf_global_ref, int8_t **out_data, size_t *out_len,
                                      char **out_err);
 
@@ -69,7 +65,6 @@ bool litert_bridge_kotlin_run(void *model_global_ref, void *const *input_global_
                                size_t num_inputs, void *const *output_global_refs,
                                size_t num_outputs, char **out_err);
 
-// see session-state: litert_jni_bridge.h#litert_bridge_kotlin_read_int8
 bool litert_bridge_close_environment(void *global_ref, char **out_err);
 bool litert_bridge_close_compiled_model(void *global_ref, char **out_err);
 bool litert_bridge_close_tensor_buffer(void *global_ref, char **out_err);

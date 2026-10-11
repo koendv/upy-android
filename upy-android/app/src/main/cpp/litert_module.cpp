@@ -9,7 +9,6 @@
 // upstream native library, libLiteRt.so -- see CMakeLists.txt's
 // comment on tflite_module.cpp for why that's one copy of TFLite in
 // the process, not two.
-// see session-state: litert_module.cpp#module_design
 
 #include <cstdlib>
 #include <cstring>
@@ -25,13 +24,11 @@ extern "C" {
 #include "litert_jni_bridge.h"
 #include "litert_module.h"
 
-// see session-state: litert_module.cpp#module_design
 #include "litert/c/litert_common.h"
 #include "litert/c/litert_environment.h"
 #include "litert/c/litert_model.h"
 #include "litert/c/litert_model_types.h"
 
-// see session-state: litert_module.cpp#module_design
 extern const mp_obj_type_t litert_environment_type;
 extern const mp_obj_type_t litert_compiled_model_type;
 extern const mp_obj_type_t litert_options_type;
@@ -58,7 +55,8 @@ MP_NORETURN void raise_os_error_free(int errno_, char *msg) {
     nlr_raise(mp_obj_exception_make_new(&mp_type_OSError, 2, 0, args));
 }
 
-// see session-state: litert_module.cpp#registry_design
+// Every native handle is listed here, so litert_close_all() can free
+// what a script left open.
 struct LitertHandleNode {
     long raw_handle;
     void *global_ref;
@@ -376,7 +374,7 @@ static MP_DEFINE_CONST_FUN_OBJ_2(litert_compiled_model_output_shape_obj, litert_
 // create_output_buffers() -- internal plumbing only in this version,
 // never a Python-visible object (the old TensorBuffer type is gone).
 // A run() call creates one, uses it, and closes it; no reuse across
-// calls in v1 (see session-state).
+// calls.
 struct BufferSet {
     LitertHandleNode **nodes;
     size_t count;
@@ -417,11 +415,10 @@ void close_buffer_set(BufferSet &bufs) {
 
 // Writes an array.array's buffer into an input TensorBuffer, via
 // whichever typed bridge call matches the array's typecode. No
-// quantization/scale/zero_point handling -- no implicit conversion
-// (see session-state). bool tensors take a uint8 ('B') array of 0/1
-// bytes, reinterpreted as C++ bool: safe on this target specifically
-// (sizeof(bool) == 1 on arm64 clang), not a portable assumption in
-// general.
+// quantization/scale/zero_point handling -- no implicit conversion.
+// bool tensors take a uint8 ('B') array of 0/1 bytes, reinterpreted as
+// C++ bool: safe on this target specifically (sizeof(bool) == 1 on arm64
+// clang), not a portable assumption in general.
 void write_array_to_buffer(LitertHandleNode *node, mp_obj_t arr_obj) {
     if (!mp_obj_is_type(arr_obj, &mp_type_array)) {
         raise_os_error(MP_EINVAL, "litert: run() arguments must be array.array");

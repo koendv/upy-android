@@ -1,7 +1,6 @@
 @file:JvmName("LiteRtShim")
 // Thin JNI-facing glue for litert (litert_module.cpp/
 // litert_jni_bridge.cpp).
-// see session-state: LiteRtShim.kt#createEnvironment
 package eu.kdvelectronics.upyandroid.litert
 
 import com.google.ai.edge.litert.Accelerator
