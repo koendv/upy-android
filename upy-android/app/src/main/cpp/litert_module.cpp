@@ -660,8 +660,6 @@ const char litert_help_text[] =
     "  OSError(EIO): compile, buffer creation, write, run, or read failure (Kotlin/JNI exception text is forwarded)\n"
     "  ValueError: wrong number of run() arguments\n"
     "notes:\n"
-    "  accelerators: GPU via OpenCL or OpenGL; NPU on MediaTek Dimensity phones whose firmware lets apps use NeuroPilot (verified on MT6878), and on Google Tensor G3-G6 (untested)\n"
-    "  an unavailable accelerator falls back to the CPU without an error: compare the run time with CPU, or look in logcat for DispatchDelegate (NPU) or LITERT_CL / LITERT_OPENGL (GPU)\n"
     "  accelerator-capable (CPU/GPU/NPU via litert.Accelerator) -- see tflite.help() for a plain CPU-only, non-Kotlin alternative\n"
     "see_also: tflite.help()\n"
 ;
