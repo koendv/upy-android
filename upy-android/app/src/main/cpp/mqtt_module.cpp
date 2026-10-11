@@ -209,8 +209,9 @@ mp_obj_t mqtt_client_connect(size_t n_args, const mp_obj_t *pos_args, mp_map_t *
         password_len = password_bufinfo.len;
     }
 
-    // timeout: seconds (int or float) as in umqtt.simple, None: no limit.
-    long timeout_ms = 0;
+    // timeout: seconds (int or float). None: 10 s, since Interrupt
+    // cannot stop a connect; a healthy connect takes well under 1 s.
+    long timeout_ms = 10000;
     if (parsed[ARG_timeout].u_obj != mp_const_none) {
         mp_float_t seconds = mp_obj_get_float(parsed[ARG_timeout].u_obj);
         timeout_ms = seconds > 0 ? (long) (seconds * 1000) : 1;
