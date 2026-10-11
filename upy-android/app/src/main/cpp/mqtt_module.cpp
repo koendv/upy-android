@@ -347,13 +347,14 @@ bool poll_and_dispatch(mqtt_client_obj_t *self, long timeout_ms) {
     if (!has_message) {
         return false;
     }
-    if (self->callback != mp_const_none) {
-        mp_obj_t topic_obj = mp_obj_new_bytes((const byte *) topic, strlen(topic));
-        mp_obj_t payload_obj = mp_obj_new_bytes((const byte *) payload, payload_len);
-        mp_call_function_2(self->callback, topic_obj, payload_obj);
-    }
+    // Bytes objects first, so a raising callback leaks nothing.
+    mp_obj_t topic_obj = mp_obj_new_bytes((const byte *) topic, strlen(topic));
+    mp_obj_t payload_obj = mp_obj_new_bytes((const byte *) payload, payload_len);
     free(topic);
     free(payload);
+    if (self->callback != mp_const_none) {
+        mp_call_function_2(self->callback, topic_obj, payload_obj);
+    }
     return true;
 }
 
