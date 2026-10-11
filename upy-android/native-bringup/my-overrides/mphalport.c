@@ -62,7 +62,7 @@ void mp_embed_set_output_chunk_cb(mp_embed_output_chunk_cb_t cb, void *context) 
 
 // random module seed (see MICROPY_PY_RANDOM_SEED_INIT_FUNC in
 // mpconfigport.h). arc4random_buf() is Bionic's standard entropy source
-// (stdlib.h), available since long before this project's minSdk 26. No
+// (stdlib.h), available on every Android version this app supports. No
 // fd or permission handling needed, unlike ports/unix's getrandom()/
 // /dev/random fallback.
 #include <stdlib.h>

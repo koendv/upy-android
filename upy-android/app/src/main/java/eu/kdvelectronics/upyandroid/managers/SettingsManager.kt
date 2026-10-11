@@ -39,8 +39,9 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_SSH_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_SSH_ENABLED, value).apply()
 
-    // Never pushed into :engine, never readable from a script.
-    // See BoardManager.kt#pushSettings.
+    // Never pushed into :engine (see BoardManager.kt#pushSettings), but
+    // stored in plain text: a script can read the settings file through
+    // os.VfsPosix, which is not a security boundary.
     var sshPassword: String
         get() = prefs.getString(KEY_SSH_PASSWORD, "") ?: ""
         set(value) = prefs.edit().putString(KEY_SSH_PASSWORD, value).apply()
