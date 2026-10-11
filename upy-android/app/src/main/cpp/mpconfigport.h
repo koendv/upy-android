@@ -46,7 +46,6 @@
 // Change this flag without knowing that,
 // and litert_module.cpp's TensorBuffer read/write helpers
 // silently corrupt data instead of failing loudly.
-// see session-state: mpconfigport.h#MICROPY_FLOAT_IMPL
 #define MICROPY_FLOAT_IMPL                      (MICROPY_FLOAT_IMPL_FLOAT)
 
 // Real VFS, rooted at the app's own private storage (path passed in at
@@ -106,15 +105,14 @@ unsigned long mp_android_random_seed_init(void);
 // combination, not an independent choice. Side effect: real
 // arbitrary-precision Python ints everywhere (e.g. 2**100), not only for
 // timestamps.
-// see session-state: mpconfigport.h#MICROPY_LONGINT_IMPL_and_TIMESTAMP
 #define MICROPY_LONGINT_IMPL                     (MICROPY_LONGINT_IMPL_MPZ)
 // Real Unix epoch (1970), matching CPython and every libc time_t call our
 // MICROPY_PY_TIME_INCLUDEFILE makes. MicroPython's own default
 // (MICROPY_EPOCH_IS_2000) would silently misinterpret/misproduce
 // timestamps by exactly 30 years against any real-world comparison.
 #define MICROPY_EPOCH_IS_1970                    (1)
-// TIME_T (signed), not the default UINT.
-// see session-state: mpconfigport.h#MICROPY_LONGINT_IMPL_and_TIMESTAMP
+// TIME_T (signed), not the default UINT: the local-time to UTC
+// conversion in mktime() can give a small negative value, which UINT wraps.
 #define MICROPY_TIMESTAMP_IMPL                   (MICROPY_TIMESTAMP_IMPL_TIME_T)
 // py/mpconfig.h's `typedef time_t mp_timestamp_t;` (for the TIME_T impl
 // above) references time_t directly without including <time.h> itself.
@@ -135,5 +133,3 @@ unsigned long mp_android_random_seed_init(void);
 // Frozen Python modules (native-bringup/manifest.py), e.g. asyncio.
 #define MICROPY_MODULE_FROZEN_MPY                (1)
 #define MICROPY_QSTR_EXTRA_POOL                  mp_qstr_frozen_const_pool
-
-// see session-state: mpconfigport.h#MICROPY_PY_CRC

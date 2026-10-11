@@ -1,6 +1,5 @@
-// upy-android native android module.
-// micropython android port only.
-// see session-state: android_module.cpp#module_design
+// upy-android native android module: phone capabilities with no OpenMV
+// equivalent. Its submodules are reached only as android.<name>.
 
 #include <cstring>
 
@@ -27,7 +26,6 @@ const mp_rom_map_elem_t android_proximity_globals_table[] = {
 MP_DEFINE_CONST_DICT(android_proximity_globals, android_proximity_globals_table);
 
 // Plain mp_obj_module_t, same as imu_module.
-// see session-state: android_module.cpp#module_design
 const mp_obj_module_t android_proximity_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &android_proximity_globals,
@@ -37,7 +35,6 @@ const mp_obj_module_t android_proximity_module = {
 // module blind over adb, with no repo access -- see
 // AdbExecProvider.kt/adb_help.yaml (help -> help('modules') -> import
 // android; print(android.help())).
-// see session-state: android_module.cpp#android_help
 const char android_help_text[] =
     "module: android (android-specific, no OpenMV equivalent)\n"
     "submodules:\n"

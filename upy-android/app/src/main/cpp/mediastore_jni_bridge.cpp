@@ -19,7 +19,6 @@ jclass g_shim_class = nullptr;
 jmethodID g_mid_save_image = nullptr;
 
 // Same per-call JNIEnv* lookup as litert_jni_bridge.cpp's own current_env().
-// see session-state: litert_jni_bridge.cpp#threading
 JNIEnv *current_env() {
     JNIEnv *env = nullptr;
     g_jvm->GetEnv((void **) &env, JNI_VERSION_1_6);

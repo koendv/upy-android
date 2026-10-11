@@ -98,12 +98,11 @@ set_source_files_properties(micropython_embed/openmv/py_crc.c
 # classic TfLite* C API (confirmed via nm) alongside LiteRT's own
 # LiteRt* API, since LiteRT is built from its own copy of the TFLite
 # source. One copy of TFLite in the process, not two colliding in the
-# dynamic symbol table -- see tflite/README.md and session-state for
-# why this matters. tflite_module.cpp and litert_module.cpp/
-# LiteRtShim.kt remain independent source files (zero cross-links
-# between the two modules' own code); they just happen to share this
-# one upstream native library, the same way two modules might both use
-# libc.
+# dynamic symbol table -- see tflite/README.md. tflite_module.cpp and
+# litert_module.cpp/LiteRtShim.kt remain independent source files (zero
+# cross-links between the two modules' own code); they just happen to
+# share this one upstream native library, the same way two modules might
+# both use libc.
 add_library(litert SHARED IMPORTED)
 set_target_properties(litert PROPERTIES
     IMPORTED_LOCATION ${CMAKE_CURRENT_SOURCE_DIR}/litert/lib/libLiteRt.so
@@ -127,17 +126,9 @@ target_link_options(upy_engine PRIVATE
 # (my-overrides/openmv/apriltag_config.h) and its upstream-warning suppressions.
 #
 # micropython_embed/openmv/apriltag.c (imlib_find_rects/imlib_find_apriltags)
-# must get this too, even though it's globbed into MPY_OPENMV_SOURCES, not
-# MPY_APRILTAG_SOURCES: it includes apriltag.h directly and calls
-# apriltag_detector_create()/zarray_add() etc. Without APRILTAG_HAVE_CONFIG
-# here, this TU saw apriltag_detector_t with the *default* (upstream)
-# APRILTAG_ENABLE_PROFILE/APRILTAG_ENABLE_PTHREADS values (1, 1) instead of
-# apriltag_config.h's (0, 0) -- a different struct layout (extra
-# timeprofile_t*/pthread_mutex_t fields) than every other AprilTag TU, which
-# shifted tag_families to the wrong offset and crashed with "za != NULL" in
-# zarray_add (reading what apriltag_detector_create() actually wrote to the
-# following field, left zero). Confirmed on-device 2026-10-02, see
-# session-state.
+# needs these flags too, although it is in MPY_OPENMV_SOURCES: it includes
+# apriltag.h, and without APRILTAG_HAVE_CONFIG it sees a different
+# apriltag_detector_t layout than the other AprilTag files.
 set_source_files_properties(${MPY_APRILTAG_SOURCES} micropython_embed/openmv/apriltag.c
     PROPERTIES
     COMPILE_DEFINITIONS "APRILTAG_HAVE_CONFIG"

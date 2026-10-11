@@ -1,6 +1,7 @@
 // JNI bridge for the upy-android MicroPython engine, running inside the
 // :engine process (see EngineService.kt / AndroidManifest.xml).
-// see session-state: engine_jni.cpp#threading_contract
+// Init, exec, reset and deinit run on EngineWorker's single thread;
+// interrupt, settings and display surface are safe from any thread.
 
 #include <jni.h>
 #include <cstdlib>
@@ -32,7 +33,6 @@ bool g_initialized = false;
 std::mutex g_settings_mutex;
 SettingsSnapshot g_settings_snapshot = {kDefaultHeapSizeMb, false, false};
 
-// see session-state: engine_jni.cpp#allocate_heap
 void allocate_heap(int heap_size_mb) {
     size_t requested = static_cast<size_t>(heap_size_mb) * 1024 * 1024;
     char *buf = static_cast<char *>(malloc(requested));
@@ -49,7 +49,6 @@ void allocate_heap(int heap_size_mb) {
 // java.lang.Thread from birth and stays JVM-attached for the :engine
 // process's entire lifetime, so litert_jni_bridge.cpp's GetEnv()-per-call
 // pattern (built on this JavaVM*) never needs Attach/DetachCurrentThread.
-// see session-state: litert_jni_bridge.cpp#threading
 JavaVM *g_jvm = nullptr;
 
 // Bridges mp_embed's plain-C chunk callback to a JNI upcall on the sink
@@ -93,7 +92,7 @@ SettingsSnapshot settings_snapshot_get() {
 // (itself read synchronously from SettingsManager in
 // EngineService.onCreate(), no AIDL involved). Fixed for this :engine
 // process's entire lifetime; changing it needs a real app restart, not
-// just Reset. See session-state: engine_jni.cpp#allocate_heap
+// just Reset.
 // applicationContext: a real android.content.Context, needed by
 // mediastore_module.cpp's own MediaStore access (ContentResolver is
 // only reachable through a Context, unlike litert_bridge_init, which
@@ -170,8 +169,9 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInterrupt(JNIEnv *, jobject) {
     location_interrupt_wait();
 }
 
-// Must be called on the worker thread, like nativeExec.
-// see session-state: engine_jni.cpp#nativeReset
+// Must be called on the worker thread, like nativeExec. Cameras,
+// sensors, models and MQTT clients live outside the MicroPython heap,
+// so mp_embed_deinit() does not close them; the *_close_all() calls do.
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeReset(JNIEnv *env, jobject, jint stackSizeBytes, jstring rootPath) {
     camera_close_all();
@@ -211,7 +211,6 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeDeinit(JNIEnv *, jobject) {
 }
 
 // nativeSetSettings: safe from any thread, same as nativeSetDisplaySurface.
-// see session-state: engine_jni.cpp#nativeSetSettings
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeSetSettings(
     JNIEnv *, jobject,
@@ -221,7 +220,8 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeSetSettings(
     g_settings_snapshot.adb_exec_enabled = adbExecEnabled;
 }
 
-// see session-state: engine_jni.cpp#nativeSetDisplaySurface
+// Safe from any thread. The Surface is converted here, on the calling
+// thread, since a JNI local ref cannot be used on another thread.
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeSetDisplaySurface(JNIEnv *env, jobject, jobject surface) {
     ANativeWindow *window = surface ? ANativeWindow_fromSurface(env, surface) : nullptr;
