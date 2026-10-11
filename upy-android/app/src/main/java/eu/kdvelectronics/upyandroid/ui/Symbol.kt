@@ -28,7 +28,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import eu.kdvelectronics.upyandroid.R
 
-// see session-state: Symbol.kt#SymbolIcon
 object SymbolIcon {
     const val TERMINAL = 0xeb8e
     const val FOLDER = 0xe2c7
@@ -68,7 +67,6 @@ object SymbolIcon {
 
 private val symbolFontFamily = FontFamily(Font(R.font.upy_symbols))
 
-// see session-state: Symbol.kt#Symbol
 @Composable
 fun Symbol(
     codepoint: Int,
@@ -88,7 +86,8 @@ fun Symbol(
         modifier = modifier.size(size).then(semanticsModifier),
         contentAlignment = Alignment.Center,
     ) {
-        // see session-state: Symbol.kt#Symbol
+        // Font size in sp with fontScale divided out, so the glyph is `size`
+        // whatever the user's font scale.
         Text(
             text = String(Character.toChars(codepoint)),
             fontFamily = symbolFontFamily,
@@ -108,7 +107,6 @@ fun Symbol(
     }
 }
 
-// see session-state: Symbol.kt#TooltipIconButton
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TooltipIconButton(

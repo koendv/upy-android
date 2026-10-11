@@ -80,7 +80,7 @@ import my.nanihadesuka.compose.ScrollbarSettings
 // library's gesture handling swallows drags meant for a CHILD's own
 // horizontalScroll. No fade animation, always visible when scrollable.
 // Visual thickness (4dp) vs touch target (32dp) deliberately differ --
-// a small hit target is a real usability problem. see session-state.
+// a small hit target is a real usability problem.
 @Composable
 private fun HorizontalScrollbar(state: ScrollState, modifier: Modifier = Modifier) {
     if (state.maxValue <= 0) return
@@ -126,7 +126,7 @@ private fun HorizontalScrollbar(state: ScrollState, modifier: Modifier = Modifie
 // content nested inside it. Claims clearly-horizontal drags at this
 // PARENT, outside LazyColumnScrollbar, via PointerEventPass.Initial
 // (runs before the library's own Main-pass handling ever sees the
-// event); anything not claimed passes through untouched. see session-state.
+// event); anything not claimed passes through untouched.
 private fun Modifier.interceptHorizontalDrag(state: ScrollState): Modifier = this.pointerInput(state) {
     awaitEachGesture {
         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -190,7 +190,7 @@ fun TerminalScreen(
     val textMeasurer = rememberTextMeasurer()
     val rowTextStyle = LocalTextStyle.current.copy(fontFamily = FontFamily.Monospace)
     // Monospace: fixed advance x length: never measure() per row, that's
-    // on the per-print hot path. see session-state.
+    // on the per-print hot path.
     val glyphAdvancePx = remember(rowTextStyle) {
         textMeasurer.measure("0".repeat(40), rowTextStyle).size.width / 40f
     }
@@ -213,7 +213,7 @@ fun TerminalScreen(
         if (log.lines.isEmpty()) horizontalScrollState.scrollTo(0)
     }
     // Explicit toggle, default on, not implicit at-bottom detection --
-    // matches Arduino IDE's own monitorModel.autoscroll. see session-state.
+    // matches Arduino IDE's own monitorModel.autoscroll.
     var autoscroll by remember { mutableStateOf(true) }
 
     fun run() {
@@ -234,9 +234,8 @@ fun TerminalScreen(
     // while that timer is running are discarded (no-op, not queued);
     // when the timer ends, scroll once using whatever lines.size is
     // AT THAT MOMENT (not the value that started the timer). Caps
-    // scrollToItem() at 10/sec under a fast print loop (was
-    // 20-25/sec, one per lines.size change) while doing zero work when
-    // idle, unlike a fixed-interval poll. see session-state.
+    // scrollToItem() at 10/sec under a fast print loop while doing zero
+    // work when idle, unlike a fixed-interval poll.
     LaunchedEffect(autoscroll) {
         if (!autoscroll) return@LaunchedEffect
         var timerActive = false
@@ -244,20 +243,9 @@ fun TerminalScreen(
             if (!timerActive) {
                 timerActive = true
                 launch {
-                    // 100ms, not a rounder-looking number picked blind:
-                    // measured via dumpsys gfxinfo (lcd_shield.py, ~60s,
-                    // same device) at 0/100/200ms. Frame-time percentiles
-                    // (the perceptually-relevant metric) were already
-                    // flat between 100 and 200ms (50th 20ms->19ms, 90th
-                    // 53ms->48ms) -- imperceptible to a human either way.
-                    // Janky-frame % kept dropping at 200ms (41%->32%),
-                    // but that metric counts ANY missed deadline
-                    // regardless of margin, so a slower cadence
-                    // mechanically improves it just by doing less work,
-                    // without the difference being something a user
-                    // would feel. 100ms keeps autoscroll visually live
-                    // (10 updates/sec) without paying for a frame-time
-                    // improvement that doesn't exist. see session-state.
+                    // 100ms: dumpsys gfxinfo frame times were flat
+                    // between 100 and 200ms, so a slower rate gains
+                    // nothing visible; 100ms keeps autoscroll live.
                     delay(100)
                     if (autoscroll && log.lines.isNotEmpty()) listState.scrollToItem(log.lines.size - 1)
                     timerActive = false

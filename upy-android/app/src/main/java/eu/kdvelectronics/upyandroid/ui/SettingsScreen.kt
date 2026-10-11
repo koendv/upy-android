@@ -42,7 +42,7 @@ import eu.kdvelectronics.upyandroid.ssh.SshServerManager
 
 private val ICON_SIZE = 20.dp
 
-// see session-state: SettingsScreen.kt#restartApp
+// Kills :engine and restarts the app: a new heap size needs a new process.
 private fun restartApp(context: Context) {
     val am = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
     val engineProcessName = "${context.packageName}:engine"
@@ -57,11 +57,11 @@ private fun restartApp(context: Context) {
 }
 
 // Peer top-level destination (matching Command/Files/Camera), not an
-// inline dialog: six-plus settings is too much for the dialog Part 1
-// used for adb-exec alone. onSettingsChanged fires after every edit so
-// the caller can push the new snapshot into a live :engine connection
-// immediately (see BoardManager.kt#pushSettings). heap_size_mb still
-// only takes effect at the next Reset regardless.
+// inline dialog: there are too many settings for a dialog.
+// onSettingsChanged fires after every edit so the caller can push the
+// new snapshot into a live :engine connection immediately (see
+// BoardManager.kt#pushSettings). heap_size_mb takes effect only after an
+// app restart (restartApp), not on Reset.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(

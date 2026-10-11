@@ -16,7 +16,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import eu.kdvelectronics.upyandroid.ScriptExecCore
 
 // Passive viewport, not a "run" screen.
-// see session-state: CameraScreen.kt#CameraScreen
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CameraScreen() {
@@ -40,7 +39,6 @@ fun CameraScreen() {
                 .padding(padding),
             verticalArrangement = Arrangement.Top
         ) {
-            // see session-state: CameraScreen.kt#CameraScreen
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
