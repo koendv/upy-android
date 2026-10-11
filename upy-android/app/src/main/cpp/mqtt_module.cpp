@@ -452,10 +452,37 @@ const mp_obj_module_t umqtt_simple_module = {
     .globals = (mp_obj_dict_t *) &umqtt_simple_globals,
 };
 
+const char umqtt_help_text[] =
+    "module: umqtt (umqtt.simple is the same client)\n"
+    "class: umqtt.MQTTClient(client_id, server, port=0, user=None, password=None, keepalive=0, ssl=False, ssl_params={})\n"
+    "  MQTT 3.1.1 client with the API of micropython-lib's umqtt.simple\n"
+    "  port=0: 1883, or 8883 with ssl=True\n"
+    "  ssl=True: TLS with Android's CA certificates, host name checked; ssl_params accepts only server_hostname\n"
+    "methods:\n"
+    "  set_callback(f): f(topic, msg) is called with bytes for both\n"
+    "  set_last_will(topic, msg, retain=False, qos=0): call before connect()\n"
+    "  connect(clean_session=True, timeout=None): returns 1 if the broker kept a session, else 0\n"
+    "    timeout in seconds, None: 10 s; Interrupt does not stop a connect, it takes effect after\n"
+    "  publish(topic, msg, retain=False, qos=0)\n"
+    "  subscribe(topic, qos=0), unsubscribe(topic)\n"
+    "  check_msg(): calls the callback for a waiting message, if any; does not wait\n"
+    "  wait_msg(): waits for one message and calls the callback; Interrupt stops the wait\n"
+    "  ping(): OSError ENOTCONN if not connected\n"
+    "  disconnect(): the broker does not publish the last will\n"
+    "  close(): disconnects and frees the client\n"
+    "errors: OSError EIO with the client's message (failed connect, lost connection, timeout)\n"
+    "see_also: /examples/mqtt_tls.py\n"
+;
+mp_obj_t umqtt_help() {
+    return mp_obj_new_str(umqtt_help_text, strlen(umqtt_help_text));
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(umqtt_help_obj, umqtt_help);
+
 const mp_rom_map_elem_t umqtt_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_umqtt)},
     {MP_ROM_QSTR(MP_QSTR_MQTTClient), MP_ROM_PTR(&mqtt_client_type)},
     {MP_ROM_QSTR(MP_QSTR_simple), MP_ROM_PTR(&umqtt_simple_module)},
+    {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&umqtt_help_obj)},
 };
 MP_DEFINE_CONST_DICT(umqtt_module_globals, umqtt_module_globals_table);
 
