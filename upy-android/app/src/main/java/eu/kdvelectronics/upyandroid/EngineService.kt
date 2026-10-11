@@ -7,7 +7,6 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.view.Surface
 import eu.kdvelectronics.upyandroid.camera.CameraShim
-import eu.kdvelectronics.upyandroid.litert.initLitert
 import eu.kdvelectronics.upyandroid.location.LocationShim
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 
@@ -100,7 +99,6 @@ class EngineService : Service() {
         worker.start()
         LocationShim.init(applicationContext)
         CameraShim.init(applicationContext)
-        initLitert(applicationContext)
     }
 
     private val binder = object : IEngine.Stub() {
