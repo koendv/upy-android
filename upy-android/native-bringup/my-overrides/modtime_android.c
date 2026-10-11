@@ -13,15 +13,11 @@
 // not a separate mechanism.
 #include "py_clock.h"
 
-// time.time() / time.time_ns()'s time() half: real seconds since the
-// Unix epoch (MICROPY_EPOCH_IS_1970, mpconfigport.h) with sub-second
-// precision as a float. MICROPY_FLOAT_IMPL_DOUBLE is already on for
-// math, so this is free precision matching CPython's own time.time()
-// semantics, not an extra cost.
+// time.time(): whole seconds since the Unix epoch (MICROPY_EPOCH_IS_1970),
+// as an int. A float32 (MICROPY_FLOAT_IMPL_FLOAT) cannot hold it: near
+// 1.8e9 its step is 128 s. time.time_ns() gives finer time.
 static mp_obj_t mp_time_time_get(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    return mp_obj_new_float((mp_float_t)ts.tv_sec + (mp_float_t)ts.tv_nsec / MICROPY_FLOAT_CONST(1e9));
+    return mp_obj_new_int_from_ll((long long) time(NULL));
 }
 
 // Shared body for gmtime()/localtime(): only the reentrant conversion
