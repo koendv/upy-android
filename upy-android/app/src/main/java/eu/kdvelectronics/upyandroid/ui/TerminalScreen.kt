@@ -164,6 +164,16 @@ private fun Modifier.interceptHorizontalDrag(state: ScrollState): Modifier = thi
     }
 }
 
+// Display only, Copy keeps the whole line.
+// Compose limit: Constraints packs width and height into one Long, and
+// a width above 2^18 - 1 = 262143 px throws "Can't represent a width".
+// On a Redmi 9 a row of 10000 characters is 273750 px and crashed the
+// app. 1000 characters stays far below that.
+private const val MAX_ROW_CHARS = 1000
+
+private fun rowText(text: String): String =
+    if (text.length <= MAX_ROW_CHARS) text else text.take(MAX_ROW_CHARS) + "…"
+
 // Files/Camera/Settings navigation moved to the top-level nav suite
 // (MainActivity's own NavigationSuiteScaffold). This screen only owns
 // its own terminal chrome now.
@@ -204,7 +214,7 @@ fun TerminalScreen(
             val maxChars = listState.layoutInfo.visibleItemsInfo.maxOfOrNull { info ->
                 // getOrNull, not []: after clear() or front-eviction,
                 // layoutInfo's indices can briefly exceed lines.size.
-                log.lines.getOrNull(info.index)?.text?.length ?: 0
+                log.lines.getOrNull(info.index)?.let { rowText(it.text).length } ?: 0
             } ?: 0
             (maxChars * glyphAdvancePx).toInt()
         }
@@ -312,7 +322,7 @@ fun TerminalScreen(
                             // own open issue #40 (non-uniform item sizes) by
                             // construction rather than gambling on it.
                             Text(
-                                text = line.text,
+                                text = rowText(line.text),
                                 fontFamily = FontFamily.Monospace,
                                 softWrap = false,
                                 maxLines = 1,
