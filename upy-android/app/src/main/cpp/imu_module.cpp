@@ -1,7 +1,7 @@
 // upy-android native imu module. A bridge between MicroPython
 // and Android's NDK sensor API, deliberately shaped to match upstream
-// OpenMV's own py_imu.c Python API.
-// see session-state: imu_module.cpp#module_design
+// OpenMV's own py_imu.c Python API. Each getter waits for a new sample
+// rather than returning a cached one.
 
 #include "imu_module.h"
 
@@ -35,7 +35,8 @@ constexpr int kLooperIdent = 1;
 constexpr float kMetersPerSecondSquaredToMg = 1000.0f / 9.80665f;
 constexpr float kRadToDeg = 180.0f / (float) M_PI;
 
-// see session-state: imu_module.cpp#ImuState
+// One sensor queue for accelerometer, gyroscope and proximity.
+// Proximity reports only on change, so its last value is kept here.
 struct ImuState {
     ASensorManager *manager;
     ALooper *looper;
@@ -154,7 +155,7 @@ void teardown_queue() {
     g_imu.proximity_has_reading = false;
 }
 
-// see session-state: imu_module.cpp#wait_for_fresh_event
+// Drops events already queued, then waits for a new one of want_type.
 bool wait_for_fresh_event(int32_t want_type, ASensorEvent *out) {
     ASensorEvent event;
     while (ASensorEventQueue_getEvents(g_imu.queue, &event, 1) > 0) {
@@ -163,8 +164,8 @@ bool wait_for_fresh_event(int32_t want_type, ASensorEvent *out) {
     for (int waited = 0; waited < kReadTimeoutMs; waited += kWaitChunkMs) {
         ALooper_pollOnce(kWaitChunkMs, nullptr, nullptr, nullptr);
         // Drain the FULL batch available right now, keeping only the LAST
-        // matching sample.
-        // see session-state: imu_module.cpp#wait_for_fresh_event
+        // matching sample: a sensor resuming after the screen was off can
+        // deliver a backlog at once.
         bool got_one = false;
         while (ASensorEventQueue_getEvents(g_imu.queue, &event, 1) > 0) {
             if (event.type == want_type) {
@@ -179,8 +180,8 @@ bool wait_for_fresh_event(int32_t want_type, ASensorEvent *out) {
         // wait. Same mechanism camera_module.cpp's wait loop uses.
         mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
     }
-    // Self-heal on timeout rather than stay silently wedged.
-    // see session-state: imu_module.cpp#wait_for_fresh_event
+    // Self-heal on timeout rather than stay silently wedged: the next
+    // call rebuilds the queue and enables the sensors again.
     teardown_queue();
     return false;
 }
@@ -228,7 +229,8 @@ mp_obj_t imu_angular_rate_mdps() {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(imu_angular_rate_mdps_obj, imu_angular_rate_mdps);
 
-// see session-state: imu_module.cpp#trig_functions
+// Ported from OpenMV's py_imu.c, with atan2f() instead of fast_atan2f()
+// and no board-mounting correction.
 mp_obj_t imu_roll() {
     ensure_accel_enabled();
     if (!g_imu.accel) {
@@ -299,8 +301,8 @@ MP_DEFINE_CONST_DICT(imu_module_globals, imu_module_globals_table);
 
 } // namespace
 
-// see session-state: imu_module.cpp#android_proximity_distance_cm
-// see session-state: imu_module.cpp#extern_linkage
+// Raises without a proximity sensor: 0 cm would read as "object at the
+// sensor".
 mp_obj_t android_proximity_distance_cm() {
     ensure_proximity_enabled();
     if (!g_imu.proximity) {
@@ -319,8 +321,7 @@ mp_obj_t android_proximity_distance_cm() {
         g_imu.proximity_has_reading = true;
     } else {
         // Steady state: a single non-blocking poll, cached value returned
-        // if nothing changed. see session-state:
-        // imu_module.cpp#android_proximity_distance_cm
+        // if nothing changed, since proximity only reports a change.
         ALooper_pollOnce(0, nullptr, nullptr, nullptr);
         ASensorEvent event;
         while (ASensorEventQueue_getEvents(g_imu.queue, &event, 1) > 0) {
@@ -331,9 +332,11 @@ mp_obj_t android_proximity_distance_cm() {
     }
     return mp_obj_new_float(g_imu.proximity_last_distance);
 }
+// extern: a const global has internal linkage in C++, and
+// android_module.cpp needs this one.
 extern MP_DEFINE_CONST_FUN_OBJ_0(android_proximity_distance_cm_obj, android_proximity_distance_cm);
 
-// see session-state: imu_module.cpp#extern_linkage
+// C linkage: android_module.cpp nests this as android.imu.
 extern "C" const mp_obj_module_t imu_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &imu_module_globals,
@@ -341,6 +344,6 @@ extern "C" const mp_obj_module_t imu_module = {
 
 extern "C" void imu_close_all(void) {
     teardown_queue();
-    // manager/accel/gyro/looper intentionally left set.
-    // see session-state: imu_module.cpp#ImuState
+    // manager/accel/gyro/looper stay set: only the queue holds a
+    // subscription.
 }

@@ -1,7 +1,6 @@
 // upy-android native display module. A bridge between
 // py_image.c's Image type and a real Android Surface. Not vendored
 // OpenMV source.
-// see session-state: display_module.cpp#module_design
 
 #include "display_module.h"
 
@@ -23,7 +22,8 @@ extern "C" {
 
 namespace {
 
-// see session-state: display_module.cpp#g_window_mutex
+// Guards g_window and every lock/draw/post in write(): setDisplaySurface(null)
+// can release the window on a binder thread while write() draws.
 pthread_mutex_t g_window_mutex = PTHREAD_MUTEX_INITIALIZER;
 ANativeWindow *g_window = nullptr;
 
@@ -34,8 +34,8 @@ typedef struct _display_obj_t {
 } display_obj_t;
 
 // Largest of {1,2,4,8} such that BOTH src_w*factor<=buf_w AND
-// src_h*factor<=buf_h.
-// see session-state: display_module.cpp#module_design
+// src_h*factor<=buf_h. Scaled here, in one pass, not by the compositor,
+// which would blur.
 int upscale_factor(int32_t src_w, int32_t src_h, int32_t buf_w, int32_t buf_h) {
     int factor = 1;
     for (int candidate : {2, 4, 8}) {
@@ -64,7 +64,8 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
 
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 2, pos_args + 2, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-    // see session-state: display_module.cpp#module_design
+    // Of the hint bits only HMIRROR, VFLIP and TRANSPOSE are used; the
+    // image is always centred with its aspect kept.
     int32_t hint = args[ARG_hint].u_int;
     bool transpose = (hint & IMAGE_HINT_TRANSPOSE) != 0;
     bool hint_hmirror = (hint & IMAGE_HINT_HMIRROR) != 0;
@@ -85,7 +86,6 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
         return mp_const_none;
     }
 
-    // see session-state: display_module.cpp#module_design
     int32_t logical_w = transpose ? src->h : src->w;
     int32_t logical_h = transpose ? src->w : src->h;
 
@@ -107,7 +107,6 @@ mp_obj_t display_write(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_arg
     // Opaque black. Fills the letterbox/pillarbox margin in one pass.
     memset(pixels, 0, (size_t) buffer.stride * buffer.height * 4);
 
-    // see session-state: display_module.cpp#module_design
     bool flip_x = transpose ? hint_vflip : hint_hmirror;
     bool flip_y = transpose ? hint_hmirror : hint_vflip;
 
@@ -190,7 +189,6 @@ MP_DEFINE_CONST_OBJ_TYPE(
 // module blind over adb, with no repo access -- see
 // AdbExecProvider.kt/adb_help.yaml (help -> help('modules') -> import
 // display; print(display.help())).
-// see session-state: display_module.cpp#display_help
 const char display_help_text[] =
     "module: display\n"
     "class: display.SPIDisplay(vflip=False, hmirror=False)\n"
@@ -236,7 +234,6 @@ extern "C" void display_set_window(ANativeWindow *new_window) {
     if (g_window) {
         // Fixed format, current (real) Surface size. (0,0) keeps
         // whatever the SurfaceView's actual layout size already is.
-        // see session-state: display_module.cpp#module_design
         ANativeWindow_setBuffersGeometry(g_window, 0, 0, WINDOW_FORMAT_RGBA_8888);
     }
     pthread_mutex_unlock(&g_window_mutex);
