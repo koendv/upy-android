@@ -110,44 +110,18 @@ class BoardManager(
     }
 
     fun connect() {
-        // REAL BUG, confirmed on-device (2026-09-29): a redundant
-        // connect() call while already genuinely connected (bound=true,
-        // engine != null -- e.g. MainActivity.onCreate() running again
-        // after a process restart, or the user tapping Reconnect while
-        // already connected) used to fall through to bindService()
-        // unconditionally below, same as every other case. Android does
-        // NOT redeliver onServiceConnected for a connection it already
-        // considers bound (see the stuck-connection-recovery comment
-        // below), so the Connecting status set at the top of this
-        // function never got followed by a matching Connected --
-        // status stayed permanently stuck at Connecting (which the UI
-        // shows identically to Disconnected) while the real connection,
-        // and any script currently running on it, kept working
-        // completely unaffected. Confirmed via `dumpsys activity
-        // services`: two ConnectionRecords ended up bound to the same
-        // EngineService instance after this happened once. This early
-        // return is the fix: a truly-already-connected call is a
-        // real no-op, not a reconnect attempt.
+        // Already connected (e.g. Reconnect tapped, or onCreate() run
+        // again): a no-op. Binding again would not deliver
+        // onServiceConnected, leaving the status stuck at Connecting.
         if (bound && engine != null) {
             onStatusChanges?.invoke(ConnectionStatus.Connected)
             return
         }
         onStatusChanges?.invoke(ConnectionStatus.Connecting)
-        // Stuck-connection recovery, a real bug hit and confirmed
-        // on-device: if bound is already true but engine is still null,
-        // this app's own onServiceConnected was never observed for the
-        // current binding (e.g. a missed/raced auto-reconnect after
-        // :engine died while this process was backgrounded), yet
-        // Android's own ActivityManager still considers the
-        // ServiceConnection bound (confirmed via dumpsys activity
-        // services: hasBound=true, multiple stacked ConnectionRecords
-        // on the same BinderProxy). bindService() on a connection
-        // Android already considers bound does NOT re-deliver
-        // onServiceConnected -- confirmed by a run() call that waited
-        // the full 10s ensureConnected() timeout and still got
-        // Disconnected. unbindService() first forces Android to drop
-        // the stale connection, so the bindService() below is
-        // guaranteed a fresh connection cycle.
+        // Bound but onServiceConnected never seen for this binding
+        // (e.g. :engine died while this process was in the background):
+        // bindService() on a connection Android considers bound does not
+        // deliver onServiceConnected again, so unbind first.
         if (bound && engine == null) {
             context.unbindService(connection)
             bound = false
@@ -156,7 +130,6 @@ class BoardManager(
         // at least this client process's own, instead of the OS's
         // default demotion while bound. Needed for reliable sensor
         // delivery.
-        // see session-state: BoardManager.kt#connect
         val ok = context.bindService(
             Intent(context, EngineService::class.java),
             connection,

@@ -27,7 +27,6 @@ import kotlin.concurrent.timerTask
 // connect/run/reset/interrupt work to ScriptExecCore, shared with the
 // SSH shell. This class is now only the UID-gated, base64-decoding
 // front door.
-// see session-state: AdbExecProvider.kt#AdbExecProvider
 class AdbExecProvider : ContentProvider() {
     private lateinit var appContext: Context
 
@@ -110,7 +109,6 @@ class AdbExecProvider : ContentProvider() {
         return Bundle().apply { putString("output", text) }
     }
 
-    // see session-state: AdbExecProvider.kt#handleRun
     private fun handleRun(arg: String?, timeoutSeconds: Int, resetFirst: Boolean): Bundle {
         if (arg.isNullOrEmpty()) {
             return Bundle().apply { putString("error", "missing_arg - run needs --arg <base64 script>") }

@@ -21,8 +21,6 @@ import eu.kdvelectronics.upyandroid.managers.SettingsManager
 // Explorer/Editor Run, adb-exec, SSH) never unbinds, for the process's
 // entire lifetime, not just after adb-exec or SSH has been used. Not a
 // leak. See ScriptExecCore.kt#ScriptExecCore.
-// see session-state: EngineService.kt#EngineService
-// see session-state: IEngine.aidl#reset
 class EngineService : Service() {
     // Holds the fileprovider share-request listener as a static, not an
     // instance field: android.fileprovider's native bridge (running on
@@ -32,7 +30,6 @@ class EngineService : Service() {
     // alive per process makes this equivalent to an instance field in
     // practice. @JvmStatic is required for the method to compile to a
     // real static method JNI can find, not a Companion-instance method.
-    // see session-state: EngineService.kt#Companion
     companion object {
         @Volatile
         private var shareListener: IEngineShareListener? = null
@@ -95,8 +92,8 @@ class EngineService : Service() {
     override fun onCreate() {
         super.onCreate()
         // Plain synchronous local read. No AIDL round-trip needed.
-        // heap_size_mb is fixed for this process's whole lifetime;
-        // see EngineWorker.kt#start.
+        // heap_size_mb is fixed for this process's whole lifetime: the
+        // heap is allocated once, in nativeInit().
         val heapSizeMb = SettingsManager(applicationContext).heapSizeMb
         worker = EngineWorker(filesDir.absolutePath, heapSizeMb, applicationContext)
         worker.start()
@@ -168,7 +165,6 @@ class EngineService : Service() {
     // Defense-in-depth camera teardown. Idle-unbind should already get
     // equivalent cleanup for free via process death, but this removes
     // reliance on that assumption.
-    // see session-state: EngineService.kt#onDestroy
     override fun onDestroy() {
         CameraShim.closeOnMain()
         worker.deinit()

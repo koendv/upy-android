@@ -28,14 +28,9 @@ class Snapshot(val lines: List<Line>)
 //
 // A Line list, not a single String: TerminalScreen renders this as a
 // LazyColumn (virtualized -- only visible rows laid out), which needs
-// discrete rows, not one giant reflowed string. Modeled on Arduino
-// IDE 2's own Serial Monitor (a react-window FixedSizeList solving the
-// identical growing/auto-scrolling device-log problem) and microrl's
-// real ring-buffer history algorithm for the eviction pattern -- see
-// session-state.
+// discrete rows, not one giant reflowed string.
 object TerminalLog {
     // Cross-run scrollback.
-    // see session-state: TerminalLog.kt#TerminalLog
     private const val MAX_BYTES = 8 * 32 * 1024
     private const val MAX_LINES = 5000
 

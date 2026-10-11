@@ -13,12 +13,12 @@ object Engine {
     }
 
     // rootPath: app-private storage dir (Context.filesDir.absolutePath),
-    // mounted as a jailed VfsPosix at "/". heapSizeMb is fixed for this
+    // mounted as VfsPosix at "/". heapSizeMb is fixed for this
     // :engine process's entire lifetime. Changing it needs a real app
-    // restart, not just Reset. See EngineWorker.kt#start. applicationContext:
-    // needed by mediastore_module.cpp's own MediaStore/ContentResolver
-    // access, read once here, same tier as rootPath/heapSizeMb, never
-    // re-passed on nativeReset().
+    // restart, not just Reset: the heap is allocated once, in nativeInit().
+    // applicationContext: needed by mediastore_module.cpp's own
+    // MediaStore/ContentResolver access, read once here, same tier as
+    // rootPath/heapSizeMb, never re-passed on nativeReset().
     external fun nativeInit(stackSizeBytes: Int, heapSizeMb: Int, rootPath: String, applicationContext: Context): Boolean
 
     // sink: optional, invoked synchronously on this same call/thread once

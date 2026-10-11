@@ -2,7 +2,6 @@ package eu.kdvelectronics.upyandroid;
 
 // Streamed output callback for incremental print()/traceback text
 // produced while a script runs in the :engine process.
-// see session-state: IEngineOutputListener.aidl#IEngineOutputListener
 //
 // oneway is required: this call crosses from the :engine process's
 // worker thread back into the main process. A blocking call here would

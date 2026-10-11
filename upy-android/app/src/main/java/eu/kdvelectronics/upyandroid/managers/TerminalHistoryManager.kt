@@ -12,8 +12,7 @@ package eu.kdvelectronics.upyandroid.managers
  * navigate it with up()/down(), same as shell history.
  *
  * Storage is byte-budget-capped with FIFO eviction, not entry-count
- * capped -- see session-state for the microrl/Arduino IDE reference
- * designs this follows.
+ * capped.
  */
 class TerminalHistoryManager {
     companion object {
@@ -21,7 +20,6 @@ class TerminalHistoryManager {
         // or pasted multi-line script) has no inherent size limit, so
         // entry-count capping wouldn't bound worst-case memory the way
         // byte-budget capping does.
-        // see session-state: TerminalHistoryManager.kt#TerminalHistoryManager
         private const val MAX_BYTES = 32 * 1024
     }
 
@@ -56,10 +54,7 @@ class TerminalHistoryManager {
         // Reset-from-exhausted and advance-by-one are mutually exclusive,
         // not sequential: the first down() after up() has walked off the
         // oldest entry (historyIndex == -1) must land back on that same
-        // oldest entry, matching what the last up() call showed. The
-        // original code did both in the same call (reset to 0, then
-        // immediately advance to 1), silently skipping index 0 -- real
-        // bug, found and fixed 2026-09-28, see session-state.
+        // oldest entry, matching what the last up() call showed.
         if (historyIndex == -1) {
             historyIndex = 0
         } else if (historyIndex + 1 < history.size) {

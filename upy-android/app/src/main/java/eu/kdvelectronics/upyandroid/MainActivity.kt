@@ -388,7 +388,6 @@ class MainActivity : ComponentActivity() {
     // exactly once ever. camera_module.cpp's own OSError remains the
     // fallback signal on denial, telling the user to grant access
     // manually via Settings.
-    // see session-state: MainActivity.kt#maybeRequestCameraPermission
     private fun maybeRequestCameraPermission() {
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED

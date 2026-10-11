@@ -11,14 +11,13 @@ import java.util.concurrent.LinkedBlockingQueue
 // a script that is currently blocking the worker thread.
 //
 // rootPath: app-private storage dir (Context.filesDir.absolutePath),
-// mounted as a jailed VfsPosix at "/". Same physical path regardless of
+// mounted as VfsPosix at "/". Same physical path regardless of
 // which process reads it (same app/UID), even though this class runs in
 // the :engine process via EngineService's own Context. heapSizeMb: read
 // once by the caller (EngineService.onCreate(), a plain synchronous
 // SettingsManager read, no AIDL involved) and fixed for this process's
-// entire lifetime. Changing it needs a real app restart. See
-// EngineWorker.kt#start for why this must be read locally like this,
-// not pushed over IEngine.aidl#setSettings. applicationContext: passed
+// entire lifetime. Changing it needs a real app restart: the heap is
+// allocated once, in nativeInit(). applicationContext: passed
 // straight through to Engine.nativeInit() for mediastore_module.cpp's
 // own MediaStore access. EngineService's own Context, not
 // re-read/re-passed on reset().
@@ -36,7 +35,6 @@ class EngineWorker(
     private val taskQueue = LinkedBlockingQueue<Runnable>()
     private lateinit var thread: Thread
 
-    // see session-state: EngineWorker.kt#start
     fun start() {
         thread = Thread(null, {
             Engine.nativeInit(STACK_SIZE_BYTES, heapSizeMb, rootPath, applicationContext)

@@ -18,8 +18,7 @@ import kotlinx.coroutines.flow.asStateFlow
 // registers the output listener (forwarding every chunk into
 // TerminalLog) and the share-request-listener passthrough once,
 // permanently, so live output and correct busy reporting work the same
-// way for every caller instead of only two of four.
-// see session-state: ScriptExecCore.kt#ScriptExecCore
+// way for every caller.
 object ScriptExecCore {
     sealed class RunResult {
         data class Ok(val output: String, val exception: String) : RunResult()
@@ -36,7 +35,6 @@ object ScriptExecCore {
     // needs, making a concurrent run() see "not busy" incorrectly.
     // compareAndSet(0, 1) below only succeeds when nothing at all is
     // in flight, from any caller.
-    // see session-state: ScriptExecCore.kt#ScriptExecCore
     private val inFlight = AtomicInteger(0)
 
     // Read-only view for adb-exec's status method.

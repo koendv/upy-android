@@ -8,7 +8,6 @@ import eu.kdvelectronics.upyandroid.IEngineShareListener;
 // Typed AIDL surface for the MicroPython engine running in the :engine
 // process. Not the raw-REPL byte protocol micro-repl's CommandsManager
 // used for USB serial.
-// see session-state: IEngine.aidl#IEngine
 interface IEngine {
     // Blocks until the code has finished executing. Returns "output":
     // print() text and any uncaught-exception traceback, and "exception":
@@ -20,7 +19,6 @@ interface IEngine {
     void interrupt();
 
     // Explicit, fast, deterministic in-process reset. Not unbind/rebind.
-    // see session-state: IEngine.aidl#reset
     void reset();
 
     // Registers (or, with null, unregisters) a live listener for
@@ -35,7 +33,6 @@ interface IEngine {
     // Registers (or, with null, unregisters) a live listener for
     // android.fileprovider.share() requests raised from a running
     // script. Same reconnect caveat as setOutputListener above.
-    // see session-state: IEngine.aidl#setShareListener
     void setShareListener(IEngineShareListener listener);
 
     // Hands :engine a Surface to draw into (Surface is Parcelable) for
@@ -45,16 +42,11 @@ interface IEngine {
     // script itself is never interrupted by this.
     //
     // oneway: the caller (a main-thread SurfaceHolder.Callback) must
-    // never block on this. display_module.cpp's g_window_mutex is also
-    // held by write() for the full ANativeWindow_lock()/copy/
-    // unlockAndPost() sequence on the worker thread, and
-    // ANativeWindow_lock() can legitimately stall waiting for a free
-    // graphics buffer -- a synchronous call here hit exactly that
-    // window and produced a real ANR ("Input dispatching timed out,
-    // waited 10001ms") on-device. oneway calls to the same interface
-    // stay ordered, so a surface-then-null sequence still applies
-    // correctly; nothing here ever depended on synchronous completion.
-    // see session-state: IEngine.aidl#setDisplaySurface
+    // never block on this. write() holds display_module.cpp's
+    // g_window_mutex while ANativeWindow_lock() may wait for a free
+    // graphics buffer, so a synchronous call could block the main thread
+    // into an ANR. oneway calls to the same interface stay ordered, so a
+    // surface-then-null sequence still applies correctly.
     oneway void setDisplaySurface(in Surface surface);
 
     // Pushes the current, non-secret settings snapshot (see
@@ -64,6 +56,5 @@ interface IEngine {
     // through the worker thread. Called on every successful connect
     // (before the caller sees Connected) and again whenever the user
     // changes a setting while connected.
-    // see session-state: IEngine.aidl#setSettings
     void setSettings(in Bundle settings);
 }
