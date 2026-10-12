@@ -50,6 +50,8 @@ If `MODEL` is not in the list, expect the model to run on the CPU. Tell the user
 
 For `qualcomm`, note `N`: the column `runtime_library_version` without the `v`. For example `v75` gives `N=75`. For a chip not in the list, `N` is a guess, for example from a closely related chip in the list. Say so to the user.
 
+For `qualcomm` with `runtime_library_version` `v66` or lower and `L` 2.3.0, stop: LiteRT 2.3.0 always uses Qualcomm's HTP backend, and HTP starts at `v68`. QAIRT has no HTP files for `v66`.
+
 ### 3. Download the runtime
 
 Set `L` from step 1 and `V` from the table. For example, `L=2.3.0 V=qualcomm`:
@@ -116,6 +118,7 @@ Treat any other source of runtime files as suspect. Models, such as the MobileNe
 | Phone | Firmware | litert.version() | In list | Result |
 |---|---|---|---|---|
 | Redmi 9 | LineageOS, Android 16 | `2.3.0,Mediatek,MT6769T` | no | CPU. Runtime loads, then `Failed to load NeuronAdapter shared library`. |
+| Xiaomi Pad 6 | HyperOS 2.0, Android 14 | `2.3.0,QTI,SM8250` | yes, `v66` | CPU. Plugin loads `libQnnHtp.so`, then `Unsupported SnapdragonModel by HTP backend`. LiteRT 2.3.0 has no option to select the DSP backend. |
 | REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | no | CPU. Runtime and QNN (V73) load, then `open_device_node failed … errno 13, Permission denied` and `createUnsignedPD unsigned PD … not supported by HTP`. |
 
 ## Improving this document
