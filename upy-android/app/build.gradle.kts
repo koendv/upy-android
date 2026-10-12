@@ -173,6 +173,7 @@ val copyDemoScripts = tasks.register<Copy>("copyDemoScripts") {
         rootProject.file("examples/mqtt_tls/mqtt_tls.py"),
         rootProject.file("examples/tflite_selftest/tflite_selftest.py"),
         rootProject.file("examples/litert_selftest/litert_selftest.py"),
+        rootProject.file("examples/litert_bench/litert_bench.py"),
         rootProject.file("examples/add_simple/add_simple.tflite"),
         rootProject.file("examples/quant/single_add_default_a8w8_recipe_quantized.tflite"),
     )
