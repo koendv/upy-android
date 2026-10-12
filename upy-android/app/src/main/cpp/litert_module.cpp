@@ -663,10 +663,13 @@ const char litert_help_text[] =
     "  OSError(EIO): compile, buffer creation, write, run, or read failure (Kotlin/JNI exception text is forwarded)\n"
     "  ValueError: wrong number of run() arguments\n"
     "functions:\n"
-    "  version(): \"LITERT,MAKER,MODEL\", e.g. \"2.3.0,Mediatek,MT6878\"; LiteRT version and chip; they select the NPU runtime\n"
+    "  version(): \"LITERT,MAKER,MODEL\", e.g. \"2.3.0,QTI,SM8650\"; LiteRT version and chip; they select the NPU runtime\n"
     "accelerators:\n"
     "  GPU: built in\n"
-    "  NPU: not built in; with Settings > \"Load accelerators from /litert/\" on and the folder /litert/ present, LiteRT loads the NPU runtime from /litert/ (native code): jni/arm64-v8a/*.so of the AAR litert-npu-runtime-* on Google Maven; Qualcomm also needs QNN from QAIRT; the setting applies at app start\n"
+    "  NPU: not built in; with Settings > \"Load accelerators from /litert/\" on and the folder /litert/ present, LiteRT loads the NPU runtime from /litert/ (native code); the setting applies at app start\n"
+    "  NPU runtime: jni/arm64-v8a/*.so of https://dl.google.com/android/maven2/com/google/ai/edge/litert/litert-npu-runtime-V/L/litert-npu-runtime-V-L.aar, L = LITERT from version(), V = mediatek (MAKER Mediatek), qualcomm (QTI), google-tensor (Google)\n"
+    "  supported chips: litert/vendors/V/supported_soc.csv in github.com/google-ai-edge/LiteRT (V = mediatek, qualcomm); a chip not listed is not supported\n"
+    "  Qualcomm also needs QNN in /litert/, from the user's QAIRT 2.35 or later (paths in the version folder, qairt/<version>/ in the zip): lib/aarch64-android/libQnnHtp.so, libQnnSystem.so, libQnnHtpV<N>Stub.so and lib/hexagon-v<N>/unsigned/libQnnHtpV<N>Skel.so; N = runtime_library_version in the qualcomm supported_soc.csv without the v, e.g. 75 for SM8650\n"
     "  an accelerator that does not load falls back to the CPU without an error; compare run() timing with Accelerator.CPU, e.g. /examples/litert_bench.py\n"
     "see_also: tflite.help()\n"
 ;
@@ -687,7 +690,7 @@ void soc_property(const char *name, char value[PROP_VALUE_MAX]) {
     }
 }
 
-// "LITERT,MAKER,MODEL", e.g. "2.3.0,Mediatek,MT6878": selects the NPU
+// "LITERT,MAKER,MODEL", e.g. "2.3.0,QTI,SM8650": selects the NPU
 // runtime.
 mp_obj_t litert_version() {
     char maker[PROP_VALUE_MAX];
