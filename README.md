@@ -8,28 +8,25 @@
 
 ### What upy-android is
 
-upy-android turns an Android phone into a camera vision module. You program the phone in MicroPython.
+upy-android turns an Android phone into a MicroPython machine vision system.
 
-A phone has advantages over a microcontroller camera board:
+### Documentation
 
-- a better camera
-- a faster CPU
-- a GPU and NPU for neural networks
-- Wi-Fi, a screen and a battery
+The documentation comes in two parts:
+
+- README.MD (this document) for MicroPython machine vision users
+- [DEVELOPER.md](doc/DEVELOPER.md) for app developers
+
+### Requirements:
+
+- Android 9 or later (API 28)
+- 64-bit ARM (`arm64-v8a`)
 
 ### Install
 
 Download the APK from [Releases](https://github.com/koendv/upy-android/releases) and install it.
 
-Requirements: Android 8.1 or later (API 27), 64-bit ARM (`arm64-v8a`).
-
-### Phone settings
-
-These settings depend on the phone brand. The names can be different on your phone.
-
-- **Install the APK.** Allow **Install unknown apps** for your browser or file manager.
-- **USB debugging.** Needed for adb. Open **Settings > About phone** and tap **Build number** 7 times. Then enable **USB debugging** in **Developer options**.
-- The camera only works while upy-android is on the screen.
+If you have [Obtainium](https://obtainium.imranr.dev/) installed, click on [Get it on Obtainium](obtainium://add/https://github.com/koendv/upy-android).
 
 ### One minute on-boarding
 
@@ -44,7 +41,8 @@ These settings depend on the phone brand. The names can be different on your pho
 
 ### Example Script
 
-This script prints the id and center of every [AprilTag](doc/apriltags.pdf) the camera sees. The **Camera** screen shows the image, with a box around each tag:
+A script to print the id and center of every [AprilTag](doc/apriltags.pdf) the camera sees.
+The **Camera** screen shows the image, with a box around each tag:
 
 ```python
 import camera, display
@@ -62,49 +60,64 @@ while True:
 
 More example scripts are in `/examples` on the phone.
 
-### Connecting
-
-The phone sends results over Wi-Fi or USB:
-
-- MQTT (`umqtt`, with TLS). For example, to an MQTT broker or an ESP32.
-- SSH shell on port 2222. Password login.
-- HTTP file server on port 8080, read-only.
-- adb over USB. Run scripts from a PC.
-
-SSH, HTTP, adb:
-
-- enable and set passwords in the Settings screen.
-- default is not enabled
-
 ### Programming
 
-Distinguish between manual coding, and AI-assisted "coding by intent".
+Programming is in [MicroPython](https://docs.micropython.org/en/latest/), a Python derivative for microcontrollers.
+One may program by hand, or AI-assisted _coding by intent_.
 
 #### Programming by hand
 
-- **Built-in editor.** Open the **Files** screen and tap a file. Tap **Edit** to open the editor. The editor has syntax highlighting, undo, redo, run and save. Tap **Run** to run the file. The output is in the **Command** screen.
-- **Other editor apps.** Open the **Files** screen, tap a file and tap **Open with**. Choose an editor app. If the editor app can write back, **Save** writes the file back to upy-android.
-- **Files from other apps.** In another app, tap **Share** and choose upy-android. The file is saved in `/` of the upy-android file store. The **Import** button in the **Files** screen does the same with a file picker.
-- **SSH.** Enable SSH in **Settings**. Then run `ssh -p 2222 user@<phone-ip>` on your PC. You get a Python shell. Type code, then an empty line to run the code.
-- **SFTP.** Enable SSH in **Settings**. Then use `sftp -P 2222 user@<phone-ip>`, `scp -P 2222`, or a program such as FileZilla or WinSCP. SFTP can only access the upy-android file store. This is the same `/` as in MicroPython.
+The app has a built-in editor: _Files_ -> tap a file -> _Edit_. Tap _run icon_ to run the file. Tap _Command_ to see program text output, _Camera_ to see program bitmap output.
 
-#### AI-assisted programming
+In the _Files_ menu:
 
-An AI coding agent on your PC can write and run scripts on the phone. Any agent that can run shell commands works, for example Claude Code. You describe what you want. The agent writes the code, runs it on the phone and checks the result.
+- _Open with_: edit file with editor app
+- _Share_: send file to app 
+- _Import_: file picker for file from other app
+
+From another app:
+
+- tap _Share_ and choose _upy_.
+
+Using ssh Secure Shell:
+
+- In the app: _Settings_ -> _Enable SSH_ and set ssh password. ssh will not work without password.
+
+On the PC:
+
+- `ssh -p 2222 user@<phone-ip>`
+- `sftp -P 2222 user@<phone-ip>`
+
+In ssh, type MicroPython code. End with an empty line to run the code.
+
+#### AI-assisted coding by intent
+
+The app has been designed for ai. Just tell the ai coding agent where to find the app and begin coding. 
+Describe what you want. The agent writes the code, runs it on the phone and checks the result.
 
 Setup:
 
-1. Connect the phone to the PC with a USB cable. Enable USB debugging (see [Phone settings](#phone-settings)).
-2. In upy-android, open **Settings** and enable **adb exec**.
-3. Give the agent this prompt:
+- PC with coding agent that can run shell commands, for example Claude Code.
+- Android phone with upy-android installed
+- usb cable from PC to Android phone
+
+Steps:
+
+- In Android, enable USB debugging: _Settings_ -> _About Phone_ -> tap _Build Number_ 7 times
+- In Android, with USB debugging enabled: _Settings_ -> _System_ -> _Developer Options_ select _Stay awake_ and _USB debugging_
+- Connect PC and Android with usb cable.
+- In upy-android, open **Settings** and enable **adb exec**.
+- On the PC, give the agent this prompt:
 
    > An Android phone is connected over USB. The app content provider runs code over adb. Start with:
    > `adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help`
    > and follow what it says.
 
-The agent reads the help page and the `help()` of each module. The agent learns the API from the phone. A good first question: "Describe the features of this micropython."
+- When a message appears "Allow USB debugging?" select _Allow_, _Always from this computer_.
 
-Agree on the plan before the agent writes code. Use these steps:
+The agent learns the API from the phone. A good first question: "Describe the features of this micropython."
+
+Use this pattern:
 
 1. "Do not generate yet, first discuss."
 2. Describe what you want.
@@ -114,6 +127,8 @@ Agree on the plan before the agent writes code. Use these steps:
 6. "Proceed."
 
 For a real example session, see [SAMPLE_SESSION.md](doc/SAMPLE_SESSION.md).
+
+usb debugging over WiFi or mobile networks is also possible; use with caution.
 
 ### Modules
 
@@ -125,32 +140,50 @@ For a real example session, see [SAMPLE_SESSION.md](doc/SAMPLE_SESSION.md).
 | `gif`, `mjpeg` | Video recording. |
 | `android` | Proximity sensor, accelerometer, gyroscope, location, save to gallery, share. |
 | `tflite` | TensorFlow Lite inference on CPU or NNAPI. |
-| `litert` | LiteRT inference on the CPU, GPU or NPU. |
+| `litert` | LiteRT inference on the CPU, GPU or NPU. The NPU needs a runtime, see [NPU](#npu). |
 | `ulab` | Arrays, similar to NumPy. |
 | `umqtt` | MQTT client, with TLS. |
 
 The modules `camera`, `display`, `android`, `tflite` and `litert` have a `help()` function. For example: `import camera; print(camera.help())`.
 
-### Performance
+### NPU
 
-Phone: REDMI Note 15 5G, Android 16. Grayscale images.
+`litert` runs on the CPU, the GPU or the NPU, as the script chooses with `litert.Options(accelerator=...)`. The CPU and the GPU work out of the box. The NPU needs a runtime for the phone's chip, which the user installs. LiteRT does not support the NPU of all phones only.
 
-| Function | Resolution | Time per frame | Frame rate |
-|---|---|---|---|
-| `find_apriltags()` | 640×480 | 9 ms | 31 fps (camera limit) |
-| `find_line_segments()` | 320×240 | 16 ms | 25 fps (camera limit) |
-| `find_line_segments()` | 640×480 | 82 ms | 12 fps |
+Download the runtime with an AI assistant. Connect the phone over USB with USB debugging on, enable **Settings > Enable adb exec**, and give an AI assistant that can run commands and browse the web this prompt:
 
-For `find_apriltags()`, one AprilTag was in view. The time of `find_line_segments()` depends on the image.
+```
+My Android phone runs the MicroPython app upy. Start with:
+  adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help
+and download the NPU runtime for my phone.
+```
+
+The assistant puts the runtime in a folder `litert` on the PC. For a Qualcomm chip, the assistant asks for Qualcomm's QAIRT SDK, which the user downloads from Qualcomm.
+
+Copy the runtime to the phone:
+
+1. In the app, **Settings > Enable SSH**, and set an SSH password.
+2. On the PC:
+   ```
+   sftp -P 2222 user@<phone-ip>
+   sftp> mkdir /litert
+   sftp> put litert/*.so /litert/
+   ```
+3. In **Settings**, enable **Load accelerators from /litert/** and press **Restart**.
+4. To benchmark LiteRT, transfer the MobileNet models to `/` on the phone. The download links are in the header of `/examples/litert_bench.py`. Use SFTP on the PC (`put mobilenet_v2_1.0_224_INT8.tflite /`), or download the models on the phone and use **Files > Import** in the app, at the top level of **Files**.
+5. Run `/examples/litert_bench.py` in the app, or ask the AI assistant to run `litert_bench.py`. If the NPU is not faster than the CPU, the runtime did not load and LiteRT runs on the CPU.
+
+To download by hand, or for details, see [doc/NPU.md](doc/NPU.md).
 
 ### Status
 
-Working prototype. Programmed with AI assistance, not fully audited. Moderate your expectations. Use with caution.
+Largely works. Programmed with AI assistance, tested with testbench but not fully audited. Moderate your expectations. Use with caution.
 
 ### Development
 
-Building, the adb test setup and other developer notes: [DEVELOPER.md](doc/DEVELOPER.md).
+Building, testbench and developer notes: [DEVELOPER.md](doc/DEVELOPER.md).
 
 ### License
 
-[MIT](LICENSE.md). MicroPython, ulab, and OpenMV-derived files retain their upstream licenses.
+[MIT](LICENSE.md). Upstream files (MicroPython, ulab, and OpenMV) retain their upstream licenses.
+
