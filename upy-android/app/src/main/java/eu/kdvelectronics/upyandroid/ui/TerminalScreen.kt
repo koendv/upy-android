@@ -78,20 +78,23 @@ import my.nanihadesuka.compose.ScrollbarSettings
 
 // Hand-rolled, not LazyColumnScrollbar's own RowScrollbar: that
 // library's gesture handling swallows drags meant for a CHILD's own
-// horizontalScroll. No fade animation, always visible when scrollable.
+// horizontalScroll. No fade animation.
+// Always drawn, full-width thumb when nothing scrolls: the row width
+// follows the visible rows, so a scrollbar that came and went changed
+// the list height, which changed the visible rows, in a loop.
 // Visual thickness (4dp) vs touch target (32dp) deliberately differ --
 // a small hit target is a real usability problem.
 @Composable
-private fun HorizontalScrollbar(state: ScrollState, modifier: Modifier = Modifier) {
-    if (state.maxValue <= 0) return
+private fun HorizontalScrollbar(state: ScrollState, scrollable: Boolean, modifier: Modifier = Modifier) {
     val visualHeight = 4.dp
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(32.dp)
-            .pointerInput(state) {
+            .pointerInput(state, scrollable) {
                 detectDragGestures { change, dragAmount ->
                     change.consume()
+                    if (!scrollable || state.maxValue <= 0) return@detectDragGestures
                     val trackWidth = size.width.toFloat()
                     val contentWidth = trackWidth + state.maxValue
                     val thumbWidth = (trackWidth * (trackWidth / contentWidth))
@@ -106,11 +109,12 @@ private fun HorizontalScrollbar(state: ScrollState, modifier: Modifier = Modifie
             .drawWithContent {
                 drawContent()
                 val trackWidth = size.width
-                val contentWidth = trackWidth + state.maxValue
+                val maxValue = if (scrollable) state.maxValue else 0
+                val contentWidth = trackWidth + maxValue
                 val thumbWidth = (trackWidth * (trackWidth / contentWidth))
                     .coerceAtLeast(24.dp.toPx())
                     .coerceAtMost(trackWidth)
-                val thumbOffsetX = (trackWidth - thumbWidth) * (state.value.toFloat() / state.maxValue)
+                val thumbOffsetX = if (maxValue > 0) (trackWidth - thumbWidth) * (state.value.toFloat() / maxValue) else 0f
                 val visualHeightPx = visualHeight.toPx()
                 drawRoundRect(
                     color = Color.Gray,
@@ -342,9 +346,11 @@ fun TerminalScreen(
                 }
             }
             // maxValue only updates when a row is laid out, so it goes stale after clear().
-            if (log.lines.isNotEmpty()) {
-                HorizontalScrollbar(state = horizontalScrollState, modifier = Modifier.padding(top = 2.dp))
-            }
+            HorizontalScrollbar(
+                state = horizontalScrollState,
+                scrollable = log.lines.isNotEmpty(),
+                modifier = Modifier.padding(top = 2.dp),
+            )
 
             if (status !is ConnectionStatus.Connected) {
                 TextButton(onClick = onReconnect) {
