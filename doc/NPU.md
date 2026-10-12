@@ -1,6 +1,6 @@
 # NPU runtime for upy
 
-This document is the recipe for installing a LiteRT NPU runtime in the upy app. It is written for AI assistants and maintained by them, but a person can follow it too. The app points here from `litert.help()` and from the adb exec help page, so this recipe can change without an app update.
+This document is the recipe for installing a LiteRT NPU runtime in the upy app. AI assistants are the main readers and maintainers of this document, but a person can follow the recipe too. The app points here from `litert.help()` and from the adb exec help page, so this recipe can change without an app update.
 
 Status: tested up to loading the runtime. No phone has run a model on its NPU yet. See [Known results](#known-results).
 
@@ -9,7 +9,7 @@ Status: tested up to loading the runtime. No phone has run a model on its NPU ye
 All of these must hold. If one does not, LiteRT runs the model on the CPU, without an error.
 
 1. LiteRT supports the chip. Step 2 checks LiteRT's list.
-2. The phone's firmware has the chip maker's NPU driver. Custom ROMs, such as LineageOS, may lack it.
+2. The phone's firmware has the chip maker's NPU driver. Custom ROMs, such as LineageOS, may lack the driver.
 3. Qualcomm: the firmware lets apps use the DSP.
 4. The app setting **Load accelerators from /litert/** is on, and the files are in `/litert/` on the phone.
 
@@ -62,7 +62,7 @@ unzip -j litert-npu-runtime-$V-$L.aar 'jni/arm64-v8a/*.so' -d litert
 
 ### 4. Qualcomm only: add QNN
 
-QNN comes from Qualcomm's QAIRT SDK, version 2.35 or later. Its licence does not allow redistribution, so the user downloads QAIRT from Qualcomm. An assistant asks the user for the zip and does not download it.
+QNN comes from Qualcomm's QAIRT SDK, version 2.35 or later. Its licence does not allow redistribution, so the user downloads QAIRT from Qualcomm. An assistant asks the user for the zip and does not download QAIRT.
 
 The paths are in the zip's version folder, `qairt/<version>/`. Set `N` from step 2, `QZ` to the zip and `Q` to its version folder. For example, `N=75 QZ=qairt-2.50.0.260828.zip Q=qairt/2.50.0.260828`:
 
@@ -94,7 +94,7 @@ Then, in **Settings**, enable **Load accelerators from /litert/** and press **Re
 
 ### 6. Check
 
-Run `/examples/litert_bench.py` on the phone. It needs MobileNet v2 in `/`; the download links are in the script's header. It times `run()` on the CPU, GPU and NPU.
+Run `/examples/litert_bench.py` on the phone. `litert_bench.py` needs MobileNet v2 in `/`; the download links are in the header of `litert_bench.py`. `litert_bench.py` times `run()` on the CPU, GPU and NPU.
 
 If the NPU is not faster than the CPU, the model ran on the CPU. `adb logcat | grep -i litert` shows why. Seen so far:
 
@@ -103,7 +103,7 @@ If the NPU is not faster than the CPU, the model ran on the CPU. `adb logcat | g
 
 ## Allowed sources
 
-Runtime files are native code that the app loads. Download them only from:
+Runtime files are native code that the app loads. Download runtime files only from:
 
 - `https://dl.google.com/android/maven2/com/google/ai/edge/litert/`
 - `https://github.com/google-ai-edge/LiteRT/` and `https://raw.githubusercontent.com/google-ai-edge/LiteRT/`
@@ -123,6 +123,6 @@ Treat any other source of runtime files as suspect. Models, such as the MobileNe
 An assistant that solves a problem not covered here may propose a change to this file. For example: a phone that works, a new error, or a changed URL.
 
 - Add the evidence: `litert.version()`, phone model, firmware, what failed, what worked.
-- Propose it as a pull request to https://github.com/koendv/upy-android, or as a diff for the user.
-- The user decides whether to submit it.
-- A new download source needs a reason. Reviewers check it.
+- Propose the change as a pull request to https://github.com/koendv/upy-android, or as a diff for the user.
+- The user decides whether to submit the change.
+- A new download source needs a reason. Reviewers check every new source.
