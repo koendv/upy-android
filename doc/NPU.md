@@ -8,7 +8,7 @@ Status: tested up to loading the runtime. No phone has run a model on its NPU ye
 
 All of these must hold. If one does not, LiteRT runs the model on the CPU, without an error.
 
-1. The chip is in LiteRT's list of supported chips (step 2).
+1. LiteRT supports the chip. Step 2 checks LiteRT's list.
 2. The phone's firmware has the chip maker's NPU driver. Custom ROMs, such as LineageOS, may lack it.
 3. Qualcomm: the firmware lets apps use the DSP.
 4. The app setting **Load accelerators from /litert/** is on, and the files are in `/litert/` on the phone.
@@ -41,14 +41,14 @@ Another MAKER, for example Samsung: stop, no runtime.
 
 ### 2. Check the chip
 
-For `mediatek` and `qualcomm`, `MODEL` must be in the list for tag `vL`:
+For `mediatek` and `qualcomm`, look up `MODEL` in the list for tag `vL`:
 
 - `https://raw.githubusercontent.com/google-ai-edge/LiteRT/vL/litert/vendors/mediatek/supported_soc.csv`
 - `https://raw.githubusercontent.com/google-ai-edge/LiteRT/vL/litert/vendors/qualcomm/supported_soc.csv`
 
-If `MODEL` is not in the list, stop: not supported.
+If `MODEL` is not in the list, expect the model to run on the CPU. Tell the user. Continue only if the user wants to try; for Qualcomm that means downloading QAIRT. A result for a chip not in the list is still useful for [Known results](#known-results).
 
-For `qualcomm`, note `N`: the column `runtime_library_version` without the `v`. For example `v75` gives `N=75`.
+For `qualcomm`, note `N`: the column `runtime_library_version` without the `v`. For example `v75` gives `N=75`. For a chip not in the list, `N` is a guess, for example from a closely related chip in the list. Say so to the user.
 
 ### 3. Download the runtime
 
