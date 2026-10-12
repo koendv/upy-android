@@ -2,13 +2,13 @@
 
 This document is the recipe for installing a LiteRT NPU runtime in the upy app. AI assistants are the main readers and maintainers of this document, but a person can follow the recipe too. The app points here from `litert.help()` and from the adb exec help page, so this recipe can change without an app update.
 
-Status: tested up to loading the runtime. No phone has run a model on its NPU yet. See [Known results](#known-results).
+Status: one phone runs MobileNet v2 on its NPU, see [Known results](#known-results).
 
 ## Requirements
 
 All of these must hold. If one does not, LiteRT runs the model on the CPU, without an error.
 
-1. LiteRT supports the chip. Step 2 checks LiteRT's list.
+1. LiteRT supports the chip. LiteRT's list (step 2) is a guide: a chip in the list can fail, and a chip outside the list can work.
 2. The phone's firmware has the chip maker's NPU driver. Custom ROMs, such as LineageOS, may lack the driver.
 3. Qualcomm: the firmware lets apps use the DSP.
 4. The app setting **Load accelerators from /litert/** is on, and the files are in `/litert/` on the phone.
@@ -46,7 +46,7 @@ For `mediatek` and `qualcomm`, look up `MODEL` in the list for tag `vL`:
 - `https://raw.githubusercontent.com/google-ai-edge/LiteRT/vL/litert/vendors/mediatek/supported_soc.csv`
 - `https://raw.githubusercontent.com/google-ai-edge/LiteRT/vL/litert/vendors/qualcomm/supported_soc.csv`
 
-If `MODEL` is not in the list, expect the model to run on the CPU. Tell the user. Continue only if the user wants to try; for Qualcomm that means downloading QAIRT. A result for a chip not in the list is still useful for [Known results](#known-results).
+If `MODEL` is not in the list, the NPU may still work: the MT6878 is not in the list and works. Tell the user. Continue only if the user wants to try; for Qualcomm that means downloading QAIRT. A result for a chip not in the list is still useful for [Known results](#known-results).
 
 For `qualcomm`, note `N`: the column `runtime_library_version` without the `v`. For example `v75` gives `N=75`. For a chip not in the list, `N` is a guess, for example from a closely related chip in the list. Say so to the user.
 
@@ -98,7 +98,11 @@ Then, in **Settings**, enable **Load accelerators from /litert/** and press **Re
 
 Run `/examples/litert_bench.py` on the phone. `litert_bench.py` needs MobileNet v2 in `/`; the download links are in the header of `litert_bench.py`. `litert_bench.py` times `run()` on the CPU, GPU and NPU.
 
-If the NPU is not faster than the CPU, the model ran on the CPU. `adb logcat | grep -i litert` shows why. Seen so far:
+If the NPU is not faster than the CPU, the model ran on the CPU. `adb logcat | grep -E 'litert|tflite'` shows which. On the NPU:
+
+- `1 compiler plugins were applied successfully`, then `Replacing 1 out of 1 node(s) with delegate (DispatchDelegate)`.
+
+On the CPU:
 
 - `0 compiler plugins were applied successfully`: the runtime did not compile the model.
 - `Replacing 66 out of 66 node(s) with delegate (TfLiteXNNPackDelegate)`: the model runs on the CPU.
@@ -117,6 +121,7 @@ Treat any other source of runtime files as suspect. Models, such as the MobileNe
 
 | Phone | Firmware | litert.version() | In list | Result |
 |---|---|---|---|---|
+| REDMI Note 15 Pro 5G | HyperOS 3.0, Android 16 | `2.3.0,Mediatek,MT6878` | no | NPU. MediaTek runtime only. `1 compiler plugins were applied successfully: MediaTek compiler plugin`, then `DispatchDelegate`. MobileNet v2 int8 6.4 ms (CPU 11.0), float32 11.2 ms (CPU 21.3). Same top class as the CPU. |
 | Redmi 9 | LineageOS, Android 16 | `2.3.0,Mediatek,MT6769T` | no | CPU. Runtime loads, then `Failed to load NeuronAdapter shared library`. |
 | Xiaomi Pad 6 | HyperOS 2.0, Android 14 | `2.3.0,QTI,SM8250` | yes, `v66` | CPU. Plugin loads `libQnnHtp.so`, then `Unsupported SnapdragonModel by HTP backend`. LiteRT 2.3.0 has no option to select the DSP backend. |
 | REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | no | CPU. Runtime and QNN (V73) load, then `open_device_node failed … errno 13, Permission denied` and `createUnsignedPD unsigned PD … not supported by HTP`. |
