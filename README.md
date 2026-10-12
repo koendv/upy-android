@@ -26,8 +26,6 @@ The documentation comes in two parts:
 
 Download the APK from [Releases](https://github.com/koendv/upy-android/releases) and install it.
 
-If you have [Obtainium](https://obtainium.imranr.dev/) installed, click on [Get it on Obtainium](obtainium://add/https://github.com/koendv/upy-android).
-
 ### One minute on-boarding
 
 - Start up the application.

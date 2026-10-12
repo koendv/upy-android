@@ -239,7 +239,7 @@ Local Docker builds need two secrets. The password is in the environment variabl
 --secret id=signing_keystore,src=$HOME/.upy-android-release.jks --secret id=signing_password,env=UPY_STORE_PASSWORD
 ```
 
-If no ket us set, each Docker or GitHub build uses a different, random key.
+If no key is set, each Docker or GitHub build uses a different, random key.
 
 ## Distributing upy-android
 
