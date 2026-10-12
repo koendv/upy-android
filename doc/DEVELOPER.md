@@ -2,9 +2,10 @@
 
 - Uses MicroPython `ports/embed`, not `ports/unix`.
 - Two processes: user interface and MicroPython interpreter.
-- interface between user interface and interpreter is AIDL.
-- interface between interpreter and Android is JNI.
+- interface between user interface and MicroPython interpreter is [AIDL](https://developer.android.com/develop/background-work/services/aidl).
+- interface between MicroPython interpreter and Android is [JNI](https://developer.android.com/ndk/guides/jni-tips).
 - The MicroPython file system is in the app's private storage.
+- upstream repositories are pinned to version or commit hash.
 - `arm64-v8a` only. An arm32 build is possible but out of scope: the release test matrix would double.
 
 ## Build
@@ -14,8 +15,8 @@
 Requirements:
 
 - A full JDK 21, with `javac`.
-- The Android SDK with the NDK, CMake and platform versions that the build uses. See [`tools/docker/Dockerfile`](../tools/docker/Dockerfile).
-- `upy-android/local.properties` with the SDK path, for example `sdk.dir=/home/user/Android/Sdk`.
+- See [`tools/docker/Dockerfile`](../tools/docker/Dockerfile) for Android SDK, NDK, CMake and platform versions. 
+- Put SDK path in `upy-android/local.properties`, for example `sdk.dir=/home/user/Android/Sdk`.
 
 ```bash
 export JAVA_HOME=/path/to/jdk-21
@@ -24,12 +25,7 @@ cd upy-android
 # -> app/build/outputs/apk/debug/app-debug.apk
 ```
 
-The first build downloads:
-
-- MicroPython, OpenMV, ulab and AprilTag from GitHub (`native-bringup/fetch-upstream.sh`).
-- Libraries from Maven Central and Google Maven.
-
-On a slow or filtered network, set a proxy or a mirror for Git and Gradle.
+On a slow or filtered network, set a proxy or a mirror for Git and Gradle. See `native-bringup/fetch-upstream.sh`.
 
 ### Docker build
 
@@ -55,7 +51,7 @@ Gradle dependency locking is on (`upy-android/app/gradle.lockfile`). After addin
 
 ## Install on the phone
 
-Enable **USB debugging** on the phone (see [Phone settings](../README.md#phone-settings) in the README). Then:
+Enable **Stay awake**, **USB debugging** on the phone.
 
 ```bash
 cd upy-android/app/build/outputs/apk/debug/
@@ -76,7 +72,9 @@ adb exec runs MicroPython scripts on the phone from a PC. adb exec is a content 
 
 adb exec is remote code execution by design. Anyone with ADB access to the device can run arbitrary MicroPython. Leave adb exec off unless developing.
 
-To enable adb exec: in upy-android, open **Settings** and enable **adb exec**. Then start with:
+To enable adb exec:
+- **USB debugging.** Needed for adb. Open **Settings > About phone** and tap **Build number** 7 times. Then enable **USB debugging** in **Developer options**.
+ in upy-android, open **Settings** and enable **adb exec**. Then start with:
 
 ```bash
 adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help
@@ -100,38 +98,68 @@ To stop a running script, for example one with `while True`, run in a second ter
 adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method interrupt
 ```
 
-Output is limited to 128 KB, a script to about 96 KB. The help page explains all methods (`status`, `run`, `reset`, `interrupt`) and limits. To use adb exec with an AI agent, see [AI-assisted programming](../README.md#ai-assisted-programming) in the README.
+### AI-assisted programming
 
-The modules `camera`, `display`, `android` (and its submodules), `tflite` and `litert` have a `help()` function, for example `import camera; print(camera.help())`. With these, an agent can learn the API from the phone. When you add, remove or change a method, update the module's `help()` text in the same commit.
+upy is designed for ai-assisted programming.
 
-`/examples` on the phone has example scripts, for example `find_apriltags.py` and `face_detection.py`. They cover the OpenMV modules (`image`, `gif`, `mjpeg`, ...) that have no `help()`.
+- `adb exec` is gated on in _Settings_
+- the `help` method explains the agent 
+    - how to execute MicroPython (`run` method)
+    - how to list all modules (`help("modules")`)
+    - how to obtain help for a module (e.g. `litert.help()`)
+    - scripts in `/examples` provide usage patterns for modules that have no `help()`.
 
-### Test scripts
+Together, this allows an agent to learn the API from the phone.
+When adding, removing or changing a method, update the module's `help()` text in the same commit.
 
-The test scripts run over adb. Local test runs use a phone connected over USB; GitHub workflows use an Android emulator. The device needs the app installed and **adb exec** enabled. With more than one device connected, set `ANDROID_SERIAL`.
+### Testbench
 
-- `tools/run-tests.py` runs this project's own tests and compares the output with the `.exp` file next to each test. The markers are in [upy-android/tests/README.md](../upy-android/tests/README.md). `--only <name>` runs one test.
-- `tools/run-micropython-tests.sh` runs MicroPython's own test suite on the device, for example `tools/run-micropython-tests.sh -d basics`.
+The `upy` app has arm64 native libraries. The arm64 libraries make running a testbench on a x86-64 impractical. Running a testbench in an android emulator on arm64 linux (raspberry) is possible, but running the testbench on a phone is easier.
 
-### SSH, SFTP and HTTP
+The test scripts run over `adb exec` on a phone connected over USB. With more than one device connected, set `ANDROID_SERIAL`.
 
-Enable these in **Settings**. Login is with a password.
+`tools/run-tests.py` sends each test script to the app and compares the output with the `.exp` file next to the script. Test scripts are `upy-android/tests/*.py` and `upy-android/examples/*_selftest/*.py`.
 
-```bash
-ssh -p 2222 user@<phone-ip>      # MicroPython shell
-sftp -P 2222 user@<phone-ip>     # only files in the app's file store
+```
+tools/run-tests.py                 # required and known-failure tests
+tools/run-tests.py --manual        # also manual tests
+tools/run-tests.py --micropython   # also MicroPython's basics tests, about 15 minutes
+tools/run-tests.py --only litert   # one test
+tools/run-tests.py --list          # tests and their tier
 ```
 
-The HTTP file server is on port 8080, read-only.
+Exit code: 0 when all required tests pass, 1 when a required test fails, 2 for a marker error.
 
-- `/media` lists the images and videos that scripts saved to the gallery. `/media/<token>` downloads one.
-- `/files/<path>` downloads a file from the app's file store. Enable **private files** in **Settings** first.
+#### Markers
 
-Login uses Digest authentication, so the password does not cross the network. Any user name works.
+Markers are comment lines at the top of a test script. The first line that is not a comment, or a blank line, ends the markers.
 
-```bash
-curl --digest -u user:<password> http://<phone-ip>:8080/media
+```python
+# test: required
+# fixture: ../add_simple/add_simple.tflite /examples/add_simple.tflite
 ```
+
+- `# test: required`: must pass. A failure fails the run.
+- `# test: known-failure <reason>`: a known bug. The test runs and a failure is reported, but does not fail the run. If the test passes, the report says "unexpectedly passed": the bug may be fixed, and the test can become required.
+- `# test: manual <reason>`: not run by default. Run with `--manual`.
+- `# fixture: <local> <device>`: copies a file to the phone before the test. `<local>` is relative to the folder of the test script, `<device>` is an absolute path on the phone.
+- `# runs: host`: the script runs on the PC instead of the phone, and talks to the phone through adb exec. The test passes when the script exits with code 0. A host check has no `.exp` file.
+- `# needs: --micropython`: not run by default. Run with `--micropython`. The time limit is 60 minutes instead of 5.
+
+Each test script needs one `# test:` line.
+
+A test is named after what it tests.
+
+#### Expected output
+
+The `.exp` file holds the expected output. For a known failure, the `.exp` file holds the correct output, not what the script prints today.
+
+A missing `.exp` file is an error. `--record --only <name>` writes the current output as the `.exp` file; read the file before trusting it.
+
+#### MicroPython's own tests
+
+- `tools/run-tests.py --micropython` also runs MicroPython's own `basics` tests (`upy-android/tests/micropython_basics.py`). Tests that fail or cannot run on the phone are in `upy-android/tests/micropython_known_failures.txt`, each with a reason.
+- `tools/run-micropython-tests.sh` runs any part of MicroPython's test suite, without the list of known failures, for example `tools/run-micropython-tests.sh -d extmod`.
 
 ## Upstream code and patches
 
@@ -141,9 +169,7 @@ curl --digest -u user:<password> http://<phone-ip>:8080/media
 
 ## Networking
 
-For a more robust and simpler implementation, network protocols are not written in Python on top of sockets.
-Sockets are in Android, not MicroPython.
-A known good Java, Kotlin, C or C++ library is wrapped as a MicroPython module.
+For networking, a known good Java, Kotlin, C or C++ library is wrapped as a MicroPython module.
 
 Three layers, for example `umqtt`:
 
@@ -164,10 +190,15 @@ See the `help()` of each module for the exact API.
 
 Notes:
 
-- LiteRT is part of the APK. It is not the Google Play variant.
+The APK contains:
+
+- LiteRT .so from github (not from Google Play).
+- The GPU accelerator `libLiteRtClGlAccelerator.so` from the `litert-gpu` AAR
+- NPU runtimes are not in the APK. Not including NPU runtimes means no APK updates when a new processor is released, and no vendor licenses in the APK.
+- If **Load accelerators from /litert/** is on at `:engine` start and the folder `litert` is present, NPU runtimes are loaded from `files/litert`.
 - Both modules take and return plain `array.array`, not `ulab.numpy` arrays.
-- Neither module handles quantization (scale, zero point). There is no automatic dequantization.
-- The shape is a separate query, `input_shape(i)` and `output_shape(i)`. `run()` does not return shape.
+- There is no automatic dequantization.
+- Shape is a separate query, `input_shape(i)` and `output_shape(i)`. `run()` does not return shape.
 
 ## Version and release
 
@@ -184,15 +215,34 @@ To publish a release on GitHub: **Actions > upy-android > Run workflow**, tick *
 If different builds of an app are signed with the same key, upgrading the app keeps the private files.
 If different builds of an app are signed with different keys, the app must be uninstalled before installing the new build, losing all private files.
 
-Debug and release APKs are signed with one key, `~/.android/debug.keystore` on the development PC.
-Keep a backup of this key offline.
-
-GitHub builds read the key from the repository secret `SIGNING_KEYSTORE`:
+Debug and release APKs are signed with the release key, `~/.upy-android-release.jks` on the development PC.
+The password of the key is in `~/.gradle/gradle.properties`:
 
 ```
-base64 -w0 ~/.android/debug.keystore | gh secret set SIGNING_KEYSTORE --repo koendv/upy-android
+upyStoreFile=~/.upy-android-release.jks
+upyKeyAlias=upy-android
+upyStorePassword=<password>
 ```
 
-Local Docker builds need `--secret id=signing_keystore,src=$HOME/.android/debug.keystore`.
+Keep a backup of both files offline. Without the key, the app cannot be updated or registered with Google.
 
-Without the secret, each Docker or GitHub build uses a different random key.
+GitHub builds read the key and the password from two repository secrets:
+
+```
+base64 -w0 ~/.upy-android-release.jks | gh secret set SIGNING_KEYSTORE --repo koendv/upy-android
+gh secret set SIGNING_KEYSTORE_PASSWORD --repo koendv/upy-android
+```
+
+Local Docker builds need two secrets. The password is in the environment variable `UPY_STORE_PASSWORD`:
+
+```
+--secret id=signing_keystore,src=$HOME/.upy-android-release.jks --secret id=signing_password,env=UPY_STORE_PASSWORD
+```
+
+If no ket us set, each Docker or GitHub build uses a different, random key.
+
+## Distributing upy-android
+
+upy-android is MIT-licensed. Distribution is unlimited.
+
+Feel free to upload this app to an app store. No permission needed.
