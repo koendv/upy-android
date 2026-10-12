@@ -148,7 +148,7 @@ The modules `camera`, `display`, `android`, `tflite` and `litert` have a `help()
 
 ### NPU
 
-`litert` runs on the CPU, the GPU or the NPU, as the script chooses with `litert.Options(accelerator=...)`. The CPU and the GPU work out of the box. The NPU needs a runtime for the phone's chip, which the user installs. LiteRT does not support the NPU of all phones only.
+`litert` runs on the CPU, the GPU or the NPU, as the script chooses with `litert.Options(accelerator=...)`. The CPU and the GPU work out of the box. The NPU needs a runtime for the phone's chip, which the user installs. LiteRT supports the NPU of some phones, not all.
 
 Download the runtime with an AI assistant. Connect the phone over USB with USB debugging on, enable **Settings > Enable adb exec**, and give an AI assistant that can run commands and browse the web this prompt:
 
@@ -170,11 +170,10 @@ Copy the runtime to the phone:
    sftp> put litert/*.so /litert/
    ```
 3. In **Settings**, enable **Load accelerators from /litert/** and press **Restart**.
-4. To benchmark LiteRT, transfer the MobileNet models to `/` on the phone. The download links are in the header of `/examples/litert_bench.py`. Use SFTP on the PC (`put mobilenet_v2_1.0_224_INT8.tflite /`), or download the models on the phone and use **Files > Import** in the app, at the top level of **Files**.
+4. Transfer the MobileNet models to `/` on the phone. The download links are in the header of `/examples/litert_bench.py`. Use SFTP on the PC (`put mobilenet_v2_1.0_224_INT8.tflite /`), or download the models on the phone and use **Files > Import** in the app, at the top level of **Files**.
 5. Run `/examples/litert_bench.py` in the app, or ask the AI assistant to run `litert_bench.py`. If the NPU is not faster than the CPU, the runtime did not load and LiteRT runs on the CPU.
 
 To download by hand, or for details, see [doc/NPU.md](doc/NPU.md).
-
 ### Status
 
 Largely works. Programmed with AI assistance, tested with testbench but not fully audited. Moderate your expectations. Use with caution.
