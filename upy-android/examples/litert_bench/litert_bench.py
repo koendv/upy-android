@@ -8,7 +8,10 @@
 # Times MobileNet v2 run() on the CPU, GPU and NPU. An accelerator that
 # does not load falls back to the CPU without an error: then its time is
 # about the CPU time. An NPU usually needs the int8 model. A GPU can be
-# slower than the CPU on the int8 model. Times vary from run to run.
+# slower than the CPU on the int8 model. The CPU is timed twice, before
+# and after the GPU and NPU, because CPU speed varies on a phone (for
+# example 57 and 112 ms for the same model). The NPU is compared with the
+# faster of the two CPU runs.
 
 import array
 import os
@@ -24,6 +27,7 @@ ACCELERATORS = (
     ("CPU", litert.Accelerator.CPU),
     ("GPU", litert.Accelerator.GPU),
     ("NPU", litert.Accelerator.NPU),
+    ("CPU again", litert.Accelerator.CPU),
 )
 RUNS = 20
 
@@ -59,6 +63,7 @@ for label, path, typecode in MODELS:
             print("%s %s: %.1f ms" % (label, name, times[name]))
         except OSError as e:
             print("%s %s: failed, %s" % (label, name, e))
-    if "NPU" in times and "CPU" in times and times["NPU"] > 0.8 * times["CPU"]:
-        print("%s NPU: not faster than the CPU, probably runs on the CPU" % label)
+    cpu = [times[n] for n in ("CPU", "CPU again") if n in times]
+    if "NPU" in times and cpu and times["NPU"] > 0.8 * min(cpu):
+        print("%s NPU: not faster than the faster CPU run, probably runs on the CPU" % label)
 env.close()
