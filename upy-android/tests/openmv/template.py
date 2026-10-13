@@ -1,0 +1,15 @@
+# Adapted from OpenMV scripts/unittest/tests/template.py
+# (MIT license, Copyright (c) 2013-2023 OpenMV LLC).
+# Changed: copy_to_fb removed, this port has no frame buffer.
+
+def unittest(data_path, temp_path):
+    import image
+
+    try:
+        from image import SEARCH_EX, SEARCH_DS
+    except Exception as e:
+        raise Exception("function unavailable")
+    img = image.Image(data_path + "/graffiti.pgm")
+    temp = image.Image(data_path + "/template.pgm")
+    r = img.find_template(temp, 0.70, step=4, search=SEARCH_DS)
+    return r == (150, 128, 40, 40)

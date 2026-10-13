@@ -6,6 +6,7 @@
 #   tools/run-tests.py                 # required and known-failure tests
 #   tools/run-tests.py --manual        # also manual tests
 #   tools/run-tests.py --micropython   # also MicroPython's own test suite
+#   tools/run-tests.py --openmv        # also OpenMV's own unit tests
 #   tools/run-tests.py --only litert   # one test, by name
 #   tools/run-tests.py --list          # list tests with their tier
 #   tools/run-tests.py --record --only litert   # write litert's .exp
@@ -26,9 +27,9 @@ TEST_GLOBS = [
 ]
 TIERS = ("required", "known-failure", "manual")
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
-NEEDS = ("--micropython",)
+NEEDS = ("--micropython", "--openmv")
 HOST_TIMEOUT = 300  # seconds
-LONG_HOST_TIMEOUT = 3600  # seconds, for "needs: --micropython"; basics takes about 30 minutes
+LONG_HOST_TIMEOUT = 3600  # seconds, for "needs: --micropython" and "--openmv"; basics takes about 30 minutes
 
 
 class Test:
@@ -41,7 +42,7 @@ class Test:
         self.reason = ""
         self.fixtures = []  # (local path, device path)
         self.host = False  # "# runs: host": runs on the PC, passes on exit code 0
-        self.needs = None  # "# needs: --micropython": runs only with that flag, or with --only
+        self.needs = None  # "# needs: --micropython" or "--openmv": runs only with that flag, or with --only
         self.problems = []
         self._read_markers()
 
@@ -170,6 +171,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--manual", action="store_true", help="also run manual tests")
     parser.add_argument("--micropython", action="store_true", help="also run MicroPython's own test suite")
+    parser.add_argument("--openmv", action="store_true", help="also run OpenMV's own unit tests")
     parser.add_argument("--only", metavar="NAME", help="run one test, by name")
     parser.add_argument("--list", action="store_true", help="list tests with their tier")
     parser.add_argument("--record", action="store_true", help="write the current output as .exp")
@@ -201,7 +203,7 @@ def main():
             sys.stderr.write("unknown test %r -- choices: %s\n" % (args.only, ", ".join(t.name for t in tests)))
             sys.exit(2)
     else:
-        given = {"--micropython": args.micropython}
+        given = {"--micropython": args.micropython, "--openmv": args.openmv}
         selected = [t for t in tests if (t.tier != "manual" or args.manual) and (not t.needs or given[t.needs])]
 
     results = []
