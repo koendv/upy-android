@@ -184,19 +184,24 @@ Protocols that have to be persistent across interpreter resets and crashes, or t
 Two independent native modules:
 
 - `tflite`: the classic TensorFlow Lite C API.
-- `litert`: standalone LiteRT. It can use the CPU, GPU or NPU with `litert.Accelerator.{CPU,GPU,NPU}`.
+- `litert`: standalone LiteRT. `litert` can use the CPU, GPU or NPU.
+
+`litert.Options(accelerator=litert.Accelerator.CPU)` (or `GPU`, `NPU`) selects the accelerator.
 
 See the `help()` of each module for the exact API.
 
 Notes:
 
-The APK contains:
+The APK contains LiteRT:
 
 - LiteRT .so from github (not from Google Play).
-- The GPU accelerator `libLiteRtClGlAccelerator.so` from the `litert-gpu` AAR
-- NPU runtimes are not in the APK. Not including NPU runtimes means no APK updates when a new processor is released, and no vendor licenses in the APK.
+- The GPU accelerator `libLiteRtClGlAccelerator.so` is from the `litert-gpu` AAR.
+- NPU runtimes with a licence that allows redistribution are in the APK: MediaTek and Google Tensor, from the `litert-npu-runtime-mediatek` and `litert-npu-runtime-google-tensor` AARs (Apache 2.0). The AARs have the same version as LiteRT.
+- The Qualcomm NPU runtime is not in the APK. The required QNN libraries come from Qualcomm's SDK, with a licence that does not allow redistribution.
+- Samsung: no ready-made runtime has been found.
+- If **Load accelerators from /litert/** is off at `:engine` start, NPU runtimes are loaded from `nativeLibraryDir` in the APK. `jniLibs.useLegacyPackaging = true` extracts the native libraries at install, so the plugins are real files in `nativeLibraryDir`.
 - If **Load accelerators from /litert/** is on at `:engine` start and the folder `litert` is present, NPU runtimes are loaded from `files/litert`.
-- Both modules take and return plain `array.array`, not `ulab.numpy` arrays.
+- `tflite` and `litert` modules take and return plain `array.array`, not `ulab.numpy` arrays.
 - There is no automatic dequantization.
 - Shape is a separate query, `input_shape(i)` and `output_shape(i)`. `run()` does not return shape.
 

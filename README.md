@@ -138,7 +138,7 @@ usb debugging over WiFi or mobile networks is also possible; use with caution.
 | `gif`, `mjpeg` | Video recording. |
 | `android` | Proximity sensor, accelerometer, gyroscope, location, save to gallery, share. |
 | `tflite` | TensorFlow Lite inference on CPU or NNAPI. |
-| `litert` | LiteRT inference on the CPU, GPU or NPU. The NPU needs a runtime, see [NPU](#npu). |
+| `litert` | LiteRT inference on the CPU, GPU or NPU, see [NPU](#npu). |
 | `ulab` | Arrays, similar to NumPy. |
 | `umqtt` | MQTT client, with TLS. |
 
@@ -146,35 +146,18 @@ The modules `camera`, `display`, `android`, `tflite` and `litert` have a `help()
 
 ### NPU
 
-`litert` runs on the CPU, the GPU or the NPU, as the script chooses with `litert.Options(accelerator=...)`. The CPU and the GPU work out of the box. The NPU needs a runtime for the phone's chip, which the user installs. LiteRT supports the NPU of some phones, not all.
+`litert` does TensorFlow Lite inference on the CPU, the GPU or the NPU. The CPU and the GPU work out of the box, and are sufficient for most work. On some processors, for the highest performance, `litert` can run on the NPU.
 
-Download the runtime with an AI assistant. Connect the phone over USB with USB debugging on, enable **Settings > Enable adb exec**, and give an AI assistant that can run commands and browse the web this prompt:
+The NPU needs a runtime library, which depends on the phone's processor. Runtimes with a licence that allows redistribution are included in the APK: MediaTek and Google Tensor. A runtime does not guarantee that the NPU works on every phone with such a processor. The Qualcomm runtime has a restrictive licence, so you download the runtime yourself. For Samsung, no ready-made runtime has been found.
 
-```
-My Android phone runs the MicroPython app upy. Start with:
-  adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help
-and download the NPU runtime for my phone.
-```
+- How to [install an NPU runtime](doc/LITERT.md)
+- [Known results](doc/NPU.md#known-results)
 
-The assistant puts the runtime in a folder `litert` on the PC. For a Qualcomm chip, the assistant asks for Qualcomm's QAIRT SDK, which the user downloads from Qualcomm.
-
-Copy the runtime to the phone:
-
-1. In the app, **Settings > Enable SSH**, and set an SSH password.
-2. On the PC:
-   ```
-   sftp -P 2222 user@<phone-ip>
-   sftp> mkdir /litert
-   sftp> put litert/*.so /litert/
-   ```
-3. In **Settings**, enable **Load accelerators from /litert/** and press **Restart**.
-4. Transfer the MobileNet models to `/` on the phone. The download links are in the header of `/examples/litert_bench.py`. Use SFTP on the PC (`put mobilenet_v2_1.0_224_INT8.tflite /`), or download the models on the phone and use **Files > Import** in the app, at the top level of **Files**.
-5. Run `/examples/litert_bench.py` in the app, or ask the AI assistant to run `litert_bench.py`. If the NPU is not faster than the CPU, the runtime did not load and LiteRT runs on the CPU.
-
-To download by hand, or for details, see [doc/NPU.md](doc/NPU.md).
 ### Status
 
-Largely works. Programmed with AI assistance, tested with testbench but not fully audited. Moderate your expectations. Use with caution.
+The code was written with AI assistance and has had no independent audit. 
+
+The app is tested on four phones (Redmi 9, Redmi Note 15, Redmi Note 15 Pro 5G, Xiaomi Pad 6). The test run covers the modules and MicroPython's own test suite. One test is a known failure (`find_keypoints`, cause not yet found). The NPU works on one of the four phones, see [Known results](doc/NPU.md#known-results).
 
 ### Development
 
