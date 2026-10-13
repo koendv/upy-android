@@ -60,7 +60,7 @@ If `MODEL` is not in the list, the NPU may still work: the MT6878 is not in the 
 
 For `qualcomm`, note `N`: the column `runtime_library_version` without the `v`. For example `v75` gives `N=75`. For a chip not in the list, `N` is a guess, for example from a closely related chip in the list. Say so to the user.
 
-For `qualcomm` with `runtime_library_version` `v66` or lower and `L` 2.3.0, stop: LiteRT 2.3.0 always uses Qualcomm's HTP backend, and HTP starts at `v68`. QAIRT has no HTP files for `v66`.
+For `qualcomm` with `runtime_library_version` `v66` or lower and `L` 2.3.0, stop: the Kotlin API of LiteRT 2.3.0, which the app uses, always uses Qualcomm's HTP backend, and HTP starts at `v68`. QAIRT has no HTP files for `v66`. The C and C++ APIs have a `backend` option with the value `dsp`. A `v66` chip would then need the QAIRT files `libQnnDsp.so`, `libQnnDspV66Stub.so` and `libQnnDspV66Skel.so`. The app does not use these APIs, and this is not tested.
 
 ### 3. Download the runtime
 
@@ -133,7 +133,7 @@ Treat any other source of runtime files as suspect. Models, such as the MobileNe
 |---|---|---|---|---|
 | REDMI Note 15 Pro 5G | HyperOS 3.0, Android 16 | `2.3.0,Mediatek,MT6878` | no | NPU. MediaTek runtime only. `1 compiler plugins were applied successfully: MediaTek compiler plugin`, then `DispatchDelegate`. MobileNet v2 int8 6.4 ms (CPU 11.0), float32 11.2 ms (CPU 21.3). Same top class as the CPU. |
 | Redmi 9 | LineageOS, Android 16 | `2.3.0,Mediatek,MT6769T` | no | CPU. Runtime loads, then `Failed to load NeuronAdapter shared library`. |
-| Xiaomi Pad 6 | HyperOS 2.0, Android 14 | `2.3.0,QTI,SM8250` | yes, `v66` | CPU. Plugin loads `libQnnHtp.so`, then `Unsupported SnapdragonModel by HTP backend`. LiteRT 2.3.0 has no option to select the DSP backend. |
+| Xiaomi Pad 6 | HyperOS 2.0, Android 14 | `2.3.0,QTI,SM8250` | yes, `v66` | CPU. Plugin loads `libQnnHtp.so`, then `Unsupported SnapdragonModel by HTP backend`. The Kotlin API of LiteRT 2.3.0 has no option to select the DSP backend. |
 | REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | no | CPU. Runtime and QNN (V73) load, then `open_device_node failed … errno 13, Permission denied` and `createUnsignedPD unsigned PD … not supported by HTP`. |
 
 ## Improving this document
