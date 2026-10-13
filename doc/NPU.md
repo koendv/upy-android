@@ -76,7 +76,15 @@ unzip -j litert-npu-runtime-$V-$L.aar 'jni/arm64-v8a/*.so' -d litert
 
 QNN comes from Qualcomm's QAIRT SDK, version 2.35 or later. Its licence does not allow redistribution, so the user downloads QAIRT from Qualcomm. An assistant asks the user for the zip and does not download QAIRT.
 
-The paths are in the zip's version folder, `qairt/<version>/`. Set `N` from step 2, `QZ` to the zip and `Q` to its version folder. For example, `N=75 QZ=qairt-2.50.0.260828.zip Q=qairt/2.50.0.260828`:
+LiteRT pins the QAIRT version: `QAIRT_URL` in `ci/tools/python/vendor_sdk/qualcomm/setup.py` at tag `vL` of the LiteRT repository. For LiteRT 2.3.0, the pinned version is 2.50.0.260828. The download needs no login, and a plain `wget` works (2.6 GB):
+
+```sh
+wget https://softwarecenter.qualcomm.com/api/download/software/sdks/Qualcomm_AI_Runtime_Community/All/2.50.0.260828/v2.50.0.260828.zip
+```
+
+For another version, replace both occurrences of the version in the URL. The URL of LiteRT 2.2.0 had the same pattern.
+
+The paths are in the zip's version folder, `qairt/<version>/`. Set `N` from step 2, `QZ` to the zip and `Q` to its version folder. For example, `N=75 QZ=v2.50.0.260828.zip Q=qairt/2.50.0.260828`:
 
 ```sh
 N=<N> QZ=<QAIRT zip> Q=qairt/<version>
@@ -103,6 +111,8 @@ sftp> put litert/*.so /litert/
 ```
 
 Then, in **Settings**, enable **Load accelerators from /litert/** and press **Restart**. With the setting on, the app uses the runtime in `/litert/` instead of the built-in runtimes.
+
+After any later change to the files in `/litert/`, press **Restart** again. LiteRT keeps state from a failed attempt, and once a second attempt in the same process crashed the engine (SIGSEGV in the Qualcomm plugin).
 
 ### 6. Check
 
