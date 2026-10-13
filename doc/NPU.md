@@ -141,7 +141,7 @@ Treat any other source of runtime files as suspect. Models, such as the MobileNe
 
 | Phone | Firmware | litert.version() | In list | Result |
 |---|---|---|---|---|
-| REDMI Note 15 Pro 5G | HyperOS 3.0, Android 16 | `2.3.0,Mediatek,MT6878` | no | NPU. MediaTek runtime only. `1 compiler plugins were applied successfully: MediaTek compiler plugin`, then `DispatchDelegate`. MobileNet v2 int8 6.4 ms (CPU 11.0), float32 11.2 ms (CPU 21.3). Same top class as the CPU. |
+| REDMI Note 15 Pro 5G | HyperOS 3.0, Android 16 | `2.3.0,Mediatek,MT6878` | no | NPU. MediaTek runtime only. `1 compiler plugins were applied successfully: MediaTek compiler plugin`, then `DispatchDelegate`. MobileNet v2 int8 6.4 ms (CPU 11.0), float32 11.2 ms (CPU 21.3). Same top class as the CPU. With the built-in runtime of app 0.9 (release build) and no files in `/litert/`: the same log lines, MobileNet v2 int8 6.9 ms (CPU 10.9, GPU 17.0). |
 | Redmi 9 | LineageOS, Android 16 | `2.3.0,Mediatek,MT6769T` | no | CPU. Runtime loads, then `Failed to load NeuronAdapter shared library`. |
 | Xiaomi Pad 6 | HyperOS 2.0, Android 14 | `2.3.0,QTI,SM8250` | yes, `v66` | CPU. Plugin loads `libQnnHtp.so`, then `Unsupported SnapdragonModel by HTP backend`. The Kotlin API of LiteRT 2.3.0 has no option to select the DSP backend. |
 | REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | no | CPU. Runtime and QNN (V73) load, then `open_device_node failed … errno 13, Permission denied` and `createUnsignedPD unsigned PD … not supported by HTP`. |
