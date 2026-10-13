@@ -649,7 +649,7 @@ const char litert_help_text[] =
     "module: litert (standalone LiteRT, not the Play-Store-delivered variant)\n"
     "classes:\n"
     "  litert.Environment(): required once per Environment() instance passed to CompiledModel()\n"
-    "  litert.Options(accelerator=litert.Accelerator.CPU): accelerator is litert.Accelerator.{NONE,CPU,GPU,NPU}\n"
+    "  litert.Options(accelerator=litert.Accelerator.CPU): accelerator is litert.Accelerator.{CPU,GPU,NPU}; NONE exists, but CompiledModel() with it raises OSError(EINVAL)\n"
     "  litert.CompiledModel(environment, path, options=None): loads and compiles a .tflite model; path is a VFS path\n"
     "methods (CompiledModel):\n"
     "  run(*inputs): one positional array.array per input tensor, in the model's own order\n"
