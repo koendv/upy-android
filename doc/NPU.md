@@ -2,7 +2,13 @@
 
 This document is the recipe for installing a LiteRT NPU runtime in the upy app. AI assistants are the main readers and maintainers of this document, but a person can follow the recipe too. The app points here from `litert.help()` and from the adb exec help page, so this recipe can change without an app update.
 
-Status: one phone runs MobileNet v2 on its NPU, see [Known results](#known-results).
+Status: one phone runs MobileNet v2 on its NPU; Google Tensor is untested. See [Known results](#known-results).
+
+## Built-in runtimes
+
+The runtimes for MediaTek (`MAKER` `Mediatek`) and Google Tensor (`MAKER` `Google`) are built into the app. The text of `litert.help()` says so: "runtimes for MediaTek and Google Tensor are built in". For these chips with such an app, steps 3 to 5 are not needed: go to step 6.
+
+An older app does not say so in `litert.help()`: follow all the steps. Qualcomm and all other chips need steps 3 to 5 with every app.
 
 ## Requirements
 
@@ -11,7 +17,7 @@ All of these must hold. If one does not, LiteRT runs the model on the CPU, witho
 1. LiteRT supports the chip. LiteRT's list (step 2) is a guide: a chip in the list can fail, and a chip outside the list can work.
 2. The phone's firmware has the chip maker's NPU driver. Custom ROMs, such as LineageOS, may lack the driver.
 3. Qualcomm: the firmware lets apps use the DSP.
-4. The app setting **Load accelerators from /litert/** is on, and the files are in `/litert/` on the phone.
+4. The NPU runtime is in the app: built in (MediaTek, Google Tensor), or the app setting **Load accelerators from /litert/** is on and the files are in `/litert/` on the phone.
 
 ## Steps
 
@@ -37,7 +43,11 @@ Set `V` from `MAKER`:
 | `QTI` | `qualcomm` | yes |
 | `Google` | `google-tensor` | no list; untested |
 
-Another MAKER, for example Samsung: stop, no runtime.
+Another MAKER: stop, no runtime.
+
+Samsung is one such MAKER, with LiteRT support for the Exynos 2500 and 2600 only. There is no runtime on Maven or in the LiteRT releases. The compiler plugin and the dispatch library (`libLiteRtCompilerPlugin_Samsung.so`, `libLiteRtDispatch_Samsung.so`) have to be built from LiteRT's source. Compiling on the phone also needs Samsung's Exynos AI LiteCore SDK, with 64 MB of arm64 libraries. The licence file of that SDK is DRM-protected, so redistribution is unclear. The user downloads the SDK from Samsung; an assistant does not. Not tested.
+
+References: [LiteRT guide for Samsung](https://developers.google.com/edge/litert/next/samsung), [LiteRT source for Samsung](https://github.com/google-ai-edge/LiteRT/tree/v2.3.0/litert/vendors/samsung), [Samsung Exynos AI LiteCore SDK](https://soc-developer.semiconductor.samsung.com/global/development/ai-litecore).
 
 ### 2. Check the chip
 
@@ -92,7 +102,7 @@ sftp> mkdir /litert
 sftp> put litert/*.so /litert/
 ```
 
-Then, in **Settings**, enable **Load accelerators from /litert/** and press **Restart**.
+Then, in **Settings**, enable **Load accelerators from /litert/** and press **Restart**. With the setting on, the app uses the runtime in `/litert/` instead of the built-in runtimes.
 
 ### 6. Check
 
