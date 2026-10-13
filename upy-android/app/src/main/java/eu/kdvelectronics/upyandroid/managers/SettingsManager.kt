@@ -39,8 +39,8 @@ class SettingsManager(context: Context) {
         get() = prefs.getBoolean(KEY_SSH_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_SSH_ENABLED, value).apply()
 
-    // Native code from files/litert/ (DispatchLibraryDir and
-    // CompilerPluginLibraryDir). Read once, at :engine start.
+    // The NPU runtime in files/litert/ (native code) instead of the one
+    // in the APK. Read once, at :engine start.
     var litertDirEnabled: Boolean
         get() = prefs.getBoolean(KEY_LITERT_DIR_ENABLED, false)
         set(value) = prefs.edit().putBoolean(KEY_LITERT_DIR_ENABLED, value).apply()

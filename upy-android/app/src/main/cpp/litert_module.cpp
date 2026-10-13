@@ -666,7 +666,7 @@ const char litert_help_text[] =
     "  version(): \"LITERT,MAKER,MODEL\", e.g. \"2.3.0,QTI,SM8650\"; LiteRT version and chip; they select the NPU runtime, see NPU runtime below\n"
     "accelerators:\n"
     "  GPU: built in\n"
-    "  NPU: not built in; with Settings > \"Load accelerators from /litert/\" on and the folder /litert/ present, LiteRT loads the NPU runtime from /litert/ (native code); the setting applies at app start\n"
+    "  NPU: runtimes for MediaTek and Google Tensor are built in; other NPUs need a runtime in /litert/: with Settings > \"Load accelerators from /litert/\" on and the folder /litert/ present, LiteRT loads the NPU runtime from /litert/ (native code) instead of the built-in runtimes; the setting applies at app start\n"
     "  NPU runtime, recipe: https://raw.githubusercontent.com/koendv/upy-android/main/doc/NPU.md\n"
     "  an accelerator that does not load falls back to the CPU without an error; compare run() timing with Accelerator.CPU, e.g. /examples/litert_bench.py\n"
     "see_also: tflite.help()\n"

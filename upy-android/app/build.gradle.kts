@@ -120,6 +120,12 @@ android {
         dex {
             useLegacyPackaging = true
         }
+        // Compressed and extracted on install: LiteRT searches
+        // nativeLibraryDir for the NPU dispatch and compiler plugin
+        // libraries, so they must be real files there.
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/io.netty.versions.properties"
@@ -127,12 +133,12 @@ android {
         }
     }
 
-    // libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate) is staged
-    // into src/main/jniLibs/arm64-v8a/ by the stageLitertDelegate task
-    // below, from the litert-gpu AAR (see the litert-api dependency's own
-    // comment below for why that AAR is not a normal dependency).
-    // LiteRtEnvironment dlopen()s it by name at runtime, so it must
-    // ship in the APK. AGP scans jniLibs/<abi>/ by convention. See
+    // libLiteRtClGlAccelerator.so (a GPU/OpenCL-GL delegate) and the NPU
+    // libraries are staged into src/main/jniLibs/arm64-v8a/ by the
+    // stageLitertDelegate task below, from the litert-gpu and
+    // litert-npu-runtime-* AARs (see the litert-api dependency's own
+    // comment below for why these AARs are not normal dependencies).
+    // LiteRT loads them at runtime, so they must ship in the APK. AGP scans jniLibs/<abi>/ by convention. See
     // NOTICE.html for licensing.
 }
 
@@ -227,10 +233,14 @@ val litertNative: Configuration by configurations.creating {
 dependencies {
     litertNative("com.google.ai.edge.litert:litert:$litertVersion@aar")
     litertNative("com.google.ai.edge.litert:litert-gpu:$litertVersion@aar")
+    // NPU dispatch and compiler plugin libraries. MediaTek: verified on a
+    // Dimensity (MT6878). Google Tensor: untested.
+    litertNative("com.google.ai.edge.litert:litert-npu-runtime-mediatek:$litertVersion@aar")
+    litertNative("com.google.ai.edge.litert:litert-npu-runtime-google-tensor:$litertVersion@aar")
 }
 
-// libLiteRt.so: linked by CMakeLists.txt. libLiteRtClGlAccelerator.so:
-// loaded at runtime by name, so it is also staged in jniLibs/ to ship.
+// libLiteRt.so: linked by CMakeLists.txt. The GPU and NPU libraries are
+// loaded at runtime, so they are also staged in jniLibs/ to ship.
 // Sync, not Copy: a library no longer in the AARs must not linger here.
 val extractLitert = tasks.register<Sync>("extractLitert") {
     from({ litertNative.files.map { zipTree(it) } }) {
@@ -245,7 +255,8 @@ val extractLitert = tasks.register<Sync>("extractLitert") {
 // version. Input to genLicenses below.
 val litertNoticesDir = layout.buildDirectory.dir("litert-notices")
 val extractLitertNotices = tasks.register<Sync>("extractLitertNotices") {
-    // The litert-gpu AAR carries the same notices file.
+    // The litert-gpu AAR carries the same notices file; every line of the
+    // litert-npu-runtime-* notices is in it too (checked for 2.3.0).
     from({ zipTree(litertNative.files.single { it.name == "litert-$litertVersion.aar" }) }) {
         include("THIRD_PARTY_NOTICE.txt")
     }
@@ -274,7 +285,9 @@ val genLicenses = tasks.register<Exec>("genLicenses") {
 
 val stageLitertDelegate = tasks.register<Sync>("stageLitertDelegate") {
     dependsOn(extractLitert)
-    from(layout.projectDirectory.file("src/main/cpp/litert/lib/libLiteRtClGlAccelerator.so"))
+    from(layout.projectDirectory.dir("src/main/cpp/litert/lib")) {
+        include("libLiteRtClGlAccelerator.so", "libLiteRtDispatch_*.so", "libLiteRtCompilerPlugin_*.so")
+    }
     into(layout.projectDirectory.dir("src/main/jniLibs/arm64-v8a"))
 }
 
@@ -403,10 +416,11 @@ dependencies {
     // re-deriving it. Accepted APK-size cost (Guava;
     // isMinifyEnabled=false strips nothing).
     //
-    // NOT also com.google.ai.edge.litert:litert or litert-gpu as normal
-    // dependencies: only their .so files are used. libLiteRt.so is
-    // CMakeLists.txt's own `litert` IMPORTED target (auto-packaged by
-    // AGP), libLiteRtClGlAccelerator.so is staged by stageLitertDelegate.
+    // NOT also com.google.ai.edge.litert:litert, litert-gpu or
+    // litert-npu-runtime-* as normal dependencies: only their .so files are
+    // used. libLiteRt.so is CMakeLists.txt's own `litert` IMPORTED target
+    // (auto-packaged by AGP), the GPU and NPU libraries are staged by
+    // stageLitertDelegate.
     // Both are extracted through the separate litertNative configuration,
     // which AGP never merges. This is still the project's
     // first prebuilt-binary native dependency (see NOTICE.html) --

@@ -40,7 +40,6 @@ import androidx.compose.ui.unit.dp
 import eu.kdvelectronics.upyandroid.MainActivity
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 import eu.kdvelectronics.upyandroid.ssh.SshServerManager
-import java.io.File
 
 private val ICON_SIZE = 20.dp
 
@@ -49,8 +48,7 @@ private val ICON_SIZE = 20.dp
 // process, before any change; not per screen open, which would lose a
 // change made before leaving Settings.
 private var heapSizeMbAtStart: Int? = null
-// (setting, setting and folder there)
-private var litertAtStart: Pair<Boolean, Boolean>? = null
+private var litertDirEnabledAtStart: Boolean? = null
 
 // Kills :engine and restarts the app: a new heap size needs a new process.
 private fun restartApp(context: Context) {
@@ -86,18 +84,16 @@ fun SettingsScreen(
     var sshEnabled by remember { mutableStateOf(settingsManager.sshEnabled) }
     var sshPassword by remember { mutableStateOf(settingsManager.sshPassword) }
     var adbExecEnabled by remember { mutableStateOf(settingsManager.adbExecEnabled) }
-    val (initialLitertDirEnabled, litertDirInUse) = litertAtStart ?: Pair(
-        settingsManager.litertDirEnabled,
-        settingsManager.litertDirEnabled && File(context.filesDir, "litert").isDirectory,
-    ).also { litertAtStart = it }
+    val initialLitertDirEnabled = litertDirEnabledAtStart
+        ?: settingsManager.litertDirEnabled.also { litertDirEnabledAtStart = it }
     var litertDirEnabled by remember { mutableStateOf(settingsManager.litertDirEnabled) }
     val heapSizeChanged = heapSizeMb.toIntOrNull() != initialHeapSizeMb
     val litertDirChanged = litertDirEnabled != initialLitertDirEnabled
     val restartReason = when {
         heapSizeChanged && litertDirChanged -> "Restart for the new heap size and accelerators"
         heapSizeChanged -> "Restart for the new heap size"
-        litertDirChanged && litertDirEnabled -> "Restart to load the accelerators"
-        litertDirChanged -> "Restart to stop loading the accelerators"
+        litertDirChanged && litertDirEnabled -> "Restart to load the accelerators from /litert/"
+        litertDirChanged -> "Restart to use the built-in accelerators"
         else -> ""
     }
 
@@ -156,7 +152,7 @@ fun SettingsScreen(
             SettingsRow(
                 "Load accelerators from /litert/",
                 litertDirEnabled,
-                icon = if (litertDirInUse) SymbolIcon.SPEED_4 else SymbolIcon.SPEED_2,
+                icon = SymbolIcon.SPEED_4,
             ) {
                 litertDirEnabled = it
                 settingsManager.litertDirEnabled = it

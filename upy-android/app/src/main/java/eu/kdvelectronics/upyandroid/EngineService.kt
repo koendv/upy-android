@@ -7,7 +7,7 @@ import android.os.IBinder
 import android.os.RemoteException
 import android.view.Surface
 import eu.kdvelectronics.upyandroid.camera.CameraShim
-import eu.kdvelectronics.upyandroid.litert.setLitertDir
+import eu.kdvelectronics.upyandroid.litert.setAcceleratorDir
 import eu.kdvelectronics.upyandroid.location.LocationShim
 import eu.kdvelectronics.upyandroid.managers.SettingsManager
 import java.io.File
@@ -99,9 +99,13 @@ class EngineService : Service() {
         val heapSizeMb = SettingsManager(applicationContext).heapSizeMb
         worker = EngineWorker(filesDir.absolutePath, heapSizeMb, applicationContext)
         val litertDir = File(filesDir, "litert")
-        if (SettingsManager(applicationContext).litertDirEnabled && litertDir.isDirectory) {
-            setLitertDir(litertDir.path)
-        }
+        setAcceleratorDir(
+            if (SettingsManager(applicationContext).litertDirEnabled && litertDir.isDirectory) {
+                litertDir.path
+            } else {
+                applicationInfo.nativeLibraryDir
+            }
+        )
         worker.start()
         LocationShim.init(applicationContext)
         CameraShim.init(applicationContext)

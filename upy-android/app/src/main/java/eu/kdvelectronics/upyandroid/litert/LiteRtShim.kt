@@ -8,16 +8,18 @@ import com.google.ai.edge.litert.CompiledModel
 import com.google.ai.edge.litert.Environment
 import com.google.ai.edge.litert.TensorBuffer
 
-// Set once in EngineService.onCreate(), before the worker thread starts.
-private var litertDir: String? = null
+// Where LiteRT finds the NPU dispatch and compiler plugin libraries:
+// nativeLibraryDir (built in) or files/litert. Set once in
+// EngineService.onCreate(), before the worker thread starts.
+private var acceleratorDir: String? = null
 
-fun setLitertDir(dir: String) {
-    litertDir = dir
+fun setAcceleratorDir(dir: String) {
+    acceleratorDir = dir
 }
 
 // An accelerator that does not load falls back to CPU silently.
 fun createEnvironment(): Environment {
-    val dir = litertDir ?: return Environment.create()
+    val dir = acceleratorDir ?: return Environment.create()
     return Environment.create(mapOf(
         Environment.Option.DispatchLibraryDir to dir,
         Environment.Option.CompilerPluginLibraryDir to dir,
