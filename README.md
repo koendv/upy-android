@@ -157,7 +157,14 @@ The NPU needs a runtime library, which depends on the phone's processor. Runtime
 
 The code was written with AI assistance and has had no independent audit. 
 
-The app is tested on four phones (Redmi 9, Redmi Note 15, Redmi Note 15 Pro 5G, Xiaomi Pad 6). The test run covers the modules and MicroPython's own test suite. One test is a known failure (`find_keypoints`, cause not yet found). The NPU works on one of the four phones, see [Known results](doc/NPU.md#known-results).
+| Group | Tests | Result on the Redmi 9 |
+|---|---|---|
+| Project tests (`tools/run-tests.py`) | 7 | all pass, no known failure |
+| MicroPython `basics` (`--micropython`) | 574 | 542 pass, 32 skipped, 0 failed |
+| OpenMV unit tests, adapted (`--openmv`) | 78 | all pass |
+| **Total** | **659** | **620 pass, 32 skipped, 0 failed** |
+
+The app is tested on four phones (Redmi 9, Redmi Note 15, Redmi Note 15 Pro 5G, Xiaomi Pad 6). The test run covers the modules, MicroPython's and OpenMV's own test suite. Depending on phone, LiteRT runs on CPU, GPU or NPU, see [Known results](doc/NPU.md#known-results).
 
 ### Development
 
