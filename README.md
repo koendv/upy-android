@@ -10,6 +10,8 @@
 
 upy-android turns an Android phone into a MicroPython machine vision system.
 
+One use case is as a hands-on lab for computer vision courses: camera capture, image processing, AI inference, and result output are all integrated into a single smartphone, requiring no additional hardware.
+
 ### Documentation
 
 The documentation comes in two parts:
