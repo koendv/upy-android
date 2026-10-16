@@ -146,7 +146,10 @@ env = litert.Environment()
 opts = litert.Options(litert.Accelerator.CPU)
 print('E litert missing model', err(lambda: litert.CompiledModel(env, 'mn/missing.tflite', opts)))
 m = litert.CompiledModel(env, 'mn/f32.tflite', opts)
+print('E litert wrong dtype', err(lambda: m.run(array.array('d', [0.0] * (224 * 224 * 3)))))
+print('E litert too large', err(lambda: m.run(array.array('f', [0.0] * (2 * 224 * 224 * 3)))))
 print('E litert too small', err(lambda: m.run(array.array('f', [0.0] * 10))))
+print('E litert run after errors', len(m.run(array.array('f', [0.0] * (224 * 224 * 3)))))
 print('E litert too many inputs', err(lambda: m.run(array.array('f', [0.0]), array.array('f', [0.0]))))
 print('E litert shape', m.input_shape(0), m.output_shape(0))
 m.close()
@@ -160,10 +163,6 @@ print('E tflite shape', t.input_shape(0), t.output_shape(0))
 t.close()
 print('E tflite closed model', err(lambda: t.run(array.array('f', [0.0] * (224 * 224 * 3)))))
 '''
-
-# A run() whose input array makes the write fail (a typecode outside f/b/i/q/B, or an array
-# larger than the tensor) raises OSError and then crashes the engine at the next reset:
-# litert_compiled_model_run leaves its buffers open. Not tested until that is fixed.
 
 
 def clean():
@@ -210,6 +209,11 @@ try:
     # Not an error today: an input array that is too small is accepted (tflite raises ValueError).
     print("  note: litert run() with a too small array: %s" % got.get("litert too small"))
     check("error: litert too many inputs", got.get("litert too many inputs") == "ValueError", out)
+    check("error: litert wrong dtype", got.get("litert wrong dtype") == "OSError 22", out)
+    check("error: litert too large", got.get("litert too large") == "OSError 5", out)
+    check("litert run after errors", "E litert run after errors 1001" in out, out)
+    # The buffers of a failed run() once crashed the engine at the next reset.
+    check("engine alive after errors", device("print('alive')") == "alive\n")
     check("error: litert closed model", got.get("litert closed model") == "OSError 22", out)
     check("error: tflite missing model", got.get("tflite missing model") == "OSError 2", out)
     check("error: tflite wrong size", got.get("tflite wrong size") == "ValueError", out)

@@ -536,15 +536,33 @@ mp_obj_t litert_compiled_model_run(size_t n_args, const mp_obj_t *args) {
     auto *self = (litert_compiled_model_obj_t *) MP_OBJ_TO_PTR(args[0]);
     raise_if_model_closed(self);
 
-    BufferSet inputs = create_buffer_set(self, false);
-    BufferSet outputs = create_buffer_set(self, true);
+    // Anything below can raise (a wrong typecode, an array larger than the
+    // tensor, a failed run). The buffers must be closed before the raise
+    // leaves this function: closed later, after the model is closed, LiteRT
+    // crashes. So the raise is caught here, the buffers closed, and the raise
+    // passed on. bufs is allocated, not a local: nlr handlers see only
+    // memory, not locals changed after nlr_push().
+    struct RunBuffers {
+        BufferSet inputs;
+        BufferSet outputs;
+    };
+    auto *bufs = (RunBuffers *) calloc(1, sizeof(RunBuffers));
+    nlr_buf_t nlr;
+    if (nlr_push(&nlr) != 0) {
+        close_buffer_set(bufs->inputs);
+        close_buffer_set(bufs->outputs);
+        free(bufs);
+        nlr_jump(nlr.ret_val);
+    }
+
+    bufs->inputs = create_buffer_set(self, false);
+    bufs->outputs = create_buffer_set(self, true);
+    BufferSet &inputs = bufs->inputs;
+    BufferSet &outputs = bufs->outputs;
 
     if (inputs.count != n_args - 1) {
-        size_t want = inputs.count;
-        close_buffer_set(inputs);
-        close_buffer_set(outputs);
         mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("litert: run() needs %d input(s), got %d"),
-            (int) want, (int) (n_args - 1));
+            (int) inputs.count, (int) (n_args - 1));
     }
 
     for (size_t i = 0; i < inputs.count; i++) {
@@ -566,8 +584,6 @@ mp_obj_t litert_compiled_model_run(size_t n_args, const mp_obj_t *args) {
     free(input_refs);
     free(output_refs);
     if (!ok) {
-        close_buffer_set(inputs);
-        close_buffer_set(outputs);
         raise_os_error_free(MP_EIO, err);
     }
 
@@ -584,6 +600,8 @@ mp_obj_t litert_compiled_model_run(size_t n_args, const mp_obj_t *args) {
 
     close_buffer_set(inputs);
     close_buffer_set(outputs);
+    nlr_pop();
+    free(bufs);
     return result;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(litert_compiled_model_run_obj, 1, MP_OBJ_FUN_ARGS_MAX, litert_compiled_model_run);

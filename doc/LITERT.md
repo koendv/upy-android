@@ -22,7 +22,6 @@ Copy the runtime to the phone:
    sftp> put litert/*.so /litert/
    ```
 3. In **Settings**, enable **Load accelerators from /litert/** and press **Restart**.
-4. Transfer the MobileNet models to `/` on the phone. The download links are in the header of `/examples/litert_bench.py`. Use SFTP on the PC (`put mobilenet_v2_1.0_224_INT8.tflite /`), or download the models on the phone and use **Files > Import** in the app, at the top level of **Files**.
-5. Run `/examples/litert_bench.py` in the app, or ask the AI assistant to run `litert_bench.py`. If the NPU is not faster than the CPU, the runtime did not load and LiteRT runs on the CPU.
+4. Run `/examples/litert_bench.py` in the app, or ask the AI assistant to run `litert_bench.py`. The script asks permission to download MobileNet models from github. If the NPU is not faster than the CPU, the runtime did not load and LiteRT runs on the CPU.
 
-To download by hand, or for details, see [NPU](NPU.md).
+For details, see [NPU](NPU.md).
