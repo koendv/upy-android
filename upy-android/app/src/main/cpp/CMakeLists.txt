@@ -43,6 +43,8 @@ add_library(upy_engine SHARED
     location_jni_bridge.cpp
     mqtt_module.cpp
     mqtt_jni_bridge.cpp
+    zipfile_module.cpp
+    zipfile_jni_bridge.cpp
     ${MPY_PY_SOURCES}
     ${MPY_PORT_SOURCES}
     ${MPY_SHARED_SOURCES}

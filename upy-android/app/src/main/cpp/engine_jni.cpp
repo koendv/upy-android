@@ -21,6 +21,7 @@ extern "C" {
 #include "litert_module.h"
 #include "mediastore_module.h"
 #include "mqtt_module.h"
+#include "zipfile_module.h"
 #include "settings_state.h"
 #include "tflite_module.h"
 
@@ -128,6 +129,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint s
         fileprovider_bridge_init(env);
         location_bridge_init(env);
         mqtt_bridge_init(env);
+        zipfile_bridge_init(env);
         camera_bridge_init(env);
         jclass service_class = env->FindClass("eu/kdvelectronics/upyandroid/EngineService");
         g_engine_service_class = static_cast<jclass>(env->NewGlobalRef(service_class));

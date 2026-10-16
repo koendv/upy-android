@@ -305,6 +305,11 @@ SRC_QSTR += ../app/src/main/cpp/location_module.cpp
 # reasoning as mediastore_jni_bridge.cpp above.
 SRC_QSTR += ../app/src/main/cpp/mqtt_module.cpp
 
+# zipfile_module.cpp: this project's own native module (top-level zipfile),
+# same case as mqtt_module.cpp. zipfile_jni_bridge.cpp #includes <jni.h> and
+# is not listed, same reason.
+SRC_QSTR += ../app/src/main/cpp/zipfile_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk
 

@@ -120,6 +120,7 @@ class EngineService : Service() {
             }
         )
         worker.start()
+        VfsPath.setRoot(filesDir.absolutePath)
         LocationShim.init(applicationContext)
         CameraShim.init(applicationContext)
     }
