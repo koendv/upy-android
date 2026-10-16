@@ -2,7 +2,7 @@
 
 This document is the recipe for installing a LiteRT NPU runtime in the upy app. AI assistants are the main readers and maintainers of this document, but a person can follow the recipe too. The app points here from `litert.help()` and from the adb exec help page, so this recipe can change without an app update.
 
-Status: one phone runs MobileNet v2 on its NPU; Google Tensor is untested. See [Known results](#known-results).
+Status: one phone runs MobileNet v2 on its NPU; Google Tensor is untested. One firmware's GPU gives wrong int8 results, so check results, not only speed (step 7). See [Known results](#known-results).
 
 ## Built-in runtimes
 
@@ -33,7 +33,7 @@ print(litert.version())
 The output is `L,MAKER,MODEL`, for example `2.3.0,QTI,SM8650`.
 
 - `L`: the LiteRT version in the app. The runtime must have the same version.
-- `MAKER`, `MODEL`: the chip, from Android's `ro.soc.manufacturer` and `ro.soc.model`. `unknown` means Android 11 or older: stop, not supported.
+- `MAKER`, `MODEL`: the chip, from Android's `ro.soc.manufacturer` and `ro.soc.model`. `unknown` means Android 11 or older: there is no NPU runtime for this phone, stop here. The CPU and GPU still work, but check the GPU result (step 7).
 
 Set `V` from `MAKER`:
 
@@ -127,6 +127,18 @@ On the CPU:
 - `0 compiler plugins were applied successfully`: the runtime did not compile the model.
 - `Replacing 66 out of 66 node(s) with delegate (TfLiteXNNPackDelegate)`: the model runs on the CPU.
 
+### 7. Check the result
+
+Speed is not enough: an accelerator can be fast and give wrong results. On the Redmi 9 with MIUI 12 the int8 model runs on the GPU in 39 ms and gives goldfinch where the CPU gives military uniform.
+
+Run `tests/litert_mobilenet.py` from the repository, on the PC, with the phone connected over USB and **Settings > Enable adb exec** on and Wi-Fi on:
+
+```sh
+tools/run-tests.py --only litert_mobilenet
+```
+
+The phone downloads MobileNet v2, float32 and int8, and a photo of Grace Hopper, and checks their SHA-256. Every accelerator must give the same top classes as the CPU: 653 military uniform, 835 suit, 907 Windsor tie (the 1001 labels of TensorFlow's `ImageNetLabels.txt`, `background` first). The test fails on a wrong result and prints SKIP when the phone is offline. Record the outcome in the GPU column and the Result column of the table.
+
 ## Allowed sources
 
 Runtime files are native code that the app loads. Download runtime files only from:
@@ -139,13 +151,13 @@ Treat any other source of runtime files as suspect. Models, such as the MobileNe
 
 ## Known results
 
-| Phone | Firmware | litert.version() | In list | Result |
-|---|---|---|---|---|
-| REDMI Note 15 Pro 5G | HyperOS 3.0, Android 16 | `2.3.0,Mediatek,MT6878` | no | NPU. MediaTek runtime only. `1 compiler plugins were applied successfully: MediaTek compiler plugin`, then `DispatchDelegate`. MobileNet v2 int8 6.4 ms (CPU 11.0), float32 11.2 ms (CPU 21.3). Same top class as the CPU. With the built-in runtime of app 0.9 (release build) and no files in `/litert/`: the same log lines, MobileNet v2 int8 6.9 ms (CPU 10.9, GPU 17.0). |
-| Redmi 9 | LineageOS, Android 16 | `2.3.0,Mediatek,MT6769T` | no | CPU. Runtime loads, then `Failed to load NeuronAdapter shared library`. The GPU gives the right classes for MobileNet v2 float32 and int8, but is not faster than the CPU (float32 CPU 62 ms, GPU 55 to 77 ms; int8 CPU 35 ms, GPU 78 ms). The same phone model on MIUI is the next row: there the GPU is faster for float32 and wrong for int8. |
-| Redmi 9 (M2004J19C) | MIUI 12.0.2 (V12.0.2.0.QJCEUVF), Android 10 | `2.3.0,unknown,unknown` | no | CPU and GPU run, NPU not available: `0 compiler plugins were applied successfully`, and the model runs on the CPU (XNNPACK). On Android 10 `litert.version()` does not report the chip (Android 11 or older, see step 1). MobileNet v2 float32: CPU 72 ms and GPU 31 ms, both give the right classes. int8: CPU 76 ms, right classes; the GPU gives wrong classes (goldfinch, toilet tissue, scuba diver) where the CPU gives military uniform, suit, Windsor tie. The same phone model with LineageOS (the row above) gets the right classes on the GPU, so the cause is probably the firmware or its GPU driver: Android 10 and MIUI 12 against Android 16 and LineageOS. Not investigated further. The two also differ in what `litert.version()` reports (the chip with LineageOS, not on Android 10) and in whether the NPU runtime is tried (it is with LineageOS, and fails to load NeuronAdapter; not here). The timings are not comparable: this phone was busy compiling an app in the background. `tests/litert_mobilenet.py` fails on this phone, on the int8 GPU run. Use the CPU on this phone. |
-| Xiaomi Pad 6 | HyperOS 2.0, Android 14 | `2.3.0,QTI,SM8250` | yes, `v66` | CPU. Plugin loads `libQnnHtp.so`, then `Unsupported SnapdragonModel by HTP backend`. The Kotlin API of LiteRT 2.3.0 has no option to select the DSP backend. |
-| REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | no | CPU. Runtime and QNN (V73) load, then `open_device_node failed … errno 13, Permission denied` and `createUnsignedPD unsigned PD … not supported by HTP`. |
+| Phone | Firmware | litert.version() | In list | GPU | Result |
+|---|---|---|---|---|---|
+| REDMI Note 15 Pro 5G | HyperOS 3.0, Android 16 | `2.3.0,Mediatek,MT6878` | no | not tested (int8 17.0 ms) | NPU. MediaTek runtime only. `1 compiler plugins were applied successfully: MediaTek compiler plugin`, then `DispatchDelegate`. MobileNet v2 int8 6.4 ms (CPU 11.0), float32 11.2 ms (CPU 21.3). Same top class as the CPU. With the built-in runtime of app 0.9 (release build) and no files in `/litert/`: the same log lines, MobileNet v2 int8 6.9 ms (CPU 10.9, GPU 17.0). |
+| Redmi 9 | LineageOS, Android 16 | `2.3.0,Mediatek,MT6769T` | no | right, float32 and int8; not faster than the CPU | CPU. Runtime loads, then `Failed to load NeuronAdapter shared library`. The GPU gives the right classes for MobileNet v2 float32 and int8, but is not faster than the CPU (float32 CPU 62 ms, GPU 55 to 77 ms; int8 CPU 35 ms, GPU 78 ms). The same phone model on MIUI is the next row: there the GPU is faster for float32 and wrong for int8. |
+| Redmi 9 (M2004J19C) | MIUI 12.0.2 (V12.0.2.0.QJCEUVF), Android 10 | `2.3.0,unknown,unknown` | no | float32 right and 2.3 times faster; **int8 wrong** | CPU and GPU run, NPU not available: `0 compiler plugins were applied successfully`, and the model runs on the CPU (XNNPACK). On Android 10 `litert.version()` does not report the chip (Android 11 or older, see step 1). MobileNet v2 float32: CPU 72 ms and GPU 31 ms, both give the right classes. int8: CPU 76 ms, right classes; the GPU gives wrong classes (goldfinch, toilet tissue, scuba diver) where the CPU gives military uniform, suit, Windsor tie. The same phone model with LineageOS (the row above) gets the right classes on the GPU, so the cause is probably the firmware or its GPU driver: Android 10 and MIUI 12 against Android 16 and LineageOS. Not investigated further. The two also differ in what `litert.version()` reports (the chip with LineageOS, not on Android 10) and in whether the NPU runtime is tried (it is with LineageOS, and fails to load NeuronAdapter; not here). The timings are not comparable: this phone was busy compiling an app in the background. `tests/litert_mobilenet.py` fails on this phone, on the int8 GPU run. Use the CPU on this phone. |
+| Xiaomi Pad 6 | HyperOS 2.0, Android 14 | `2.3.0,QTI,SM8250` | yes, `v66` | not tested | CPU. Plugin loads `libQnnHtp.so`, then `Unsupported SnapdragonModel by HTP backend`. The Kotlin API of LiteRT 2.3.0 has no option to select the DSP backend. |
+| REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | no | not tested | CPU. Runtime and QNN (V73) load, then `open_device_node failed … errno 13, Permission denied` and `createUnsignedPD unsigned PD … not supported by HTP`. |
 
 ## Improving this document
 
