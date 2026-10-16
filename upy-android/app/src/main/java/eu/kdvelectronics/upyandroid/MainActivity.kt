@@ -15,9 +15,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.navigationsuite.ExperimentalMaterial3AdaptiveNavigationSuiteApi
+import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType
@@ -224,6 +226,12 @@ class MainActivity : ComponentActivity() {
                         }
                     },
                     layoutType = layoutType,
+                    // The bar, the rail and the drawer have the background of the rest of the app.
+                    navigationSuiteColors = NavigationSuiteDefaults.colors(
+                        navigationBarContainerColor = MaterialTheme.colorScheme.background,
+                        navigationRailContainerColor = MaterialTheme.colorScheme.background,
+                        navigationDrawerContainerColor = MaterialTheme.colorScheme.background,
+                    ),
                 ) {
                     NavHost(navController = navController, startDestination = TopLevelDestination.TERMINAL.route) {
                         composable(TopLevelDestination.TERMINAL.route) {
