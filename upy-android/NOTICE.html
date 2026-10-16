@@ -57,6 +57,56 @@
     <li>License: Apache License 2.0</li>
   </ul>
   <p>libLiteRt.so and libLiteRtClGlAccelerator.so are prebuilt binaries (the litert AAR, resolved via Gradle from Google's own Maven repository), not compiled from source by this project. LiteRT's C API headers (litert/c/) are included in source form, copied from the matching LiteRT source tag, since the published binaries ship none.</p>
+  <h2>Libraries (Gradle dependencies, included in the APK)</h2>
+  <p>Licenses: Apache License 2.0 unless stated. The license texts are in Settings &gt; About &gt; Licenses. Versions are those of this release.</p>
+  <h3>Jetpack (AndroidX), including CameraX and Compose</h3>
+  <ul>
+    <li>Source: <a href="https://android.googlesource.com/platform/frameworks/support">https://android.googlesource.com/platform/frameworks/support</a></li>
+    <li>Copyright: The Android Open Source Project</li>
+    <li>License: Apache License 2.0</li>
+    <li>CameraX camera-core includes code from libyuv (Copyright 2011 The LibYuv Project Authors): BSD 3-Clause</li>
+  </ul>
+  <h3>JetBrains Compose Multiplatform and annotations</h3>
+  <ul>
+    <li>Source: <a href="https://github.com/JetBrains/compose-multiplatform">https://github.com/JetBrains/compose-multiplatform</a>, <a href="https://github.com/JetBrains/java-annotations">https://github.com/JetBrains/java-annotations</a></li>
+    <li>License: Apache License 2.0</li>
+  </ul>
+  <h3>Kotlin standard library, kotlinx.coroutines, kotlinx.serialization, kotlinx.atomicfu</h3>
+  <ul>
+    <li>Source: <a href="https://github.com/JetBrains/kotlin">https://github.com/JetBrains/kotlin</a>, <a href="https://github.com/Kotlin/kotlinx.coroutines">https://github.com/Kotlin/kotlinx.coroutines</a>, <a href="https://github.com/Kotlin/kotlinx.serialization">https://github.com/Kotlin/kotlinx.serialization</a>, <a href="https://github.com/Kotlin/kotlinx-atomicfu">https://github.com/Kotlin/kotlinx-atomicfu</a></li>
+    <li>License: Apache License 2.0</li>
+  </ul>
+  <h3>LazyColumnScrollbar 3.0.0</h3>
+  <ul>
+    <li>Source: <a href="https://github.com/nanihadesuka/LazyColumnScrollbar">https://github.com/nanihadesuka/LazyColumnScrollbar</a></li>
+    <li>Copyright: 2021-2026 nani</li>
+    <li>License: MIT</li>
+  </ul>
+  <h3>HiveMQ MQTT Client 1.4.0 (umqtt)</h3>
+  <ul>
+    <li>Source: <a href="https://github.com/hivemq/hivemq-mqtt-client">https://github.com/hivemq/hivemq-mqtt-client</a></li>
+    <li>License: Apache License 2.0</li>
+    <li>Its dependencies, all Apache License 2.0 except where stated: Netty 4.1.137 (<a href="https://github.com/netty/netty">https://github.com/netty/netty</a>), RxJava 2 (<a href="https://github.com/ReactiveX/RxJava">https://github.com/ReactiveX/RxJava</a>), Dagger and javax.inject / jakarta.inject (<a href="https://github.com/google/dagger">https://github.com/google/dagger</a>), JCTools (<a href="https://github.com/JCTools/JCTools">https://github.com/JCTools/JCTools</a>), Reactive Streams (<a href="https://github.com/reactive-streams/reactive-streams-jvm">https://github.com/reactive-streams/reactive-streams-jvm</a>): MIT No Attribution</li>
+  </ul>
+  <h3>Apache MINA SSHD 2.19.0 (SSH and SFTP server)</h3>
+  <ul>
+    <li>Source: <a href="https://github.com/apache/mina-sshd">https://github.com/apache/mina-sshd</a></li>
+    <li>License: Apache License 2.0</li>
+    <li>Its NOTICE: Apache MINA SSHD. Copyright 2008-2026 The Apache Software Foundation. This product includes software developed at The Apache Software Foundation (http://www.apache.org/).</li>
+    <li>With SLF4J 1.7.36 (<a href="https://github.com/qos-ch/slf4j">https://github.com/qos-ch/slf4j</a>): slf4j-api is MIT (Copyright 2004-2022 QOS.ch Sarl (Switzerland)); jcl-over-slf4j is Apache License 2.0</li>
+  </ul>
+  <h3>OkHttp 4.12.0 and Okio 3.6.0 (http)</h3>
+  <ul>
+    <li>Source: <a href="https://github.com/square/okhttp">https://github.com/square/okhttp</a>, <a href="https://github.com/square/okio">https://github.com/square/okio</a></li>
+    <li>Authors: Square, Inc.</li>
+    <li>License: Apache License 2.0</li>
+  </ul>
+  <h3>Google libraries</h3>
+  <p>LiteRT API (see LiteRT above), Guava 33.5.0-android with failureaccess and listenablefuture, error_prone_annotations, j2objc-annotations, auto-value-annotations, and JSpecify.</p>
+  <ul>
+    <li>Source: <a href="https://github.com/google/guava">https://github.com/google/guava</a>, <a href="https://github.com/google/error-prone">https://github.com/google/error-prone</a>, <a href="https://github.com/google/j2objc">https://github.com/google/j2objc</a>, <a href="https://github.com/google/auto">https://github.com/google/auto</a>, <a href="https://github.com/jspecify/jspecify">https://github.com/jspecify/jspecify</a></li>
+    <li>License: Apache License 2.0</li>
+  </ul>
   <h2>Haar cascades (/rom/)</h2>
   <p>haarcascade_frontalface.cascade, haarcascade_eye.cascade: converted by OpenMV's tools/haar2c.py from the OpenCV cascades in OpenMV's lib/haar/.</p>
   <ul>
@@ -76,7 +126,7 @@
   <h2>App icon</h2>
   <p>The app icon (viewfinder corners framing a "&gt;&gt;&gt;" REPL prompt) is original artwork made for this project, and is covered by this project's own license.</p>
   <h2>Icon font</h2>
-  <p>The icon font is a subsetted, static-instance build of Google's Material Symbols Rounded (24 glyphs, no ligature tables).</p>
+  <p>The icon font is a subsetted, static-instance build of Google's Material Symbols Rounded (41 glyphs, no ligature tables).</p>
   <ul>
     <li>Source: <a href="https://github.com/google/material-design-icons">https://github.com/google/material-design-icons</a>
     </li>
