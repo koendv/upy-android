@@ -177,11 +177,10 @@ class Shell:
         self.client.close()
 
 
-injected = adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+injected = adb("shell", "input", "tap", "1", "1")  # a key event is allowed on MIUI, a tap is not
 if b"INJECT_EVENTS" in injected.stdout + injected.stderr:
-    print("ssh_input                      skipped: this phone refuses injected input "
-          "(Developer options: USB debugging (Security settings))")
-    sys.exit(0)
+    print("this phone refuses injected input (Developer options: USB debugging (Security settings))")
+    sys.exit(77)  # skipped, see tools/run-tests.py
 port = None
 shells = []
 try:

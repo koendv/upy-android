@@ -29,6 +29,7 @@ TIERS = ("required", "known-failure", "manual")
 TOOLS_DIR = os.path.dirname(os.path.abspath(__file__))
 NEEDS = ("--micropython", "--openmv")
 HOST_TIMEOUT = 300  # seconds
+SKIP_EXIT_CODE = 77  # a host check exits with this when it cannot run here (no internet, no input injection); its last output line says why
 LONG_HOST_TIMEOUT = 3600  # seconds, for "needs: --micropython" and "--openmv"; basics takes about 30 minutes
 
 
@@ -127,6 +128,9 @@ def run_host(test, force_record):
         return "FAIL", "timed out after %d s" % timeout
     if proc.returncode == 0:
         return "PASS", None
+    if proc.returncode == SKIP_EXIT_CODE:
+        lines = proc.stdout.strip().splitlines()
+        return "SKIP", lines[-1].strip() if lines else ""
     return "FAIL", (proc.stdout + proc.stderr).rstrip()
 
 
@@ -214,7 +218,7 @@ def main():
         results.append((t, status))
         label = {"XFAIL": "XFAIL (known failure)", "XPASS": "XPASS (unexpectedly passed)"}.get(status, status)
         print("%-18s %-14s %s" % (t.name, t.tier, label))
-        if detail and status in ("FAIL", "ERROR", "RECORDED"):
+        if detail and status in ("FAIL", "ERROR", "RECORDED", "SKIP"):
             print(detail if status == "FAIL" else "  " + detail)
 
     counts = {}

@@ -178,8 +178,9 @@ try:
     out = device(DOWNLOAD)
     lines = [l for l in out.split("\n") if l.startswith("DOWNLOAD")]
     if any("failed" in l and ("UnknownHost" in l or "Unable to resolve" in l or "ETIMEDOUT" in l or "timeout" in l or "110" in l) for l in lines):
-        print("litert_mobilenet             skipped, the phone cannot reach the download servers:\n  " + "\n  ".join(lines))
-        sys.exit(0)
+        print("\n".join(lines))
+        print("the phone cannot reach the download servers (is Wi-Fi on?)")
+        sys.exit(77)  # skipped, see tools/run-tests.py
     check("download and SHA-256", len(lines) == 3 and all(l.endswith("sha ok") for l in lines), out)
     if failures:
         sys.exit(1)
