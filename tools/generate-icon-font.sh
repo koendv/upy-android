@@ -29,7 +29,7 @@ ICON_NAMES=(
     edit delete drive_file_rename_outline folder_open
     vertical_align_bottom content_copy
     open_in_new share upload_file description undo redo save
-    speed_2 speed_4 info keyboard close
+    speed_2 speed_4 info keyboard close send
 )
 
 OUT_FONT="upy-android/app/src/main/res/font/upy_symbols.ttf"

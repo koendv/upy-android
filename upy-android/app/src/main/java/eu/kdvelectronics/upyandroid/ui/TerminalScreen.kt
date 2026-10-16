@@ -50,6 +50,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -60,6 +62,7 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -67,6 +70,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
 import eu.kdvelectronics.upyandroid.MainViewModel
+import eu.kdvelectronics.upyandroid.ScriptExecCore
 import eu.kdvelectronics.upyandroid.TerminalLog
 import eu.kdvelectronics.upyandroid.managers.TerminalManager
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
@@ -243,6 +247,28 @@ fun TerminalScreen(
         }
     }
 
+    // While a running script waits for input (sys.stdin, input()) the field
+    // below takes that input, with its own text: the code being typed stays
+    // where it is and comes back afterwards. Enter or the button sends the
+    // line, and the app adds the "\n". The Command tab shows a keyboard.
+    val waiting by ScriptExecCore.inputWaiting.collectAsState()
+    var inputLine by remember { mutableStateOf("") }
+    val inputFocus = remember { FocusRequester() }
+    val keyboard = LocalSoftwareKeyboardController.current
+    LaunchedEffect(waiting) {
+        if (waiting) {
+            inputLine = ""
+            inputFocus.requestFocus()
+            keyboard?.show()
+        }
+    }
+
+    fun send() {
+        val line = inputLine + "\n"
+        inputLine = ""
+        coroutineScope.launch(Dispatchers.IO) { ScriptExecCore.sendInput(line.toByteArray(Charsets.UTF_8)) }
+    }
+
     // Trailing-edge throttle, not a continuous poll: the first
     // lines.size change starts a 100ms timer; further changes arriving
     // while that timer is running are discarded (no-op, not queued);
@@ -366,11 +392,13 @@ fun TerminalScreen(
                     icon = SymbolIcon.KEYBOARD_ARROW_UP,
                     label = "Previous line",
                     onClick = { viewModel.history.up()?.let { input = it } },
+                    enabled = !waiting,
                 )
                 TooltipIconButton(
                     icon = SymbolIcon.KEYBOARD_ARROW_DOWN,
                     label = "Next line",
                     onClick = { viewModel.history.down()?.let { input = it } },
+                    enabled = !waiting,
                 )
                 TooltipIconButton(
                     icon = SymbolIcon.STOP,
@@ -420,9 +448,11 @@ fun TerminalScreen(
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
                 OutlinedTextField(
-                    value = input,
-                    onValueChange = { input = it },
-                    modifier = Modifier.weight(1f),
+                    value = if (waiting) inputLine else input,
+                    onValueChange = { if (waiting) inputLine = it else input = it },
+                    modifier = Modifier.weight(1f).focusRequester(inputFocus),
+                    placeholder = if (waiting) ({ Text("Script input") }) else null,
+                    leadingIcon = if (waiting) ({ Symbol(SymbolIcon.KEYBOARD, contentDescription = null) }) else null,
                     textStyle = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
                     // Code input, not prose. The on-screen keyboard's autocorrect
                     // (on by default) silently mangles valid Python identifiers:
@@ -436,15 +466,21 @@ fun TerminalScreen(
                         autoCorrectEnabled = false,
                         capitalization = KeyboardCapitalization.None
                     ),
-                    keyboardActions = KeyboardActions(onSend = { run() }),
+                    keyboardActions = KeyboardActions(onSend = { if (waiting) send() else run() }),
+                    // Not singleLine = waiting: switching it makes Compose restore the old scroll state
+                    // into the other mode after a rotation, and the app crashes.
                     singleLine = false
                 )
                 Button(
-                    onClick = ::run,
-                    enabled = status is ConnectionStatus.Connected,
+                    onClick = { if (waiting) send() else run() },
+                    enabled = waiting || status is ConnectionStatus.Connected,
                     modifier = Modifier.padding(start = 8.dp),
                 ) {
-                    Symbol(SymbolIcon.PLAY_ARROW, contentDescription = "Run")
+                    if (waiting) {
+                        Symbol(SymbolIcon.SEND, contentDescription = "Send input")
+                    } else {
+                        Symbol(SymbolIcon.PLAY_ARROW, contentDescription = "Run")
+                    }
                 }
             }
         }

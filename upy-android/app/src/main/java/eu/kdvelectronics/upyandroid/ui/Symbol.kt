@@ -68,6 +68,7 @@ object SymbolIcon {
     const val INFO = 0xe88e
     const val KEYBOARD = 0xe312
     const val CLOSE = 0xe5cd
+    const val SEND = 0xe163
 }
 
 private val symbolFontFamily = FontFamily(Font(R.font.upy_symbols))
