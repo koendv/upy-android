@@ -76,7 +76,7 @@ DOWNLOAD = (
     "    return binascii.hexlify(h.digest()).decode()\n"
     "for path, url, want in %r:\n"
     "    try:\n"
-    "        http.download(url, path, timeout=60)\n"
+    "        http.download(url, path, progress=True, timeout=60)\n"
     "    except OSError as e:\n"
     "        print('DOWNLOAD', path, 'failed', e)\n"
     "        continue\n"

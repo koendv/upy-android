@@ -85,7 +85,7 @@ def download_missing():
     for path in missing:
         url, _, want = DOWNLOADS[path]
         try:
-            http.download(url, path)
+            http.download(url, path, progress=True)
         except OSError as e:
             print("%s: download failed, %s" % (path, e))
             continue
