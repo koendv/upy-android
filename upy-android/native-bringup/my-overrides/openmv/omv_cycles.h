@@ -4,8 +4,7 @@
 // this port's copied set is imlib.h's imlib_poll_events()/
 // imlib_poll_events_noexc() macros, which periodically yield to
 // MicroPython's event loop during long-running algorithms so Interrupt
-// stays responsive. Same purpose as this project's own
-// mp_hal_delay_ms() chunking (see mphalport.c).
+// stays responsive.
 //
 // "Cycles" here are just milliseconds (OMV_CPU_FREQ_HZ=1000, i.e. 1
 // cycle == 1ms) via CLOCK_MONOTONIC, not real CPU cycles. imlib.h's

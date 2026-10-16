@@ -1,0 +1,8 @@
+sleep_ms(1): True
+sleep_ms(10): True
+sleep_ms(100): True
+sleep_ms(1000): True
+sleep(0.25): True
+sleep(1): True
+sleep(0): True
+sleep_ms(0): True

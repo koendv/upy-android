@@ -164,6 +164,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeLastException(JNIEnv *env, jobjec
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeInterrupt(JNIEnv *, jobject) {
     mp_sched_keyboard_interrupt();
+    mp_android_doorbell_ring();
     // Also wakes a waiting camera snapshot() immediately. Safe from any
     // thread, same contract as this function's own.
     camera_interrupt_active_wait();

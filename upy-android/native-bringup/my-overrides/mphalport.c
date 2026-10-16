@@ -97,25 +97,48 @@ uint64_t mp_hal_time_ns(void) {
     return (uint64_t)ts.tv_sec * 1000000000ULL + (uint64_t)ts.tv_nsec;
 }
 
-// Chunked, not busy-waiting: each chunk is a real nanosleep() (thread
-// actually blocked/parked by the OS scheduler, no CPU spent), with a
-// mp_handle_pending() check between chunks so a long time.sleep() is
-// genuinely interruptible via the app's existing Interrupt button
-// (mp_sched_keyboard_interrupt() sets a pending exception that
-// MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS raises via nlr_raise,
-// unwinding out of this loop), not just at fixed VM bytecode points.
-// 5ms chunk is the worst-case interrupt latency, negligible per-chunk
-// syscall overhead at this granularity.
-#define MP_HAL_DELAY_CHUNK_MS (5)
+// One doorbell for every wait of the interpreter thread. The pending
+// exception (mp_sched_keyboard_interrupt) is the state; the doorbell only
+// wakes the waiter, so a stale ring costs one extra loop pass.
+#include <poll.h>
+#include <sys/eventfd.h>
+#include <unistd.h>
+
+static int doorbell_fd = -1;
+
+__attribute__((constructor)) static void doorbell_create(void) {
+    doorbell_fd = eventfd(0, EFD_NONBLOCK | EFD_CLOEXEC);
+}
+
+// Any thread.
+void mp_android_doorbell_ring(void) {
+    uint64_t one = 1;
+    ssize_t r = write(doorbell_fd, &one, sizeof(one));
+    (void)r;
+}
+
+// timeout_ms < 0: no timeout.
+void mp_android_doorbell_wait(long long timeout_ms) {
+    // eventfd failed: wait in 20 ms slices, the caller's loop still sees Interrupt.
+    if (doorbell_fd < 0 && (timeout_ms < 0 || timeout_ms > 20)) {
+        timeout_ms = 20;
+    }
+    struct pollfd pfd = { .fd = doorbell_fd, .events = POLLIN };
+    struct timespec ts = { .tv_sec = (time_t)(timeout_ms / 1000), .tv_nsec = (long)(timeout_ms % 1000) * 1000000L };
+    if (ppoll(&pfd, 1, timeout_ms < 0 ? NULL : &ts, NULL) > 0) {
+        uint64_t count;
+        ssize_t r = read(doorbell_fd, &count, sizeof(count));
+        (void)r;
+    }
+}
 
 void mp_hal_delay_ms(mp_uint_t ms) {
-    while (ms > 0) {
-        mp_uint_t chunk = ms < MP_HAL_DELAY_CHUNK_MS ? ms : MP_HAL_DELAY_CHUNK_MS;
-        struct timespec ts = { .tv_sec = 0, .tv_nsec = (long)chunk * 1000000L };
-        nanosleep(&ts, NULL);
-        ms -= chunk;
-        mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
+    mp_uint_t start = mp_hal_ticks_ms();
+    mp_uint_t elapsed;
+    while ((elapsed = mp_hal_ticks_ms() - start) < ms) {
+        mp_event_wait_ms(ms - elapsed);
     }
+    mp_handle_pending(MP_HANDLE_PENDING_CALLBACKS_AND_EXCEPTIONS);
 }
 
 void mp_hal_delay_us(mp_uint_t us) {

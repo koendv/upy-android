@@ -6,6 +6,17 @@
 // Include common MicroPython embed configuration.
 #include <port/mpconfigport_common.h>
 
+// Wait primitive, mphalport.c. mp_event_wait_ms() and the time module wait here.
+#ifdef __cplusplus
+extern "C" {
+#endif
+void mp_android_doorbell_ring(void);
+void mp_android_doorbell_wait(long long timeout_ms);
+#ifdef __cplusplus
+}
+#endif
+#define MICROPY_INTERNAL_WFE(TIMEOUT_MS)        mp_android_doorbell_wait(TIMEOUT_MS)
+
 // Extra-features level: f-strings, full collections, memoryview, etc.
 // Flash size is not a concern on Android.
 #define MICROPY_CONFIG_ROM_LEVEL                (MICROPY_CONFIG_ROM_LEVEL_EXTRA_FEATURES)
