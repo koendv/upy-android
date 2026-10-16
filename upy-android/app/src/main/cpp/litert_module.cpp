@@ -422,6 +422,44 @@ void close_buffer_set(BufferSet &bufs) {
 // bool tensors take a uint8 ('B') array of 0/1 bytes, reinterpreted as
 // C++ bool: safe on this target specifically (sizeof(bool) == 1 on arm64
 // clang), not a portable assumption in general.
+// Number of elements of tensor `index`, -1 when the shape is unknown or dynamic.
+long long tensor_element_count(litert_compiled_model_obj_t *self, bool is_output, mp_int_t index) {
+    mp_obj_t shape = tensor_shape(self, is_output, index);
+    if (shape == mp_const_none) {
+        return -1;
+    }
+    size_t rank;
+    mp_obj_t *dims;
+    mp_obj_tuple_get(shape, &rank, &dims);
+    long long count = 1;
+    for (size_t i = 0; i < rank; i++) {
+        mp_int_t dim = mp_obj_get_int(dims[i]);
+        if (dim <= 0) {
+            return -1;
+        }
+        count *= dim;
+    }
+    return count;
+}
+
+// run() input `index` must have exactly as many elements as the tensor, like
+// tflite's run(): a smaller array would leave part of the tensor unset, and
+// a larger one fails inside LiteRT. Not an array: write_array_to_buffer()
+// below reports that.
+void check_input_size(litert_compiled_model_obj_t *self, mp_int_t index, mp_obj_t arr_obj) {
+    if (!mp_obj_is_type(arr_obj, &mp_type_array)) {
+        return;
+    }
+    mp_buffer_info_t bufinfo;
+    mp_get_buffer_raise(arr_obj, &bufinfo, MP_BUFFER_READ);
+    size_t item_size = mp_binary_get_size('@', bufinfo.typecode, nullptr);
+    long long want = tensor_element_count(self, false, index);
+    if (want >= 0 && (long long) (bufinfo.len / item_size) != want) {
+        mp_raise_msg_varg(&mp_type_ValueError, MP_ERROR_TEXT("litert: input %d has %d elements, the tensor needs %d"),
+            (int) index, (int) (bufinfo.len / item_size), (int) want);
+    }
+}
+
 void write_array_to_buffer(LitertHandleNode *node, mp_obj_t arr_obj) {
     if (!mp_obj_is_type(arr_obj, &mp_type_array)) {
         raise_os_error(MP_EINVAL, "litert: run() arguments must be array.array");
@@ -566,6 +604,7 @@ mp_obj_t litert_compiled_model_run(size_t n_args, const mp_obj_t *args) {
     }
 
     for (size_t i = 0; i < inputs.count; i++) {
+        check_input_size(self, (mp_int_t) i, args[1 + i]);
         write_array_to_buffer(inputs.nodes[i], args[1 + i]);
     }
 
@@ -679,7 +718,7 @@ const char litert_help_text[] =
     "errors:\n"
     "  OSError(EINVAL): construction with a closed/wrong-type Environment or Options, a call on a closed CompiledModel, a bad tensor index, or a dtype outside dtypes_supported\n"
     "  OSError(EIO): compile, buffer creation, write, run, or read failure (Kotlin/JNI exception text is forwarded)\n"
-    "  ValueError: wrong number of run() arguments\n"
+    "  ValueError: wrong number of run() arguments, or an input array whose number of elements differs from the tensor's (input_shape(i))\n"
     "functions:\n"
     "  version(): \"LITERT,MAKER,MODEL\", e.g. \"2.3.0,QTI,SM8650\"; LiteRT version and chip; they select the NPU runtime, see NPU runtime below\n"
     "accelerators:\n"
