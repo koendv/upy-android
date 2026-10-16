@@ -130,7 +130,7 @@ out = device(
     "        print('no error')\n"
     "    except OSError as e:\n"
     "        print('OSError', e.errno)\n"
-    "print(sorted(os.listdir('/')).count('evil.txt'), 'ok.txt' in os.listdir('ev/inner'))\n"
+    "print(sorted(os.listdir('/')).count('evil.txt'), 'ev' in os.listdir('/'))\n"
 )
 check("zip-slip entry", out == "OSError 5\nOSError 5\n0 False\n", repr(out))
 
@@ -192,6 +192,8 @@ check("corrupt file", lines[0] == str(errno.EIO), repr(out))
 check("missing file", lines[1:4] == [str(errno.ENOENT)] * 3, repr(out))
 check("path outside root", lines[4] == str(errno.EIO), repr(out))
 check("dest is a file", lines[5] == str(errno.EIO), repr(out))
+out = device("import os\nprint('x' in os.listdir('/'))\n")
+check("no folder after a failed read", out == "False\n", repr(out))
 
 # An entry larger than the heap is written and extracted without holding it in memory.
 out = device(

@@ -27,8 +27,9 @@ fun info(zip: String): Array<String> =
 fun extractAll(zip: String, dest: String) {
     val destDir = resolve(dest)
     if (destDir.exists() && !destDir.isDirectory) throw IOException("not a folder: $dest")
-    destDir.mkdirs()
     ZipFile(resolve(zip)).use { z ->
+        // After the archive opened: a missing or refused archive leaves no folder.
+        destDir.mkdirs()
         for (entry in z.entries()) {
             val name = entry.name
             if (name.startsWith("/") || name.split('/').contains("..")) {
