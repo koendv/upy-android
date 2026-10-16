@@ -21,20 +21,25 @@ fun info(zip: String): Array<String> =
         z.entries().asSequence().map { "${maxOf(it.size, 0L)} ${it.name}" }.toList().toTypedArray()
     }
 
-// Extracts every entry into the folder dest. An entry stops the extraction
-// with an IOException when its name has a leading "/" or a ".." part, or when
-// its CRC does not match. Entries before it stay on disk.
+private fun checkName(name: String) {
+    if (name.startsWith("/") || name.split('/').contains("..")) {
+        throw IOException("unsafe entry name: $name")
+    }
+}
+
+// Extracts every entry into the folder dest. A name with a leading "/" or a
+// ".." part is refused before anything is extracted (Android 14 and newer
+// already refuse the archive when it is opened). A wrong CRC stops the
+// extraction with an IOException; entries before it stay on disk.
 fun extractAll(zip: String, dest: String) {
     val destDir = resolve(dest)
     if (destDir.exists() && !destDir.isDirectory) throw IOException("not a folder: $dest")
     ZipFile(resolve(zip)).use { z ->
-        // After the archive opened: a missing or refused archive leaves no folder.
+        for (entry in z.entries()) checkName(entry.name)
+        // After the archive opened and its names passed: a missing or refused archive leaves no folder.
         destDir.mkdirs()
         for (entry in z.entries()) {
             val name = entry.name
-            if (name.startsWith("/") || name.split('/').contains("..")) {
-                throw IOException("unsafe entry name: $name")
-            }
             val out = File(destDir, name)
             if (entry.isDirectory) {
                 out.mkdirs()

@@ -132,7 +132,9 @@ out = device(
     "        print('OSError', e.errno)\n"
     "print(sorted(os.listdir('/')).count('evil.txt'), 'ev' in os.listdir('/'))\n"
 )
-check("zip-slip entry", out == "OSError 5\nOSError 5\n0 False\n", repr(out))
+# Android 14 and newer refuse the archive when it is opened, so info raises too; older
+# Android lists the names, and read raises before it extracts anything.
+check("zip-slip entry", out in ("OSError 5\nOSError 5\n0 False\n", "no error\nOSError 5\n0 False\n"), repr(out))
 
 with host_zipfile.ZipFile(os.path.join(work, "abs.zip"), "w") as z:
     z.writestr("/abs.txt", "bad")
