@@ -5,6 +5,7 @@ import base64
 import os
 import re
 import subprocess
+import time
 
 PACKAGE = "eu.kdvelectronics.upyandroid"
 URI = "content://%s.exec" % PACKAGE
@@ -97,6 +98,36 @@ def run_script(src_text, reset_first=True):
     if error is None and reset_first and last_reset != "done":
         return None, "app too old for reset in run (adb exec protocol 3): update the app"
     return output, error
+
+
+def send_input(data):
+    """Bytes (or str, sent as UTF-8) for the running script's sys.stdin or
+    input(). The caller adds its own newline: "yes\\n". Same shape as
+    content_call: (output, error); error is "not_running" when no script
+    runs."""
+    if isinstance(data, str):
+        data = data.encode("utf-8")
+    return content_call("input", base64.b64encode(data).decode("ascii"))
+
+
+def wait_for_input(timeout=30):
+    """Polls status until the running script waits for input. Returns
+    (prompt, None), or (None, error) after timeout seconds. An adb call
+    takes about a second, so this polls about once a second."""
+    deadline = time.time() + timeout
+    while True:
+        status, error = content_call("status")
+        if error is not None:
+            return None, error
+        lines = status.split("\n")
+        if "input: waiting" in lines:
+            for line in lines:
+                if line.startswith("prompt: "):
+                    return line[len("prompt: "):], None
+            return "", None
+        if time.time() > deadline:
+            return None, "timed out waiting for the script to ask for input"
+        time.sleep(0.2)
 
 
 def stage_fixture(local_path, device_filename):

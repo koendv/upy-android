@@ -93,6 +93,14 @@ set_source_files_properties(micropython_embed/openmv/py_crc.c
     COMPILE_DEFINITIONS "MICROPY_PY_CRC=1"
 )
 
+# vfs_posix_file.c defines sys.stdin/stdout/stderr on fd 0, 1 and 2, which would
+# send print() to the process's own stdout. The objects of
+# shared/runtime/sys_stdio_mphal.c (the app's log and stdin FIFO) take these names.
+set_source_files_properties(micropython_embed/extmod/vfs_posix_file.c
+    PROPERTIES
+    COMPILE_DEFINITIONS "mp_sys_stdin_obj=mp_vfs_posix_stdin_obj;mp_sys_stdout_obj=mp_vfs_posix_stdout_obj;mp_sys_stderr_obj=mp_vfs_posix_stderr_obj"
+)
+
 # libLiteRt.so is a real prebuilt .so (see NOTICE.html for licensing;
 # extracted from the litert AAR by build.gradle.kts's extractLitert
 # task), not something this project compiles. Headers: litert/include/,

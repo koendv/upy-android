@@ -60,6 +60,25 @@ class EngineService : Service() {
             }
         }
 
+        // Set and cleared via setOutputListener(); read from the worker
+        // thread (output chunks, inputWaiting) and Binder threads.
+        @Volatile
+        private var outputListener: IEngineOutputListener? = null
+
+        @Volatile
+        private var inputWaitingState = false
+
+        // Called from native (engine_jni.cpp) on the worker thread.
+        @JvmStatic
+        fun inputWaiting(waiting: Boolean) {
+            inputWaitingState = waiting
+            try {
+                outputListener?.onInputWaiting(waiting)
+            } catch (e: RemoteException) {
+                // Main process is gone; a new one is told on connect.
+            }
+        }
+
         // Screen lock for an open camera, -1 for none. Kept so a
         // reconnecting UI gets it again (setShareListener()).
         @Volatile
@@ -84,12 +103,6 @@ class EngineService : Service() {
     // like other Context methods, is not safely available during a
     // Service's own constructor, only from onCreate() onward.
     private lateinit var worker: EngineWorker
-
-    // Set and cleared via setOutputListener() below. Written from a
-    // Binder thread pool thread, read from the worker thread inside
-    // exec().
-    @Volatile
-    private var outputListener: IEngineOutputListener? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -128,6 +141,8 @@ class EngineService : Service() {
             }
         }
 
+        override fun sendInput(data: ByteArray): Int = Engine.nativeSendInput(data)
+
         override fun interrupt() = worker.interrupt()
         // A reset ends the script, so its location updates end too.
         // Interrupt first, or the reset waits until the script ends.
@@ -139,6 +154,9 @@ class EngineService : Service() {
 
         override fun setOutputListener(listener: IEngineOutputListener?) {
             outputListener = listener
+            if (listener != null && inputWaitingState) {
+                listener.onInputWaiting(true)
+            }
         }
 
         override fun setShareListener(listener: IEngineShareListener?) {

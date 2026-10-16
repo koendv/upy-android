@@ -12,8 +12,10 @@ import android.view.Surface
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
@@ -27,6 +29,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
@@ -49,6 +53,7 @@ import eu.kdvelectronics.upyandroid.ui.LicensesScreen
 import eu.kdvelectronics.upyandroid.ui.CameraScreen
 import eu.kdvelectronics.upyandroid.ui.EditorScreen
 import eu.kdvelectronics.upyandroid.ui.ExplorerScreen
+import eu.kdvelectronics.upyandroid.ui.InputPopup
 import eu.kdvelectronics.upyandroid.ui.SettingsScreen
 import eu.kdvelectronics.upyandroid.ui.Symbol
 import eu.kdvelectronics.upyandroid.ui.SymbolIcon
@@ -207,79 +212,82 @@ class MainActivity : ComponentActivity() {
                     NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(currentWindowAdaptiveInfoV2())
                 }
 
-                NavigationSuiteScaffold(
-                    navigationSuiteItems = {
-                        TopLevelDestination.entries.forEach { destination ->
-                            item(
-                                selected = currentRoute == destination.route,
-                                onClick = { navController.navigateToTab(destination.route) },
-                                icon = {
-                                    Symbol(destination.icon, contentDescription = null)
-                                },
-                                label = { Text(destination.label) },
-                            )
-                        }
-                    },
-                    layoutType = layoutType,
-                ) {
-                    NavHost(navController = navController, startDestination = TopLevelDestination.TERMINAL.route) {
-                        composable(TopLevelDestination.TERMINAL.route) {
-                            TerminalScreen(
-                                viewModel = vm,
-                                terminalManager = terminalManager,
-                                status = status,
-                                onReconnect = { ScriptExecCore.connect(applicationContext) },
-                            )
-                        }
-                        composable(TopLevelDestination.SETTINGS.route) {
-                            SettingsScreen(
-                                settingsManager = settingsManager,
-                                onSettingsChanged = {
-                                    ScriptExecCore.pushSettings()
-                                    SshServerManager.applySettings(applicationContext, settingsManager)
-                                },
-                                onOpenAbout = { navController.navigate("about") },
-                            )
-                        }
-                        composable(TopLevelDestination.CAMERA.route) {
-                            CameraScreen()
-                        }
-                        composable(TopLevelDestination.EXPLORER.route) {
-                            ExplorerScreen(
-                                filesManager = filesManager,
-                                onEdit = { file ->
-                                    pendingFile.value = file
-                                    navController.navigate("editor")
-                                },
-                                onRun = { content -> runAndShowTerminal(content) },
-                                focus = focus,
-                                onFocusShown = { sharedFocus.value = null },
-                            )
-                        }
-                        composable("editor") {
-                            pendingFile.value?.let { file ->
-                                EditorScreen(
-                                    filesManager = filesManager,
-                                    file = file,
-                                    onRun = { content -> runAndShowTerminal(content) },
-                                    onBack = { navController.popBackStack() }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    NavigationSuiteScaffold(
+                        navigationSuiteItems = {
+                            TopLevelDestination.entries.forEach { destination ->
+                                item(
+                                    selected = currentRoute == destination.route,
+                                    onClick = { navController.navigateToTab(destination.route) },
+                                    icon = {
+                                        Symbol(destination.icon, contentDescription = null)
+                                    },
+                                    label = { Text(destination.label) },
                                 )
                             }
-                        }
-                        composable("about") {
-                            AboutScreen(
-                                onBack = { navController.popBackStack() },
-                                onOpenAttributions = { navController.navigate("attributions") },
-                                onOpenLicenses = { navController.navigate("licenses") },
-                            )
-                        }
-                        composable("attributions") {
-                            AttributionsScreen(onBack = { navController.popBackStack() })
-                        }
-                        composable("licenses") {
-                            LicensesScreen(onBack = { navController.popBackStack() })
+                        },
+                        layoutType = layoutType,
+                    ) {
+                        NavHost(navController = navController, startDestination = TopLevelDestination.TERMINAL.route) {
+                            composable(TopLevelDestination.TERMINAL.route) {
+                                TerminalScreen(
+                                    viewModel = vm,
+                                    terminalManager = terminalManager,
+                                    status = status,
+                                    onReconnect = { ScriptExecCore.connect(applicationContext) },
+                                )
+                            }
+                            composable(TopLevelDestination.SETTINGS.route) {
+                                SettingsScreen(
+                                    settingsManager = settingsManager,
+                                    onSettingsChanged = {
+                                        ScriptExecCore.pushSettings()
+                                        SshServerManager.applySettings(applicationContext, settingsManager)
+                                    },
+                                    onOpenAbout = { navController.navigate("about") },
+                                )
+                            }
+                            composable(TopLevelDestination.CAMERA.route) {
+                                CameraScreen()
+                            }
+                            composable(TopLevelDestination.EXPLORER.route) {
+                                ExplorerScreen(
+                                    filesManager = filesManager,
+                                    onEdit = { file ->
+                                        pendingFile.value = file
+                                        navController.navigate("editor")
+                                    },
+                                    onRun = { content -> runAndShowTerminal(content) },
+                                    focus = focus,
+                                    onFocusShown = { sharedFocus.value = null },
+                                )
+                            }
+                            composable("editor") {
+                                pendingFile.value?.let { file ->
+                                    EditorScreen(
+                                        filesManager = filesManager,
+                                        file = file,
+                                        onRun = { content -> runAndShowTerminal(content) },
+                                        onBack = { navController.popBackStack() }
+                                    )
+                                }
+                            }
+                            composable("about") {
+                                AboutScreen(
+                                    onBack = { navController.popBackStack() },
+                                    onOpenAttributions = { navController.navigate("attributions") },
+                                    onOpenLicenses = { navController.navigate("licenses") },
+                                )
+                            }
+                            composable("attributions") {
+                                AttributionsScreen(onBack = { navController.popBackStack() })
+                            }
+                            composable("licenses") {
+                                LicensesScreen(onBack = { navController.popBackStack() })
+                            }
                         }
                     }
+                    InputPopup(Modifier.align(Alignment.BottomCenter))
                 }
             }
         }

@@ -28,6 +28,10 @@ object Engine {
     external fun nativeExec(code: String, sink: EngineOutputSink?): String
     external fun nativeLastException(): String
     external fun nativeInterrupt()
+
+    // Safe from any thread. Bytes for sys.stdin / input(). Returns how many
+    // bytes the 64 KB FIFO accepted, or -1 when no script runs.
+    external fun nativeSendInput(data: ByteArray): Int
     external fun nativeReset(stackSizeBytes: Int, rootPath: String)
     external fun nativeDeinit()
 

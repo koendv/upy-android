@@ -99,6 +99,23 @@ SettingsSnapshot settings_snapshot_get() {
 // needs nothing beyond a JNIEnv). Read once here, at :engine's own
 // init time, same "read once, not pushed live" tier as
 // heapSizeMb/rootPath.
+// Script input: a read on an empty stdin FIFO tells the UI (EngineService
+// forwards to IEngineOutputListener.onInputWaiting). Called on the worker
+// thread, inside nativeExec().
+static jclass g_engine_service_class;
+static jmethodID g_input_waiting_method;
+
+static void input_waiting_cb(int waiting) {
+    JNIEnv *env = nullptr;
+    if (g_jvm == nullptr || g_jvm->GetEnv(reinterpret_cast<void **>(&env), JNI_VERSION_1_6) != JNI_OK) {
+        return;
+    }
+    env->CallStaticVoidMethod(g_engine_service_class, g_input_waiting_method, static_cast<jboolean>(waiting != 0));
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+}
+
 extern "C" JNIEXPORT jboolean JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint stackSizeBytes, jint heapSizeMb, jstring rootPath, jobject applicationContext) {
     if (g_initialized) {
@@ -112,6 +129,11 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint s
         location_bridge_init(env);
         mqtt_bridge_init(env);
         camera_bridge_init(env);
+        jclass service_class = env->FindClass("eu/kdvelectronics/upyandroid/EngineService");
+        g_engine_service_class = static_cast<jclass>(env->NewGlobalRef(service_class));
+        g_input_waiting_method = env->GetStaticMethodID(service_class, "inputWaiting", "(Z)V");
+        env->DeleteLocalRef(service_class);
+        mp_android_stdin_set_waiting_cb(&input_waiting_cb);
     }
     const char *root_path_chars = env->GetStringUTFChars(rootPath, nullptr);
     allocate_heap(static_cast<int>(heapSizeMb));
@@ -143,7 +165,9 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeExec(JNIEnv *env, jobject, jstrin
 
     // An interrupt sent while no script was running would hit this one.
     MP_STATE_MAIN_THREAD(mp_pending_exception) = MP_OBJ_NULL;
+    mp_android_script_active(1);
     mp_embed_exec_str(code_chars);
+    mp_android_script_active(0);
 
     mp_embed_set_output_chunk_cb(nullptr, nullptr);
     const char *output = mp_embed_output_get();
@@ -164,11 +188,23 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeLastException(JNIEnv *env, jobjec
 extern "C" JNIEXPORT void JNICALL
 Java_eu_kdvelectronics_upyandroid_Engine_nativeInterrupt(JNIEnv *, jobject) {
     mp_sched_keyboard_interrupt();
+    mp_android_stdin_clear();
     mp_android_doorbell_ring();
     // Also wakes a waiting camera snapshot() immediately. Safe from any
     // thread, same contract as this function's own.
     camera_interrupt_active_wait();
     location_interrupt_wait();
+}
+
+// Safe from any thread. Returns the number of bytes put into the stdin
+// FIFO, or -1 when no script runs.
+extern "C" JNIEXPORT jint JNICALL
+Java_eu_kdvelectronics_upyandroid_Engine_nativeSendInput(JNIEnv *env, jobject, jbyteArray data) {
+    jsize len = env->GetArrayLength(data);
+    jbyte *bytes = env->GetByteArrayElements(data, nullptr);
+    int accepted = mp_android_stdin_push(bytes, static_cast<size_t>(len));
+    env->ReleaseByteArrayElements(data, bytes, JNI_ABORT);
+    return accepted;
 }
 
 // Must be called on the worker thread, like nativeExec. Cameras,

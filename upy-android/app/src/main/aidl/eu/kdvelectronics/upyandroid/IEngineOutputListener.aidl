@@ -9,4 +9,9 @@ package eu.kdvelectronics.upyandroid;
 // reentrancy.
 oneway interface IEngineOutputListener {
     void onOutputChunk(String text);
+
+    // A running script waits for input (true) or no longer does (false):
+    // sys.stdin.read/readline, input(). Sent when a read finds the stdin
+    // FIFO empty, and when the read gets its data or the script ends.
+    void onInputWaiting(boolean waiting);
 }

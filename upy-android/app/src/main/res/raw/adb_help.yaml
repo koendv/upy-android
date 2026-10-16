@@ -1,6 +1,6 @@
 name: upy-android adb exec
 source: https://github.com/koendv/upy-android
-protocol: 3
+protocol: 4
 runtime: MicroPython ports/embed, OpenMV subset
 model: each run executes one whole script; no REPL
 call: "adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method <method> [--arg <arg>] [--extra timeout:i:<seconds>] [--extra reset:b:true]"
@@ -11,20 +11,24 @@ reply:
   error: "Result: Bundle[{error=<code>}]"
 methods:
   help: this page
-  status: protocol, app version, commit, build date, engine connected, busy, screen, foreground, camera available (else why not)
+  status: protocol, app version, commit, build date, engine connected, busy, input waiting, prompt (only while input is waiting), screen, foreground, camera available (else why not)
   run: {arg: base64 utf-8 script, extra timeout (seconds, optional): interrupt after it, extra reset (optional): fresh interpreter first, returns: stdout, traceback, status}
   reset: fresh interpreter
   interrupt: stop running script
+  input: "arg: base64 bytes for the script's sys.stdin or input(), sent unchanged: the caller adds its own newline, for example the bytes yes plus a newline answers input(); returns: ack"
 errors:
   busy: another script running, possibly from app UI
   disconnected: engine not connected
   disabled: adb exec disabled in app settings
-  missing_arg: run without --arg
+  missing_arg: run or input without --arg
   bad_base64: arg not valid base64
+  not_running: input while no script runs
+  full: input did not fit in the 64 KB stdin buffer, the message says how many bytes were accepted
   unknown_method: see methods
 state:
   - globals persist across runs; reset clears
   - run blocks until done, or until the optional timeout; interrupt via second call
+  - a script that reads stdin (input(), sys.stdin.readline(), sys.stdin.read(n), sys.stdin.read()) waits for the app's input pop-up or for adb input; status shows "input: waiting" and the question as "prompt:". Send answers with input while run is still blocked, from a second call. Bytes sent before the script reads wait in the buffer (type-ahead). The typed bytes appear in the app's log, not in run's output. sys.stdin.read() waits only when the buffer is empty, then returns everything in it; read(n) waits until n characters have arrived; there is no EOF
   - camera needs screen on, unlocked, app in foreground: check status first
 limits:
   output: max 128 KB; longer output ends with ".[truncated]" (1-4 dots); write large results to a file

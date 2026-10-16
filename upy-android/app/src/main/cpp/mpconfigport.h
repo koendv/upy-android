@@ -5,12 +5,20 @@
 
 // Include common MicroPython embed configuration.
 #include <port/mpconfigport_common.h>
+#include <stddef.h>
+#include <stdint.h>
 
 // Wait primitive, mphalport.c. mp_event_wait_ms() and the time module wait here.
 #ifdef __cplusplus
 extern "C" {
 #endif
 void mp_android_doorbell_ring(void);
+// Script input, mphalport.c. Any thread unless noted.
+void mp_android_stdin_set_waiting_cb(void (*cb)(int waiting));
+void mp_android_script_active(int active);
+int mp_android_stdin_push(const void *data, size_t len);  // bytes accepted, -1: no script runs
+void mp_android_stdin_clear(void);
+size_t mp_android_stdin_read_available(uint8_t *buf, size_t max);  // interpreter thread
 void mp_android_doorbell_wait(long long timeout_ms);
 #ifdef __cplusplus
 }
@@ -20,10 +28,10 @@ void mp_android_doorbell_wait(long long timeout_ms);
 // Extra-features level: f-strings, full collections, memoryview, etc.
 // Flash size is not a concern on Android.
 #define MICROPY_CONFIG_ROM_LEVEL                (MICROPY_CONFIG_ROM_LEVEL_EXTRA_FEATURES)
-// No stdin, no readline.
-#define MICROPY_PY_BUILTINS_INPUT               (0)
-// vfs_posix_file.c's sys.stdout writes to fd 1, not the terminal: print() output lost.
-#define MICROPY_PY_SYS_STDFILES                 (0)
+// sys.stdin/stdout/stderr and input(): shared/runtime/sys_stdio_mphal.c, mphalport.c.
+// CMakeLists.txt renames the fd-based mp_sys_std*_obj of vfs_posix_file.c.
+#define MICROPY_PY_BUILTINS_INPUT               (1)
+#define MICROPY_PY_SYS_STDFILES                 (1)
 
 // MicroPython configuration.
 #define MICROPY_ENABLE_COMPILER                 (1)

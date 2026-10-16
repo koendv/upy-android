@@ -24,6 +24,10 @@ cp my-overrides/shared-runtime/*.c my-overrides/shared-runtime/*.h micropython_e
 # already by `make -f micropython_embed.mk`'s own android-extmod-package
 # target (embed-android.mk), fetched fresh from $(MICROPYTHON_TOP)
 # instead of vendored in my-overrides/.
+# readline.h only: py/modbuiltins.c includes it for input() (CHAR_CTRL_C); the
+# line reading itself is mp_android_readline in mphalport.c.
+mkdir -p micropython_embed/shared/readline
+cp my-overrides/shared-readline/readline.h micropython_embed/shared/readline/readline.h
 mkdir -p micropython_embed/shared/timeutils
 cp my-overrides/shared-timeutils/timeutils.h micropython_embed/shared/timeutils/timeutils.h
 # ulab (numpy/scipy-like numerical extension, not a core MicroPython

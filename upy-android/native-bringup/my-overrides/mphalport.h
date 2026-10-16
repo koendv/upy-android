@@ -39,3 +39,7 @@
             break; \
         } \
 }
+
+// input() reads a line with this function, not shared/readline.
+int mp_android_readline(vstr_t *line, const char *prompt);
+#define mp_hal_readline mp_android_readline

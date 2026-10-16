@@ -18,6 +18,12 @@ interface IEngine {
     // pending-exception flag the running script's VM loop polls.
     void interrupt();
 
+    // Raw bytes for the running script's sys.stdin / input(). Not queued
+    // behind exec(): the bytes go into a 64 KB FIFO. Returns the number of
+    // bytes accepted (fewer than data.length when the FIFO is full), or -1
+    // when no script runs.
+    int sendInput(in byte[] data);
+
     // Explicit, fast, deterministic in-process reset. Not unbind/rebind.
     void reset();
 

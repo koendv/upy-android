@@ -1,7 +1,7 @@
 # test: required
 # runs: host
 #
-# adb exec protocol 3, checked from the PC: status, run status and
+# adb exec protocol 4, checked from the PC: status, run status and
 # exception, reset in run, timeout, interrupt, output limit, NUL and UTF-8.
 # Loops stop by themselves after 10 s, so a broken timeout or interrupt
 # fails the check instead of hanging it.
@@ -31,7 +31,7 @@ def run(script, extras=()):
 core.content_call("reset")
 
 status, error = core.content_call("status")
-fields = ("protocol: 3", "app:", "commit:", "built:", "engine: connected", "busy:", "screen:", "foreground:", "camera:")
+fields = ("protocol: 4", "app:", "commit:", "built:", "engine: connected", "busy:", "screen:", "foreground:", "camera:")
 missing = [f for f in fields if error is not None or f not in status]
 check("status fields", not missing, "missing %s" % missing)
 

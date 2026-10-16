@@ -90,6 +90,11 @@ object TerminalLog {
         _lines.value = Snapshot(buffer.toList())
     }
 
+    // Text of the last line, complete or still pending: the question a
+    // waiting script has just printed. "" when the log is empty.
+    @Synchronized
+    fun lastLineText(): String = buffer.lastOrNull()?.text ?: ""
+
     @Synchronized
     fun clear() {
         buffer.clear()

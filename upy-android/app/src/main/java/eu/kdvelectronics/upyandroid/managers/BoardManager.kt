@@ -55,9 +55,16 @@ class BoardManager(
     @Volatile
     private var chunkListener: ((String) -> Unit)? = null
 
+    @Volatile
+    private var inputWaitingListener: ((Boolean) -> Unit)? = null
+
     private val outputListenerStub = object : IEngineOutputListener.Stub() {
         override fun onOutputChunk(text: String) {
             chunkListener?.invoke(text)
+        }
+
+        override fun onInputWaiting(waiting: Boolean) {
+            inputWaitingListener?.invoke(waiting)
         }
     }
 
@@ -175,6 +182,22 @@ class BoardManager(
      */
     fun setOutputListener(listener: ((String) -> Unit)?) {
         chunkListener = listener
+    }
+
+    /** Called when a running script starts or stops waiting for input. */
+    fun setInputWaitingListener(listener: ((Boolean) -> Unit)?) {
+        inputWaitingListener = listener
+    }
+
+    /**
+     * Bytes for the running script's sys.stdin. Returns the number of
+     * bytes accepted, or -1 when no script runs or the engine is gone.
+     * Not queued behind exec(): call from any thread except the UI thread.
+     */
+    fun sendInput(data: ByteArray): Int = try {
+        engine?.sendInput(data) ?: -1
+    } catch (re: RemoteException) {
+        -1
     }
 
     /**

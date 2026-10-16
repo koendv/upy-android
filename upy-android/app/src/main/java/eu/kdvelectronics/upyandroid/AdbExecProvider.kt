@@ -57,6 +57,7 @@ class AdbExecProvider : ContentProvider() {
                 ScriptExecCore.interrupt(appContext)
                 Bundle()
             }
+            "input" -> handleInput(arg)
             else -> Bundle().apply { putString("error", "unknown_method - try --method help") }
         }
     }
@@ -82,6 +83,7 @@ class AdbExecProvider : ContentProvider() {
         val commit = buildInfo.getProperty("git.commit", "unknown").take(7) +
             if (buildInfo.getProperty("git.dirty") == "true") "-dirty" else ""
         val connected = ScriptExecCore.status.value is ConnectionStatus.Connected
+        val waiting = ScriptExecCore.inputWaiting.value
 
         val screenOn = appContext.getSystemService(PowerManager::class.java).isInteractive
         val locked = appContext.getSystemService(KeyguardManager::class.java).isKeyguardLocked
@@ -103,10 +105,32 @@ class AdbExecProvider : ContentProvider() {
             "built: ${buildInfo.getProperty("build.date", "unknown")}\n" +
             "engine: ${if (connected) "connected" else "disconnected"}\n" +
             "busy: ${if (ScriptExecCore.busy) "yes" else "no"}\n" +
+            "input: ${if (waiting) "waiting" else "no"}\n" +
+            (if (waiting) "prompt: ${TerminalLog.lastLineText()}\n" else "") +
             "screen: ${if (!screenOn) "off" else if (locked) "on, locked" else "on, unlocked"}\n" +
             "foreground: ${if (foreground) "yes" else "no"}\n" +
             "camera: " + if (cameraBlockers.isEmpty()) "available\n" else "unavailable (${cameraBlockers.joinToString(", ")})\n"
         return Bundle().apply { putString("output", text) }
+    }
+
+    // Raw bytes for the running script's stdin: the caller adds its own
+    // "\n". Does not wait for the script, and works while the run call that
+    // started the script is still blocked.
+    private fun handleInput(arg: String?): Bundle {
+        if (arg.isNullOrEmpty()) {
+            return Bundle().apply { putString("error", "missing_arg - input needs --arg <base64 bytes>") }
+        }
+        val bytes = try {
+            Base64.decode(arg, Base64.DEFAULT)
+        } catch (e: IllegalArgumentException) {
+            return Bundle().apply { putString("error", "bad_base64") }
+        }
+        val accepted = ScriptExecCore.sendInput(bytes)
+        return when {
+            accepted < 0 -> Bundle().apply { putString("error", "not_running") }
+            accepted < bytes.size -> Bundle().apply { putString("error", "full - accepted $accepted of ${bytes.size} bytes") }
+            else -> Bundle()
+        }
     }
 
     private fun handleRun(arg: String?, timeoutSeconds: Int, resetFirst: Boolean): Bundle {
@@ -161,7 +185,7 @@ class AdbExecProvider : ContentProvider() {
     companion object {
         // Bump on any change to methods, args or reply format. Also in
         // res/raw/adb_help.yaml.
-        const val PROTOCOL_VERSION = 3
+        const val PROTOCOL_VERSION = 4
     }
 
     override fun query(

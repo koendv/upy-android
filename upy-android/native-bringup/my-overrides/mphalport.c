@@ -7,8 +7,12 @@
 // JNI wrapper is expected to call mp_embed_output_clear() before, then
 // mp_embed_output_get() after, each mp_embed_exec_str() call.
 
+#include <pthread.h>
 #include <string.h>
 #include "py/mphal.h"
+#include "py/runtime.h"
+#include "py/stream.h"
+#include "shared/readline/readline.h"
 #include "micropython_embed.h"
 
 // Each run's output goes back over Binder twice (engine -> app -> adb), as
@@ -160,5 +164,129 @@ void mp_hal_stdout_tx_strn_cooked(const char *str, size_t len) {
     }
     if (mp_embed_output_chunk_cb != NULL && len > 0) {
         mp_embed_output_chunk_cb(str, len, mp_embed_output_chunk_cb_context);
+    }
+}
+
+mp_uint_t mp_hal_stdout_tx_strn(const char *str, size_t len) {
+    mp_hal_stdout_tx_strn_cooked(str, len);
+    return len;
+}
+
+// stdin: a FIFO that the UI and adb fill (any thread) and the interpreter
+// thread empties. The doorbell wakes a waiting read or poll.
+#define STDIN_FIFO_SIZE (64 * 1024)
+
+static pthread_mutex_t stdin_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint8_t stdin_buf[STDIN_FIFO_SIZE];
+static size_t stdin_head;
+static size_t stdin_len;
+static bool script_active;
+static bool stdin_waiting;
+static void (*stdin_waiting_cb)(int waiting);
+
+void mp_android_stdin_set_waiting_cb(void (*cb)(int waiting)) {
+    stdin_waiting_cb = cb;
+}
+
+static void stdin_set_waiting(bool waiting) {
+    if (stdin_waiting != waiting) {
+        stdin_waiting = waiting;
+        if (stdin_waiting_cb != NULL) {
+            stdin_waiting_cb(waiting);
+        }
+    }
+}
+
+// A script starts or ends: the FIFO is emptied, and a read that was
+// interrupted no longer counts as waiting.
+void mp_android_script_active(int active) {
+    pthread_mutex_lock(&stdin_lock);
+    script_active = active;
+    stdin_len = 0;
+    pthread_mutex_unlock(&stdin_lock);
+    if (!active) {
+        stdin_set_waiting(false);
+    }
+}
+
+void mp_android_stdin_clear(void) {
+    pthread_mutex_lock(&stdin_lock);
+    stdin_len = 0;
+    pthread_mutex_unlock(&stdin_lock);
+}
+
+// Returns the number of bytes accepted, or -1 when no script runs.
+int mp_android_stdin_push(const void *data, size_t len) {
+    pthread_mutex_lock(&stdin_lock);
+    if (!script_active) {
+        pthread_mutex_unlock(&stdin_lock);
+        return -1;
+    }
+    size_t n = STDIN_FIFO_SIZE - stdin_len;
+    if (n > len) {
+        n = len;
+    }
+    for (size_t i = 0; i < n; i++) {
+        stdin_buf[(stdin_head + stdin_len + i) % STDIN_FIFO_SIZE] = ((const uint8_t *)data)[i];
+    }
+    stdin_len += n;
+    pthread_mutex_unlock(&stdin_lock);
+    mp_android_doorbell_ring();
+    return (int)n;
+}
+
+size_t mp_android_stdin_read_available(uint8_t *buf, size_t max) {
+    pthread_mutex_lock(&stdin_lock);
+    size_t n = stdin_len < max ? stdin_len : max;
+    for (size_t i = 0; i < n; i++) {
+        buf[i] = stdin_buf[(stdin_head + i) % STDIN_FIFO_SIZE];
+    }
+    stdin_head = (stdin_head + n) % STDIN_FIFO_SIZE;
+    stdin_len -= n;
+    pthread_mutex_unlock(&stdin_lock);
+    return n;
+}
+
+// Blocks while the FIFO is empty. The UI is told once per blocking read.
+int mp_hal_stdin_rx_chr(void) {
+    uint8_t c;
+    bool announced = false;
+    for (;;) {
+        if (mp_android_stdin_read_available(&c, 1) == 1) {
+            if (announced) {
+                stdin_set_waiting(false);
+            }
+            return c;
+        }
+        if (!announced) {
+            announced = true;
+            stdin_set_waiting(true);
+        }
+        mp_event_wait_indefinite();
+    }
+}
+
+uintptr_t mp_hal_stdio_poll(uintptr_t poll_flags) {
+    uintptr_t ret = poll_flags & MP_STREAM_POLL_WR;
+    pthread_mutex_lock(&stdin_lock);
+    if ((poll_flags & MP_STREAM_POLL_RD) && stdin_len > 0) {
+        ret |= MP_STREAM_POLL_RD;
+    }
+    pthread_mutex_unlock(&stdin_lock);
+    return ret;
+}
+
+// input(): one line, without the editing and echo of readline(). The
+// prompt was printed by input() already. The line ends at "\n"; "\r" is dropped.
+int mp_android_readline(vstr_t *line, const char *prompt) {
+    (void)prompt;
+    for (;;) {
+        int c = mp_hal_stdin_rx_chr();
+        if (c == '\n') {
+            return c;
+        }
+        if (c != '\r') {
+            vstr_add_byte(line, c);
+        }
     }
 }

@@ -48,6 +48,23 @@ object ScriptExecCore {
     private val _cameraRotation = MutableStateFlow(-1)
     val cameraRotation: StateFlow<Int> = _cameraRotation.asStateFlow()
 
+    // True while a running script waits for input (sys.stdin.read, input()).
+    // TerminalScreen shows its input pop-up on this; adb status reports it.
+    private val _inputWaiting = MutableStateFlow(false)
+    val inputWaiting: StateFlow<Boolean> = _inputWaiting.asStateFlow()
+
+    // Raw bytes for the running script's stdin, from the pop-up (the UI adds
+    // the "\n") and from adb input. The bytes are echoed into the log.
+    // Returns how many bytes were accepted, -1 when no script runs. Not for
+    // the UI thread (Binder call).
+    fun sendInput(bytes: ByteArray): Int {
+        val accepted = boardManager?.sendInput(bytes) ?: -1
+        if (accepted > 0) {
+            TerminalLog.append(String(bytes, 0, accepted, Charsets.UTF_8))
+        }
+        return accepted
+    }
+
     @Volatile private var boardManager: BoardManager? = null
     @Volatile private var connected = false
     @Volatile private var latch: CountDownLatch? = null
@@ -163,6 +180,7 @@ object ScriptExecCore {
             _status.value = status
             if (status is ConnectionStatus.Disconnected) {
                 _cameraRotation.value = -1
+                _inputWaiting.value = false
             }
             if (status !is ConnectionStatus.Connecting) {
                 latch?.countDown()
@@ -172,6 +190,7 @@ object ScriptExecCore {
             it.setShareRequestListener(shareRequestListener)
             it.setPermissionRequestListener(permissionRequestListener)
             it.setCameraRotationListener { rotation -> _cameraRotation.value = rotation }
+            it.setInputWaitingListener { waiting -> _inputWaiting.value = waiting }
             boardManager = it
         }
     }
