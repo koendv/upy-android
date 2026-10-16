@@ -45,6 +45,17 @@ class AdbExecProvider : ContentProvider() {
         }
     }
 
+    // `content call --extra name:i:N` reaches the provider as an Integer on
+    // recent Android and as another number type (or a string) on older
+    // versions; getInt() would then answer its default.
+    @Suppress("DEPRECATION")
+    private fun extraInt(extras: Bundle?, name: String): Int =
+        when (val value = extras?.get(name)) {
+            is Number -> value.toInt()
+            is String -> value.toIntOrNull() ?: 0
+            else -> 0
+        }
+
     // The help page, for `content query` and `content read`: the two commands
     // an AI tries first. When adb exec is off, one line that says how to turn it on.
     private fun helpText(): String {
@@ -65,7 +76,7 @@ class AdbExecProvider : ContentProvider() {
         return when (method) {
             "help" -> handleHelp()
             "status" -> handleStatus()
-            "run" -> handleRun(arg, extras?.getInt("timeout", 0) ?: 0, extras?.getBoolean("reset", false) ?: false)
+            "run" -> handleRun(arg, extraInt(extras, "timeout"), extras?.getBoolean("reset", false) ?: false)
             "reset" -> {
                 ScriptExecCore.reset(appContext)
                 Bundle()
