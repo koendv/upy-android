@@ -310,6 +310,11 @@ SRC_QSTR += ../app/src/main/cpp/mqtt_module.cpp
 # is not listed, same reason.
 SRC_QSTR += ../app/src/main/cpp/zipfile_module.cpp
 
+# http_module.cpp: this project's own native module (top-level http), same
+# case as zipfile_module.cpp. http_jni_bridge.cpp #includes <jni.h> and is not
+# listed, same reason.
+SRC_QSTR += ../app/src/main/cpp/http_module.cpp
+
 # Include the main makefile fragment to build the MicroPython component.
 include $(MICROPYTHON_TOP)/ports/embed/embed.mk
 

@@ -438,6 +438,9 @@ dependencies {
     // call with no Service+bound-service ceremony, and its stated minSdk
     // (19+) is below this project's own.
     implementation("com.hivemq:hivemq-mqtt-client:1.4.0")
+    // http module (http_module.cpp/HttpShim.kt). okhttp, not HttpURLConnection:
+    // a write timeout, and redirects between http and https.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // camera module (camera_module.cpp/CameraShim.kt).
     implementation("androidx.camera:camera-core:1.6.2")
     implementation("androidx.camera:camera-camera2:1.6.2")

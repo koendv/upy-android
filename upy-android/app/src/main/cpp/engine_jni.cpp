@@ -22,6 +22,7 @@ extern "C" {
 #include "mediastore_module.h"
 #include "mqtt_module.h"
 #include "zipfile_module.h"
+#include "http_module.h"
 #include "settings_state.h"
 #include "tflite_module.h"
 
@@ -130,6 +131,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInit(JNIEnv *env, jobject, jint s
         location_bridge_init(env);
         mqtt_bridge_init(env);
         zipfile_bridge_init(env);
+        http_bridge_init(env);
         camera_bridge_init(env);
         jclass service_class = env->FindClass("eu/kdvelectronics/upyandroid/EngineService");
         g_engine_service_class = static_cast<jclass>(env->NewGlobalRef(service_class));
@@ -192,6 +194,7 @@ Java_eu_kdvelectronics_upyandroid_Engine_nativeInterrupt(JNIEnv *, jobject) {
     mp_sched_keyboard_interrupt();
     mp_android_stdin_clear();
     mp_android_doorbell_ring();
+    http_interrupt();
     // Also wakes a waiting camera snapshot() immediately. Safe from any
     // thread, same contract as this function's own.
     camera_interrupt_active_wait();
