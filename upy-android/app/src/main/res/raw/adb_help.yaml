@@ -10,7 +10,7 @@ reply:
   ack: "Result: Bundle[{}]"
   error: "Result: Bundle[{error=<code>}]"
 methods:
-  help: this page
+  help: "this page. Also adb exec-out content read --uri content://eu.kdvelectronics.upyandroid.exec (plain text) and adb shell content query --uri content://eu.kdvelectronics.upyandroid.exec (one row, column help); both answer also when adb exec is off"
   status: protocol, app version, commit, build date, engine connected, busy, input waiting, prompt (only while input is waiting), screen, foreground, camera available (else why not)
   run: {arg: base64 utf-8 script, extra timeout (seconds, optional): interrupt after it, extra reset (optional): fresh interpreter first, returns: stdout, traceback, status}
   reset: fresh interpreter

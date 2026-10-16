@@ -8,9 +8,11 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.database.MatrixCursor
 import android.net.Uri
 import android.os.Binder
 import android.os.Bundle
+import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.os.Process
 import android.util.Base64
@@ -19,6 +21,7 @@ import eu.kdvelectronics.upyandroid.managers.SettingsManager
 import eu.kdvelectronics.upyandroid.model.ConnectionStatus
 import java.io.IOException
 import java.util.Properties
+import java.io.OutputStream
 import java.util.Timer
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.timerTask
@@ -35,11 +38,25 @@ class AdbExecProvider : ContentProvider() {
         return true
     }
 
-    override fun call(method: String, arg: String?, extras: Bundle?): Bundle {
+    private fun requireShell() {
         val callingUid = Binder.getCallingUid()
         if (callingUid != Process.SHELL_UID && callingUid != Process.ROOT_UID) {
             throw SecurityException("AdbExecProvider: caller uid $callingUid is not shell/root")
         }
+    }
+
+    // The help page, for `content query` and `content read`: the two commands
+    // an AI tries first. When adb exec is off, one line that says how to turn it on.
+    private fun helpText(): String {
+        if (!SettingsManager(appContext).adbExecEnabled) {
+            return "upy-android adb exec is off. Turn it on in the app: Settings > Enable adb exec. " +
+                "Then read this page again: adb exec-out content read --uri content://eu.kdvelectronics.upyandroid.exec\n"
+        }
+        return appContext.resources.openRawResource(R.raw.adb_help).bufferedReader().use { it.readText() }
+    }
+
+    override fun call(method: String, arg: String?, extras: Bundle?): Bundle {
+        requireShell()
 
         if (!SettingsManager(appContext).adbExecEnabled) {
             return Bundle().apply { putString("error", "disabled - enable adb exec in app settings") }
@@ -188,13 +205,30 @@ class AdbExecProvider : ContentProvider() {
         const val PROTOCOL_VERSION = 4
     }
 
+    // adb shell content query --uri content://eu.kdvelectronics.upyandroid.exec
+    // One row, one column "help": the same page as --method help.
     override fun query(
         uri: Uri,
         projection: Array<out String>?,
         selection: String?,
         selectionArgs: Array<out String>?,
         sortOrder: String?,
-    ): Cursor? = null
+    ): Cursor {
+        requireShell()
+        return MatrixCursor(arrayOf("help")).apply { addRow(arrayOf(helpText())) }
+    }
+
+    // adb exec-out content read --uri content://eu.kdvelectronics.upyandroid.exec
+    // The same page as plain text.
+    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor {
+        requireShell()
+        val bytes = helpText().toByteArray(Charsets.UTF_8)
+        val pipe = ParcelFileDescriptor.createPipe()
+        Thread {
+            ParcelFileDescriptor.AutoCloseOutputStream(pipe[1]).use { out: OutputStream -> out.write(bytes) }
+        }.start()
+        return pipe[0]
+    }
 
     override fun getType(uri: Uri): String? = null
 

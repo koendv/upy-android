@@ -35,6 +35,14 @@ fields = ("protocol: 4", "app:", "commit:", "built:", "engine: connected", "busy
 missing = [f for f in fields if error is not None or f not in status]
 check("status fields", not missing, "missing %s" % missing)
 
+# An AI finds the page with the commands it tries first: content query and content read.
+import subprocess
+URI = "content://eu.kdvelectronics.upyandroid.exec"
+queried = subprocess.run(core.adb_cmd() + ["shell", "content", "query", "--uri", URI], capture_output=True, text=True).stdout
+check("content query", queried.startswith("Row: 0 help=name: upy-android adb exec") and "protocol: 4" in queried, repr(queried[:100]))
+read = subprocess.run(core.adb_cmd() + ["exec-out", "content", "read", "--uri", URI], capture_output=True, text=True).stdout
+check("content read", read.startswith("name: upy-android adb exec") and "protocol: 4" in read and "methods:" in read, repr(read[:100]))
+
 out, err, st, exc = run("print('hi')")
 check("run ok", (out, err, st, exc) == ("hi\n", None, "ok", ""), repr((out, err, st, exc)))
 
