@@ -107,10 +107,15 @@ upy is designed for ai-assisted programming.
     - how to execute MicroPython (`run` method)
     - how to list all modules (`help("modules")`)
     - how to obtain help for a module (e.g. `litert.help()`)
-    - scripts in `/examples` provide usage patterns for modules that have no `help()`.
+    - scripts in `/examples` show how to use the `image` module, which has no `help()`.
 
 Together, this allows an agent to learn the API from the phone.
 When adding, removing or changing a method, update the module's `help()` text in the same commit.
+
+The modules `camera`, `display`, `android`, `imu`, `tflite`, `litert`, `umqtt`, `http` and `zipfile` have a `help()` function. For example: `import camera; print(camera.help())`.
+The modules `image`, `gif`, `mjpeg` and `ulab` have no `help()`; they follow OpenMV's and ulab's own documentation.
+
+The list is repeated in `module_help` of `app/src/main/res/raw/adb_help.yaml`, which the `help` method of `adb exec` shows. Keep both in step.
 
 ### Testbench
 

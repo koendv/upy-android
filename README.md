@@ -138,13 +138,14 @@ usb debugging over WiFi or mobile networks is also possible; use with caution.
 | `display` | Shows images in the **Camera** screen of the app. |
 | `image` | OpenMV image processing: AprilTags, Data Matrix, circles, rectangles, lines, edges, template matching, HOG, LBP, face and eye detection. |
 | `gif`, `mjpeg` | Video recording. |
-| `android` | Proximity sensor, accelerometer, gyroscope, location, save to gallery, share. |
+| `android` | Proximity sensor, location, save to gallery, share. |
+| `imu` |  Inertial Measurement Unit: accelerometer and gyroscope. |
 | `tflite` | TensorFlow Lite inference on CPU or NNAPI. |
 | `litert` | LiteRT inference on the CPU, GPU or NPU, see [NPU](#npu). |
 | `ulab` | Arrays, similar to NumPy. |
 | `umqtt` | MQTT client, with TLS. |
-
-The modules `camera`, `display`, `android`, `tflite` and `litert` have a `help()` function. For example: `import camera; print(camera.help())`.
+| `http` | Web requests with HTTPS and HTTP. |
+| `zipfile` | Zip archives. |
 
 ### NPU
 
