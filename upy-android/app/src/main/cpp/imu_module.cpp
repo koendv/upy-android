@@ -285,8 +285,26 @@ mp_obj_t imu_sleep(mp_obj_t enable_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(imu_sleep_obj, imu_sleep);
 
-// Flat module, no type/instance (android.imu.acceleration_mg(), not
-// android.imu.IMU().acceleration_mg()). Matches upstream py_imu.c's
+const char imu_help_text[] =
+    "module: imu (accelerometer and gyroscope, like OpenMV's imu: functions only, no class)\n"
+    "axes: the phone's own, x to the right, y up the screen, z out of the screen\n"
+    "functions:\n"
+    "  acceleration_mg() -> (x, y, z) in milli-g; (0, 0, 0) if the phone has no accelerometer\n"
+    "  angular_rate_mdps() -> (x, y, z) in milli-degrees per second; (0, 0, 0) if the phone has no gyroscope\n"
+    "  roll() -> degrees, 0 up to 360, from the accelerometer; 0 without one\n"
+    "  pitch() -> degrees, -180 to 180, from the accelerometer; 0 without one\n"
+    "  sleep(enable) -- sleep(True) stops the sampling, sleep(False) starts it again; it starts at the first call\n"
+    "  Each call waits for the next sensor reading.\n"
+    "errors: OSError(ETIMEDOUT) if a sensor gives no reading\n"
+    "see_also: android.help() (proximity sensor), OpenMV's imu module\n"
+;
+mp_obj_t imu_help() {
+    return mp_obj_new_str(imu_help_text, strlen(imu_help_text));
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(imu_help_obj, imu_help);
+
+// Flat module, no type/instance (imu.acceleration_mg(), not
+// imu.IMU().acceleration_mg()). Matches upstream py_imu.c's
 // own shape exactly (its globals_dict_table holds the function objects
 // directly, no make_new/no mp_obj_type_t at all).
 const mp_rom_map_elem_t imu_module_globals_table[] = {
@@ -296,6 +314,7 @@ const mp_rom_map_elem_t imu_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_roll), MP_ROM_PTR(&imu_roll_obj)},
     {MP_ROM_QSTR(MP_QSTR_pitch), MP_ROM_PTR(&imu_pitch_obj)},
     {MP_ROM_QSTR(MP_QSTR_sleep), MP_ROM_PTR(&imu_sleep_obj)},
+    {MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&imu_help_obj)},
 };
 MP_DEFINE_CONST_DICT(imu_module_globals, imu_module_globals_table);
 
@@ -336,11 +355,13 @@ mp_obj_t android_proximity_distance_cm() {
 // android_module.cpp needs this one.
 extern MP_DEFINE_CONST_FUN_OBJ_0(android_proximity_distance_cm_obj, android_proximity_distance_cm);
 
-// C linkage: android_module.cpp nests this as android.imu.
+// Top-level module imu, like OpenMV's own imu module.
 extern "C" const mp_obj_module_t imu_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &imu_module_globals,
 };
+
+MP_REGISTER_MODULE(MP_QSTR_imu, imu_module);
 
 extern "C" void imu_close_all(void) {
     teardown_queue();

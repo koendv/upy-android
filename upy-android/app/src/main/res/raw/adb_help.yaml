@@ -26,17 +26,17 @@ errors:
   full: input did not fit in the 64 KB stdin buffer, the message says how many bytes were accepted
   unknown_method: see methods
 state:
-  - globals persist across runs; reset clears
-  - run blocks until done, or until the optional timeout; interrupt via second call
-  - a script that reads stdin (input(), sys.stdin.readline(), sys.stdin.read(n), sys.stdin.read()) waits for the app's input pop-up or for adb input; status shows "input: waiting" and the question as "prompt:". Send answers with input while run is still blocked, from a second call. Bytes sent before the script reads wait in the buffer (type-ahead). The typed bytes appear in the app's log, not in run's output. sys.stdin.read() waits only when the buffer is empty, then returns everything in it; read(n) waits until n characters have arrived; there is no EOF
-  - camera needs screen on, unlocked, app in foreground: check status first
+  - "globals persist across runs; reset clears"
+  - "run blocks until done, or until the optional timeout; interrupt via second call"
+  - "a script that reads stdin (input(), sys.stdin.readline(), sys.stdin.read(n), sys.stdin.read()) waits for the app's command field, which then takes input (placeholder \"Script input\"), or for adb input; status shows \"input: waiting\" and the question as \"prompt:\". Send answers with input while run is still blocked, from a second call. Bytes sent before the script reads wait in the buffer (type-ahead). The typed bytes appear in the app's log, not in run's output. sys.stdin.read() waits only when the buffer is empty, then returns everything in it; read(n) waits until n characters have arrived; there is no EOF"
+  - "camera needs screen on, unlocked, app in foreground and the camera permission: check status first"
 limits:
   output: max 128 KB; longer output ends with ".[truncated]" (1-4 dots); write large results to a file
   script: ~48 KB source, as adb closes a command over 64 KB (the script travels base64 in --arg); send large data in chunks
 env:
   fs: / is app private storage; /examples has samples
   modules: "help('modules')"
-  module_help: "camera, display, android (and its submodules), tflite, litert, and umqtt are upy-android-specific and have a help() function, e.g. import camera; print(camera.help()); android submodules too, e.g. android.location.help()"
-  examples: "os.listdir('/examples') lists scripts to use as a pattern for modules without a help() (image, gif, mjpeg, ...)"
-  phone: import android
+  module_help: "camera, display, android, imu, tflite, litert, umqtt, http and zipfile are upy-android-specific and have a help() function, e.g. import camera; print(camera.help()); android.location has its own, android.location.help(); android.mediastore and android.fileprovider are described in android.help()"
+  examples: "os.listdir('/examples') lists scripts: find_*.py and face_*.py show the image module, which has no help(); gif, mjpeg and ulab have neither help() nor an example, see OpenMV's and ulab's own documentation"
+  phone: "import android (proximity sensor, location, save to gallery, share); import imu (accelerometer, gyroscope)"
   npu_runtime: "recipe: https://raw.githubusercontent.com/koendv/upy-android/main/doc/NPU.md"

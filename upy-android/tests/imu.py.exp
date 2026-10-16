@@ -1,0 +1,6 @@
+android.imu gone: True
+acceleration about 1 g: True
+roll in range: True
+pitch in range: True
+angular rate has 3 values: True
+help: True
