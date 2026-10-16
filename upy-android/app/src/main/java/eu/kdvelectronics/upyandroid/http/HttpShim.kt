@@ -11,6 +11,7 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 import okhttp3.Call
+import okhttp3.Credentials
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -19,6 +20,11 @@ import okhttp3.ResponseBody
 
 // Shown to the script as the OSError message, so no class name in it.
 class HttpError(message: String) : IOException(message) {
+    override fun toString() = message ?: ""
+}
+
+// A bad URL, header or content type; native turns this into a ValueError.
+class BadArgument(message: String) : IllegalArgumentException(message) {
     override fun toString() = message ?: ""
 }
 
@@ -84,21 +90,55 @@ private fun readLimited(body: ResponseBody, maxBytes: Long): ByteArray {
     return out.toByteArray()
 }
 
-fun get(url: String, timeoutSeconds: Double, maxBytes: Long): ByteArray =
-    execute(Request.Builder().url(url).build(), timeoutSeconds) { readLimited(it, maxBytes) }
+// headers: name, value, name, value ... auth: Basic, sent with the first
+// request. A Content-Type header is not set here: the request body sets it.
+private fun request(url: String, headers: Array<String>, user: String?, password: String?): Request.Builder {
+    try {
+        val builder = Request.Builder().url(url)
+        if (user != null) {
+            builder.header("Authorization", Credentials.basic(user, password ?: "", Charsets.UTF_8))
+        }
+        var i = 0
+        while (i + 1 < headers.size) {
+            if (!headers[i].equals("Content-Type", ignoreCase = true)) builder.header(headers[i], headers[i + 1])
+            i += 2
+        }
+        return builder
+    } catch (e: IllegalArgumentException) {
+        throw BadArgument("http: bad argument: ${e.message}")
+    }
+}
 
-fun post(url: String, data: ByteArray, contentType: String, timeoutSeconds: Double, maxBytes: Long): ByteArray {
-    val request = Request.Builder().url(url).post(data.toRequestBody(contentType.toMediaType())).build()
-    return execute(request, timeoutSeconds) { readLimited(it, maxBytes) }
+fun get(url: String, timeoutSeconds: Double, maxBytes: Long, headers: Array<String>, user: String?, password: String?): ByteArray =
+    execute(request(url, headers, user, password).build(), timeoutSeconds) { readLimited(it, maxBytes) }
+
+// method: POST or PUT. A Content-Type header replaces the default one.
+fun send(
+    method: String, url: String, data: ByteArray, defaultType: String, timeoutSeconds: Double, maxBytes: Long,
+    headers: Array<String>, user: String?, password: String?,
+): ByteArray {
+    var contentType = defaultType
+    var i = 0
+    while (i + 1 < headers.size) {
+        if (headers[i].equals("Content-Type", ignoreCase = true)) contentType = headers[i + 1]
+        i += 2
+    }
+    val body = try {
+        data.toRequestBody(contentType.toMediaType())
+    } catch (e: IllegalArgumentException) {
+        throw BadArgument("http: bad argument: content type: ${e.message}")
+    }
+    val built = request(url, headers, user, password).method(method, body).build()
+    return execute(built, timeoutSeconds) { readLimited(it, maxBytes) }
 }
 
 // Streams to a temporary file next to path and renames it when complete, so a
 // failed download leaves no partial file.
-fun download(url: String, path: String, progress: Boolean, timeoutSeconds: Double) {
+fun download(url: String, path: String, progress: Boolean, timeoutSeconds: Double, headers: Array<String>, user: String?, password: String?) {
     val target = VfsPath.resolve(path)
     val temp = File(target.parentFile, target.name + ".part")
     try {
-        execute(Request.Builder().url(url).build(), timeoutSeconds) { body ->
+        execute(request(url, headers, user, password).build(), timeoutSeconds) { body ->
             val total = body.contentLength()
             var done = 0L
             var nextReport = 0L

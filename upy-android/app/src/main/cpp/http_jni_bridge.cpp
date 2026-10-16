@@ -23,7 +23,7 @@ jclass g_shim_class = nullptr;
 jmethodID g_mid_begin = nullptr;
 jmethodID g_mid_cancel = nullptr;
 jmethodID g_mid_get = nullptr;
-jmethodID g_mid_post = nullptr;
+jmethodID g_mid_send = nullptr;
 jmethodID g_mid_download = nullptr;
 
 // The worker thread is JVM-attached for :engine's entire lifetime, and so is
@@ -66,6 +66,22 @@ bool take_body(JNIEnv *env, jbyteArray body, uint8_t **out_data, size_t *out_len
     return true;
 }
 
+jobjectArray make_headers(JNIEnv *env, const http_options_t *options) {
+    jclass string_class = env->FindClass("java/lang/String");
+    jobjectArray array = env->NewObjectArray((jsize) (2 * options->header_count), string_class, nullptr);
+    for (size_t i = 0; i < 2 * options->header_count; i++) {
+        jstring item = env->NewStringUTF(options->headers[i]);
+        env->SetObjectArrayElement(array, (jsize) i, item);
+        env->DeleteLocalRef(item);
+    }
+    env->DeleteLocalRef(string_class);
+    return array;
+}
+
+jstring make_string(JNIEnv *env, const char *text) {
+    return text != nullptr ? env->NewStringUTF(text) : nullptr;
+}
+
 }  // namespace
 
 extern "C" void http_bridge_init_impl(void *jni_env) {
@@ -78,9 +94,12 @@ extern "C" void http_bridge_init_impl(void *jni_env) {
 
     g_mid_begin = env->GetStaticMethodID(g_shim_class, "begin", "()V");
     g_mid_cancel = env->GetStaticMethodID(g_shim_class, "cancel", "()V");
-    g_mid_get = env->GetStaticMethodID(g_shim_class, "get", "(Ljava/lang/String;DJ)[B");
-    g_mid_post = env->GetStaticMethodID(g_shim_class, "post", "(Ljava/lang/String;[BLjava/lang/String;DJ)[B");
-    g_mid_download = env->GetStaticMethodID(g_shim_class, "download", "(Ljava/lang/String;Ljava/lang/String;ZD)V");
+    g_mid_get = env->GetStaticMethodID(g_shim_class, "get",
+        "(Ljava/lang/String;DJ[Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)[B");
+    g_mid_send = env->GetStaticMethodID(g_shim_class, "send",
+        "(Ljava/lang/String;Ljava/lang/String;[BLjava/lang/String;DJ[Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)[B");
+    g_mid_download = env->GetStaticMethodID(g_shim_class, "download",
+        "(Ljava/lang/String;Ljava/lang/String;ZD[Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V");
     g_ready.store(true, std::memory_order_release);
 }
 
@@ -98,38 +117,61 @@ extern "C" void http_bridge_cancel(void) {
     }
 }
 
-extern "C" bool http_bridge_get(const char *url, double timeout_s, long long max_bytes,
+extern "C" bool http_bridge_get(const char *url, double timeout_s, long long max_bytes, const http_options_t *options,
                                  uint8_t **out_data, size_t *out_len, char **out_err) {
     JNIEnv *env = current_env();
     jstring jurl = env->NewStringUTF(url);
-    auto body = (jbyteArray) env->CallStaticObjectMethod(g_shim_class, g_mid_get, jurl, (jdouble) timeout_s, (jlong) max_bytes);
+    jobjectArray jheaders = make_headers(env, options);
+    jstring juser = make_string(env, options->user);
+    jstring jpassword = make_string(env, options->password);
+    auto body = (jbyteArray) env->CallStaticObjectMethod(g_shim_class, g_mid_get, jurl, (jdouble) timeout_s,
+                                                         (jlong) max_bytes, jheaders, juser, jpassword);
     env->DeleteLocalRef(jurl);
+    env->DeleteLocalRef(jheaders);
+    if (juser) env->DeleteLocalRef(juser);
+    if (jpassword) env->DeleteLocalRef(jpassword);
     return take_body(env, body, out_data, out_len, out_err);
 }
 
-extern "C" bool http_bridge_post(const char *url, const uint8_t *data, size_t len, const char *content_type,
-                                  double timeout_s, long long max_bytes,
-                                  uint8_t **out_data, size_t *out_len, char **out_err) {
+extern "C" bool http_bridge_send(const char *method, const char *url, const uint8_t *data, size_t len,
+                                  const char *default_type, double timeout_s, long long max_bytes,
+                                  const http_options_t *options, uint8_t **out_data, size_t *out_len, char **out_err) {
     JNIEnv *env = current_env();
+    jstring jmethod = env->NewStringUTF(method);
     jstring jurl = env->NewStringUTF(url);
-    jstring jtype = env->NewStringUTF(content_type);
+    jstring jtype = env->NewStringUTF(default_type);
     jbyteArray jdata = env->NewByteArray((jsize) len);
     env->SetByteArrayRegion(jdata, 0, (jsize) len, (const jbyte *) data);
-    auto body = (jbyteArray) env->CallStaticObjectMethod(g_shim_class, g_mid_post, jurl, jdata, jtype,
-                                                         (jdouble) timeout_s, (jlong) max_bytes);
+    jobjectArray jheaders = make_headers(env, options);
+    jstring juser = make_string(env, options->user);
+    jstring jpassword = make_string(env, options->password);
+    auto body = (jbyteArray) env->CallStaticObjectMethod(g_shim_class, g_mid_send, jmethod, jurl, jdata, jtype,
+                                                         (jdouble) timeout_s, (jlong) max_bytes, jheaders, juser, jpassword);
+    env->DeleteLocalRef(jmethod);
     env->DeleteLocalRef(jurl);
     env->DeleteLocalRef(jtype);
     env->DeleteLocalRef(jdata);
+    env->DeleteLocalRef(jheaders);
+    if (juser) env->DeleteLocalRef(juser);
+    if (jpassword) env->DeleteLocalRef(jpassword);
     return take_body(env, body, out_data, out_len, out_err);
 }
 
-extern "C" bool http_bridge_download(const char *url, const char *path, bool progress, double timeout_s, char **out_err) {
+extern "C" bool http_bridge_download(const char *url, const char *path, bool progress, double timeout_s,
+                                      const http_options_t *options, char **out_err) {
     JNIEnv *env = current_env();
     jstring jurl = env->NewStringUTF(url);
     jstring jpath = env->NewStringUTF(path);
-    env->CallStaticVoidMethod(g_shim_class, g_mid_download, jurl, jpath, (jboolean) progress, (jdouble) timeout_s);
+    jobjectArray jheaders = make_headers(env, options);
+    jstring juser = make_string(env, options->user);
+    jstring jpassword = make_string(env, options->password);
+    env->CallStaticVoidMethod(g_shim_class, g_mid_download, jurl, jpath, (jboolean) progress, (jdouble) timeout_s,
+                              jheaders, juser, jpassword);
     env->DeleteLocalRef(jurl);
     env->DeleteLocalRef(jpath);
+    env->DeleteLocalRef(jheaders);
+    if (juser) env->DeleteLocalRef(juser);
+    if (jpassword) env->DeleteLocalRef(jpassword);
     if (env->ExceptionCheck()) {
         *out_err = describe_and_clear_exception(env);
         return false;

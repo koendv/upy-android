@@ -6,6 +6,7 @@
 # the local network). Also timeouts, redirects, errors, large bodies, Interrupt
 # during connect, read, write and download, and an https smoke test.
 import base64
+import hashlib
 import socket
 import sys
 import threading
@@ -24,6 +25,15 @@ def check(name, ok, detail=""):
         failures.append(name)
 
 
+def basic(user, password):
+    return "Basic " + base64.b64encode(("%s:%s" % (user, password)).encode("utf-8")).decode("ascii")
+
+
+AUTH_BASIC = basic("user", "p\u00e4ssword")  # a non-ASCII password: sent as UTF-8
+AUTH_DAV = basic("user", "secret")
+store = {}  # what a WebDAV PUT stored
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
@@ -38,9 +48,49 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def unauthorized(self):
+        self.reply(401, b"login", headers=[("WWW-Authenticate", 'Basic realm="test"')])
+
+    def do_PUT(self):
+        n = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(n)
+        if self.path.startswith("/dav/"):
+            if self.headers.get("Authorization") != AUTH_DAV:
+                return self.unauthorized()
+            if self.headers.get("Content-Type") != "image/jpeg":
+                return self.reply(415, b"not a jpeg")
+            store[self.path] = body
+            self.reply(201)
+        elif self.path == "/redir307":
+            self.reply(307, headers=[("Location", "/echo-method")])
+        elif self.path == "/echo-method":
+            self.reply(200, ("%s %d" % (self.command, len(body))).encode())
+        else:
+            stop.wait(60)
+
     def do_GET(self):
         path = self.path
-        if path == "/hello":
+        if path == "/auth":
+            header = self.headers.get("Authorization")
+            if header == "Bearer tok123":
+                self.reply(200, b"bearer ok")
+            elif header == AUTH_BASIC:
+                self.reply(200, b"basic ok")
+            else:
+                self.unauthorized()
+        elif path == "/headers":
+            self.reply(200, self.headers.get("X-Custom", "none").encode())
+        elif path.startswith("/dav/"):
+            self.reply(200, store[path]) if path in store else self.reply(404)
+        elif path == "/seen-auth":
+            self.reply(200, ("auth:" + self.headers.get("Authorization", "none")).encode())
+        elif path == "/redir-xhost":
+            self.reply(302, headers=[("Location", "http://%s:%d/seen-auth" % (lan_ip, port))])
+        elif path == "/redir-same":
+            self.reply(302, headers=[("Location", "/seen-auth")])
+        elif path == "/method":
+            self.reply(200, self.command.encode())
+        elif path == "/hello":
             self.reply(200, b"hello")
         elif path == "/redir-https":
             self.reply(302, headers=[("Location", "https://example.com/")])
@@ -79,7 +129,10 @@ class Handler(BaseHTTPRequestHandler):
             stop.wait(60)
 
     def do_POST(self):
-        if self.path == "/echo":
+        if self.path == "/redir302":
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            self.reply(302, headers=[("Location", "/method")])
+        elif self.path == "/echo":
             n = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(n)
             self.reply(200, self.headers.get("Content-Type", "").encode() + b"\n" + body)
@@ -250,6 +303,104 @@ try:
         "print(sorted(n for n in os.listdir('/') if n.startswith('dl3')))\n" % LOCAL
     )
     check("failed download leaves nothing", out == "OSError\n[]\n", repr(out))
+
+    # Authentication and headers.
+    jpeg = b"\xff\xd8\xff\xe0" + bytes(range(256)) * 800
+    want_sha = hashlib.sha256(jpeg).hexdigest()
+    out = device(
+        "import hashlib, http\n"
+        "def err(f):\n"
+        "    try:\n"
+        "        f()\n"
+        "        return 'no error'\n"
+        "    except OSError as e:\n"
+        "        return str(e.args[1])\n"
+        "    except (ValueError, TypeError) as e:\n"
+        "        return type(e).__name__\n"
+        "U = %r\n"
+        "print(http.get(U + '/auth', headers={'Authorization': 'Bearer tok123'}))\n"
+        "print(http.get(U + '/auth', auth=('user', 'p\\u00e4ssword')))\n"
+        "print(http.get(U + '/auth', auth=('u', 'p'), headers={'Authorization': 'Bearer tok123'}))\n"
+        "print(err(lambda: http.get(U + '/auth')))\n"
+        "print(err(lambda: http.get(U + '/auth', auth=('user', 'wrong'))))\n"
+        "print(http.get(U + '/headers', headers={'X-Custom': 'a b'}))\n"
+        "print(http.post(U + '/echo', 'x', headers={'content-type': 'text/csv'}))\n"
+        "print(http.get(U + '/hello', 5, headers=None, auth=None))\n"
+        "print(http.download(U + '/auth', 'dl.bin', headers={'Authorization': 'Bearer tok123'}), open('dl.bin', 'rb').read())\n"
+        % LOCAL
+    )
+    check("headers and auth", out == "b'bearer ok'\nb'basic ok'\nb'bearer ok'\nHTTP 401\nHTTP 401\nb'a b'\n"
+          "b'text/csv\\nx'\nb'hello'\nNone b'bearer ok'\n", repr(out))
+
+    # A jpeg to WebDAV: PUT with Basic authentication and a content type.
+    script = (
+        "import hashlib, http\n"
+        "U = %r\n"
+        "jpeg = b'\\xff\\xd8\\xff\\xe0' + bytes(range(256)) * 800\n"
+        "r = http.put(U + '/dav/pic.jpg', jpeg, headers={'Content-Type': 'image/jpeg'}, auth=('user', 'secret'))\n"
+        "print(r)\n"
+        "back = http.get(U + '/dav/pic.jpg')\n"
+        "print(len(back), hashlib.sha256(back).digest().hex() if hasattr(back, 'hex') else '')\n"
+        % LOCAL
+    )
+    out = device(script)
+    got_sha = hashlib.sha256(store.get("/dav/pic.jpg", b"")).hexdigest()
+    check("put a jpeg to WebDAV", out.startswith("b''\n") and got_sha == want_sha and len(store["/dav/pic.jpg"]) == len(jpeg), repr(out) + got_sha)
+    out = device(
+        "import http\n"
+        "def err(f):\n"
+        "    try:\n"
+        "        f()\n"
+        "        return 'no error'\n"
+        "    except OSError as e:\n"
+        "        return str(e.args[1])\n"
+        "U = %r\n"
+        "print(err(lambda: http.put(U + '/dav/x.jpg', b'x', auth=('user', 'secret'))))\n"
+        "print(err(lambda: http.put(U + '/dav/x.jpg', b'x', headers={'Content-Type': 'image/jpeg'}, auth=('user', 'bad'))))\n"
+        % LOCAL
+    )
+    check("put: type and login errors", out == "HTTP 415\nHTTP 401\n", repr(out))
+
+    # Redirects: Authorization stays on the same host, goes away on another; a 302 turns
+    # a post into a get and drops the data; a 307 keeps the method and the data.
+    out = device(
+        "import http\n"
+        "U = %r\n"
+        "print(http.get(U + '/redir-same', auth=('user', 'secret'))[:11])\n"
+        "print(http.get(U + '/redir-xhost', auth=('user', 'secret')))\n"
+        "print(http.post(U + '/redir302', 'data'))\n"
+        "print(http.put(U + '/redir307', 'body'))\n"
+        % LOCAL
+    )
+    check("redirects and credentials", out == "b'auth:Basic '\nb'auth:none'\nb'GET'\nb'PUT 4'\n", repr(out))
+
+    # Bad arguments.
+    out = device(
+        "import http\n"
+        "def err(f):\n"
+        "    try:\n"
+        "        f()\n"
+        "        return 'no error'\n"
+        "    except OSError as e:\n"
+        "        return 'OSError'\n"
+        "    except (ValueError, TypeError) as e:\n"
+        "        return type(e).__name__\n"
+        "U = %r\n"
+        "print(err(lambda: http.get(U + '/hello', headers={'X\\n': 'v'})))\n"
+        "print(err(lambda: http.get(U + '/hello', headers={'X': 'v\\r\\nY: z'})))\n"
+        "print(err(lambda: http.get(U + '/hello', headers={'X': '\\u00e9'})))\n"
+        "print(err(lambda: http.get(U + '/hello', headers={'': 'v'})))\n"
+        "print(err(lambda: http.get(U + '/hello', headers={'a b': 'v'})))\n"
+        "print(err(lambda: http.get(U + '/hello', headers=5)))\n"
+        "print(err(lambda: http.get(U + '/hello', headers={1: 'v'})))\n"
+        "print(err(lambda: http.get(U + '/hello', auth=('user',))))\n"
+        "print(err(lambda: http.get(U + '/hello', auth='user:pw')))\n"
+        "print(err(lambda: http.get('not a url')))\n"
+        "print(err(lambda: http.post(U + '/echo', 'x', headers={'Content-Type': 'no/ct/at all'})))\n"
+        % LOCAL
+    )
+    check("bad arguments", out == "ValueError\nValueError\nValueError\nValueError\nValueError\nTypeError\nTypeError\n"
+          "TypeError\nTypeError\nValueError\nValueError\n", repr(out))
 
     # Interrupt: during a read, a connect, a write and a download.
     for label, body, limit in (
