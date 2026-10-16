@@ -8,8 +8,12 @@ import eu.kdvelectronics.upyandroid.model.ExecResult
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 // The one shared BoardManager connection for the whole process: Terminal
@@ -39,6 +43,11 @@ object ScriptExecCore {
 
     // Read-only view for adb-exec's status method.
     val busy: Boolean get() = inFlight.get() > 0
+
+    // Every chunk a script prints, as it is printed (also what goes to
+    // TerminalLog). A slow collector loses the oldest chunks.
+    private val _scriptOutput = MutableSharedFlow<String>(extraBufferCapacity = 1024, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    val scriptOutput: SharedFlow<String> = _scriptOutput.asSharedFlow()
 
     private val _status = MutableStateFlow<ConnectionStatus>(ConnectionStatus.Connecting)
     val status: StateFlow<ConnectionStatus> = _status.asStateFlow()
@@ -186,7 +195,10 @@ object ScriptExecCore {
                 latch?.countDown()
             }
         }.also {
-            it.setOutputListener { chunk -> TerminalLog.append(chunk) }
+            it.setOutputListener { chunk ->
+                TerminalLog.append(chunk)
+                _scriptOutput.tryEmit(chunk)
+            }
             it.setShareRequestListener(shareRequestListener)
             it.setPermissionRequestListener(permissionRequestListener)
             it.setCameraRotationListener { rotation -> _cameraRotation.value = rotation }
