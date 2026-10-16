@@ -45,8 +45,8 @@ def ui_nodes():
         n = m.group(0)
         b = re.search(r'bounds="\[(\d+),(\d+)\]\[(\d+),(\d+)\]"', n)
         nodes.append({
-            "text": re.search(r'text="([^"]*)"', n).group(1),
-            "cls": re.search(r'class="([^"]*)"', n).group(1).split(".")[-1],
+            "text": (re.search(r'text="([^"]*)"', n) or re.search(r"(.*)", "")).group(1),
+            "cls": (re.search(r'class="([^"]*)"', n) or re.search(r"(.*)", "")).group(1).split(".")[-1],
             "checked": 'checked="true"' in n,
             "clickable": 'clickable="true"' in n,
             "box": tuple(int(v) for v in b.groups()) if b else (0, 0, 0, 0),
@@ -83,6 +83,9 @@ def open_settings():
         if any(n["text"].startswith("Enable SSH") for n in nodes):
             return nodes
         tabs = [n for n in nodes if n["text"] == "Settings"]
+        if not tabs:
+            # The tab bar is hidden while the keyboard shows: Back hides the keyboard.
+            adb("shell", "input", "keyevent", "4")
         if tabs:
             box = max(tabs, key=lambda n: n["box"][1])["box"]
             tap_at((box[0] + box[2]) // 2, (box[1] + box[3]) // 2 - 40)
