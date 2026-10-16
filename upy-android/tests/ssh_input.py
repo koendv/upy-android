@@ -177,6 +177,11 @@ class Shell:
         self.client.close()
 
 
+injected = adb("shell", "input", "keyevent", "KEYCODE_WAKEUP")
+if b"INJECT_EVENTS" in injected.stdout + injected.stderr:
+    print("ssh_input                      skipped: this phone refuses injected input "
+          "(Developer options: USB debugging (Security settings))")
+    sys.exit(0)
 port = None
 shells = []
 try:
