@@ -101,7 +101,7 @@ private fun NavHostController.navigateToTab(route: String) {
 // Bumped whenever a bundled demo script's own content changes. See
 // seedDemoScriptsIfNeeded() below. Lets an app update that fixes a
 // demo script reach existing installs too, not just fresh ones.
-private const val CURRENT_DEMO_SCRIPTS_VERSION = 17
+private const val CURRENT_DEMO_SCRIPTS_VERSION = 18
 
 // Bumped whenever the bundled /rom/ files change. See seedRomIfNeeded().
 private const val CURRENT_ROM_VERSION = 1

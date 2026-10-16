@@ -116,7 +116,7 @@ After any later change to the files in `/litert/`, press **Restart** again. Lite
 
 ### 6. Check
 
-Run `/examples/litert_bench.py` on the phone. `litert_bench.py` needs MobileNet v2 in `/`; the download links are in the header of `litert_bench.py`. `litert_bench.py` times `run()` on the CPU, GPU and NPU.
+Run `/examples/litert_bench.py` on the phone. `litert_bench.py` needs MobileNet v2 in `/`. If the models are missing, the script offers to download them from GitHub (18 MB, SHA-256 checked) and asks first: answer `y`. A run from adb answers with the adb `input` method (see `--method help`). `litert_bench.py` times `run()` on the CPU, GPU and NPU.
 
 If the NPU is not faster than the CPU, the model ran on the CPU. `adb logcat | grep -E 'litert|tflite'` shows which. On the NPU:
 
