@@ -5,12 +5,18 @@
 
 #include <jni.h>
 
+#include <atomic>
+
 #include <cstdlib>
 #include <cstring>
 
 namespace {
 
 JavaVM *g_jvm = nullptr;
+// Set when camera_bridge_init_impl() has resolved everything. Interrupt can
+// arrive on a Binder thread before that (Reset interrupts first, also right
+// after the process starts), so camera_bridge_interrupt() must not use the IDs before then.
+std::atomic<bool> g_ready{false};
 jclass g_shim_class = nullptr;
 
 jmethodID g_mid_count = nullptr;
@@ -123,6 +129,7 @@ extern "C" void camera_bridge_init_impl(void *jni_env) {
     g_mid_control_abandon = env->GetStaticMethodID(g_shim_class, "controlAbandon", "()V");
     g_mid_info_numbers = env->GetStaticMethodID(g_shim_class, "infoNumbers", "(IFF)[D");
     g_mid_info_string = env->GetStaticMethodID(g_shim_class, "infoString", "(I)Ljava/lang/String;");
+    g_ready.store(true, std::memory_order_release);
 }
 
 extern "C" bool camera_bridge_count(int *out_count, char **out_err) {
@@ -336,8 +343,11 @@ extern "C" bool camera_bridge_info_string(int key, bool *out_open, char **out_va
 }
 
 extern "C" void camera_bridge_interrupt(void) {
+    if (!g_ready.load(std::memory_order_acquire)) {
+        return;
+    }
     JNIEnv *env = current_env();
-    if (!env || !g_shim_class) {
+    if (!env) {
         return;
     }
     env->CallStaticVoidMethod(g_shim_class, g_mid_interrupt);
