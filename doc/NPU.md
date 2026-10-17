@@ -10,8 +10,8 @@ The observations below are for LiteRT 2.3.0, from [Known results](#known-results
 
 - MediaTek MT6878: the NPU works, with the built-in runtime.
 - Qualcomm: no NPU on the two phones tested. Xiaomi Pad 6: `Unsupported SnapdragonModel by HTP backend`. REDMI Note 15 5G: `Permission denied` when opening the DSP device.
-- GPU, float32: right on the three phones where the result was checked, faster than the CPU on two of the three.
-- GPU, int8: right on one of the three phones where the result was checked, and wrong on the other two.
+- GPU, float32: right on the four phones where the result was checked, faster than the CPU on three of the four.
+- GPU, int8: right on one of the four phones where the result was checked, and wrong on the other three.
 - Not tested: Google Tensor, Samsung.
 
 ## Built-in runtimes
@@ -169,7 +169,7 @@ Each row is one observation: one phone, one firmware, one LiteRT version (the fi
 | Redmi 9 | LineageOS, Android 16 | `2.3.0,Mediatek,MT6769T` | NPU 2026-10-12; GPU 2026-10-16 | no | right, float32 and int8; not faster than the CPU | CPU. NPU: `Failed to load NeuronAdapter shared library`. |
 | Redmi 9 (M2004J19C) | MIUI 12.0.2 (V12.0.2.0.QJCEUVF), Android 10 | `2.3.0,unknown,unknown` | NPU and GPU 2026-10-16 | no | float32 right and 2.3 times faster; **int8 wrong** | CPU and GPU. No NPU: `0 compiler plugins were applied successfully`. |
 | Xiaomi Pad 6 | HyperOS 2.0, Android 14 | `2.3.0,QTI,SM8250` | NPU 2026-10-12; GPU 2026-10-17 | yes, `v66` (stop, step 2) | float32 right and 2.1 times faster; **int8 wrong** | CPU and GPU. NPU: `Unsupported SnapdragonModel by HTP backend`. |
-| REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | NPU 2026-10-12 | no | not tested | CPU. Runtime and QNN (V73) load, then `open_device_node failed … errno 13, Permission denied` and `createUnsignedPD unsigned PD … not supported by HTP`. |
+| REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | NPU 2026-10-12; GPU 2026-10-17 | no | float32 right and 2.5 times faster; **int8 wrong** | CPU and GPU. NPU: runtime and QNN (V73) load, then `open_device_node failed … errno 13, Permission denied` and `createUnsignedPD unsigned PD … not supported by HTP`. |
 
 ## Notes on results
 
@@ -179,6 +179,7 @@ All notes are for LiteRT 2.3.0.
 - **Redmi 9, LineageOS.** The GPU gives the right classes for MobileNet v2 float32 and int8, but is not faster than the CPU (float32 CPU 62 ms, GPU 55 to 77 ms; int8 CPU 35 ms, GPU 78 ms). The same phone model on MIUI is the next phone: there the GPU is faster for float32 and wrong for int8.
 - **Redmi 9, MIUI 12, Android 10.** On Android 10 `litert.version()` does not report the chip (Android 11 or older, see step 1). With the NPU requested, the model runs on the CPU (XNNPACK). MobileNet v2 float32: CPU 72 ms and GPU 31 ms, both give the right classes. int8: CPU 76 ms, right classes; the GPU gives wrong classes (goldfinch, toilet tissue, scuba diver) where the CPU gives military uniform, suit, Windsor tie. The same phone model with LineageOS gets the right classes on the GPU, so a cause may be the firmware or its GPU driver (Android 10 and MIUI 12 against Android 16 and LineageOS). Not investigated further. The two also differ in what `litert.version()` reports and in whether the NPU runtime is tried (it is with LineageOS, and fails to load NeuronAdapter; not here). The timings are not comparable: this phone was busy compiling an app in the background. `tests/litert_mobilenet.py` fails on this phone, on the int8 GPU run.
 - **Xiaomi Pad 6.** The Kotlin API of LiteRT 2.3.0 has no option to select the DSP backend, which the `v66` chip needs. MobileNet v2 float32: CPU 20.4 ms and GPU 9.5 ms, both give the right classes. int8: CPU 11.5 ms, right classes; the GPU (Adreno) gives wrong classes. With one fixed input, two models created from the same file gave different GPU output (top classes 12, 1000, 428 and then 999, 983, 980), where the CPU gave the same output both times (905, 886, 557); the GPU output has the same type and length as the CPU output. The call to LiteRT differs only in the accelerator, so a cause may be the LiteRT GPU delegate or the GPU driver. `tests/litert_mobilenet.py` fails on this tablet, on the int8 GPU run.
+- **REDMI Note 15 5G.** MobileNet v2 float32: CPU 25.3 ms and GPU 10.0 ms, both give the right classes. int8: CPU 13.4 ms, right classes; the GPU gives wrong classes (644, 380, 2 where the CPU gives 653, 835, 907). Measured with `examples/litert_bench/litert_bench.py`.
 
 ## Improving this document
 
