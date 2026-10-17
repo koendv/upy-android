@@ -296,7 +296,7 @@ SRC_QSTR += ../app/src/main/cpp/mediastore_module.cpp
 # it #includes <jni.h>, same exclusion reasoning as
 # mediastore_jni_bridge.cpp above.
 SRC_QSTR += ../app/src/main/cpp/fileprovider_module.cpp
-# location_module.cpp: android.location, same pattern as fileprovider.
+# location_module.cpp: top-level location, same pattern as imu_module.cpp.
 SRC_QSTR += ../app/src/main/cpp/location_module.cpp
 
 # mqtt_module.cpp: this project's own native module (top-level umqtt).

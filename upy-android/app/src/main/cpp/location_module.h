@@ -1,4 +1,4 @@
-// upy-android: android.location, a thin layer over Android's LocationManager.
+// upy-android: location, a thin layer over Android's LocationManager.
 #ifndef UPY_ANDROID_LOCATION_MODULE_H
 #define UPY_ANDROID_LOCATION_MODULE_H
 

@@ -11,7 +11,7 @@ import android.os.Looper
 import androidx.core.content.ContextCompat
 import eu.kdvelectronics.upyandroid.EngineService
 
-// android.location: a thin layer over Android's LocationManager, for
+// location: a thin layer over Android's LocationManager, for
 // location_jni_bridge.cpp. Lives in :engine. Static (@JvmStatic) so the
 // native bridge reaches it with FindClass + GetStaticMethodID, like
 // EngineService.requestShare(). No Google Play Services (fused location).

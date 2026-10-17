@@ -120,7 +120,7 @@ class MainActivity : ComponentActivity() {
     private val cameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
-    // Prompts requested by a script (android.location.start()). The
+    // Prompts requested by a script (location.start()). The
     // result needs no handling: the script checks the permission itself
     // when it runs again.
     private val scriptPermissionLauncher =

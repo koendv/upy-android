@@ -1,16 +1,16 @@
-// upy-android: android.location, a thin layer over Android's
+// upy-android: location, a thin layer over Android's
 // LocationManager (LocationShim.kt, via location_jni_bridge.cpp).
 //
-//   android.location.start(interval_ms=1000, min_distance_m=0)
-//                                             begin updates (GPS, network);
-//                                             no new fix until moved
-//                                             min_distance_m
-//   android.location.read(timeout_ms=0)       fix new since the last read(),
-//                                             waiting up to timeout_ms
-//                                             (-1: until one arrives);
-//                                             None if there is none
-//   android.location.last()                   Android's last known fix or None
-//   android.location.stop()                   end updates (also done by reset)
+//   location.start(interval_ms=1000, min_distance_m=0)
+//                                     begin updates (GPS, network);
+//                                     no new fix until moved
+//                                     min_distance_m
+//   location.read(timeout_ms=0)       fix new since the last read(),
+//                                     waiting up to timeout_ms
+//                                     (-1: until one arrives);
+//                                     None if there is none
+//   location.last()                   Android's last known fix or None
+//   location.stop()                   end updates (also done by reset)
 //
 // A fix is (latitude, longitude, altitude_m, accuracy_m, speed_mps,
 // bearing_deg, time_ms, provider), None for values Android does not have.
@@ -150,9 +150,9 @@ static MP_DEFINE_CONST_FUN_OBJ_0(location_last_obj, location_last);
 // Runtime-queryable usage reference for an AI (or human) driving this
 // module blind over adb, with no repo access -- see
 // AdbExecProvider.kt/adb_help.yaml (help -> help('modules') -> import
-// android; print(android.location.help())).
+// location; print(location.help())).
 const char location_help_text[] =
-    "module: android.location (import android; android.location.*)\n"
+    "module: location (import location; location.*)\n"
     "a thin wrapper over Android's LocationManager (GPS/network provider)\n"
     "methods:\n"
     "  start(interval_ms=1000, min_distance_m=0): begin location updates\n"
@@ -173,7 +173,7 @@ mp_obj_t location_help() {
 }
 static MP_DEFINE_CONST_FUN_OBJ_0(location_help_obj, location_help);
 
-// Keep location_help_text (android.location.help(), above) in sync
+// Keep location_help_text (location.help(), above) in sync
 // with this table -- see DEVELOPER.md's "adb server" section.
 const mp_rom_map_elem_t location_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_location)},
@@ -191,6 +191,8 @@ extern "C" const mp_obj_module_t location_module = {
     .base = {&mp_type_module},
     .globals = (mp_obj_dict_t *) &location_globals,
 };
+
+MP_REGISTER_MODULE(MP_QSTR_location, location_module);
 
 extern "C" void location_bridge_init(void *jni_env) {
     location_bridge_init_impl(jni_env);

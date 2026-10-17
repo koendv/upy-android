@@ -8,7 +8,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _upy_adb_core as core
 
-MODULES = ["camera", "display", "android", "android.location", "imu", "tflite", "litert", "umqtt", "http", "zipfile"]
+MODULES = ["camera", "display", "android", "location", "imu", "tflite", "litert", "umqtt", "http", "zipfile"]
 NO_HELP = ["image", "gif", "mjpeg", "ulab"]
 MARK = "@@@@"
 OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "doc", "API.md")
@@ -18,7 +18,7 @@ import %s
 for name in %r:
     print(%r + name)
     print(eval(name + '.help()'))
-""" % (", ".join(m for m in MODULES if "." not in m), MODULES, MARK)
+""" % (", ".join(MODULES), MODULES, MARK)
 
 HEADER = """# API reference
 

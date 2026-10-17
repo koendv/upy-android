@@ -112,7 +112,7 @@ upy is designed for ai-assisted programming.
 Together, this allows an agent to learn the API from the phone.
 When adding, removing or changing a method, update the module's `help()` text in the same commit.
 
-The modules `camera`, `display`, `android`, `android.location`, `imu`, `tflite`, `litert`, `umqtt`, `http` and `zipfile` have a `help()` function. For example: `import camera; print(camera.help())`.
+The modules `camera`, `display`, `android`, `location`, `imu`, `tflite`, `litert`, `umqtt`, `http` and `zipfile` have a `help()` function. For example: `import camera; print(camera.help())`.
 The modules `image`, `gif`, `mjpeg` and `ulab` have no `help()`; they follow OpenMV's and ulab's own documentation.
 
 The list is repeated in `module_help` of `app/src/main/res/raw/adb_help.yaml`, which the `help` method of `adb exec` shows. Keep both in step.

@@ -4,7 +4,7 @@ package eu.kdvelectronics.upyandroid;
 // "crosses from :engine's worker thread back into the main process"
 // reasoning as IEngineOutputListener.
 //
-// Also carries runtime-permission requests (android.location): only the
+// Also carries runtime-permission requests (location): only the
 // main process has an Activity to show the permission prompt.
 // And the screen lock while a camera is open.
 oneway interface IEngineShareListener {

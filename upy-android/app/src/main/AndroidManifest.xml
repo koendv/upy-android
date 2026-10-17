@@ -9,7 +9,7 @@
 
     <!-- Network sockets: umqtt (HiveMQ MQTT client) and the SSH server. -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <!-- android.location; asked on first use by a script. -->
+    <!-- location; asked on first use by a script. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 

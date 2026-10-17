@@ -138,7 +138,8 @@ usb debugging over WiFi or mobile networks is also possible; use with caution.
 | `display` | Shows images in the **Camera** screen of the app. |
 | `image` | OpenMV image processing: AprilTags, Data Matrix, circles, rectangles, lines, edges, template matching, HOG, LBP, face and eye detection. |
 | `gif`, `mjpeg` | Video recording. |
-| `android` | Proximity sensor, location, save to gallery, share. |
+| `android` | Proximity sensor, save to gallery, share. |
+| `location` | GPS and network location. |
 | `imu` |  Inertial Measurement Unit: accelerometer and gyroscope. |
 | `tflite` | TensorFlow Lite inference on CPU or NNAPI. |
 | `litert` | LiteRT inference on the CPU, GPU or NPU, see [NPU](#npu). |

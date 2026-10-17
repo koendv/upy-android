@@ -14,7 +14,6 @@ extern const mp_obj_fun_builtin_fixed_t android_settings_obj;
 
 extern "C" const mp_obj_module_t mediastore_module;
 extern "C" const mp_obj_module_t fileprovider_module;
-extern "C" const mp_obj_module_t location_module;
 
 namespace {
 
@@ -40,10 +39,9 @@ const char android_help_text[] =
     "  android.proximity: distance_cm() -- proximity sensor reading in cm; OSError(ENODEV) if no sensor\n"
     "  android.mediastore: save_image(data, name, mime_type=\"image/jpeg\") -- save bytes to the device's shared Photos/gallery; returns the new content:// URI; delete(uri) -- remove an item save_image() returned\n"
     "  android.fileprovider: share(path, mime_type=\"application/octet-stream\") -- open Android's share sheet for a file; fire-and-forget, no return value, silently does nothing if no app window is focused\n"
-    "  android.location: GPS/network location; see android.location.help()\n"
     "functions:\n"
     "  android.settings() -- dict snapshot of app settings (heap_size_mb, ssh_enabled, adb_exec_enabled); read-only here, set from the app UI\n"
-    "see_also: camera.help(), display.help(); accelerometer and gyroscope: module imu (OpenMV style: imu.acceleration_mg(), imu.angular_rate_mdps(), imu.roll(), imu.pitch())\n"
+    "see_also: camera.help(), display.help(), location.help() (GPS/network location); accelerometer and gyroscope: module imu (OpenMV style: imu.acceleration_mg(), imu.angular_rate_mdps(), imu.roll(), imu.pitch())\n"
 ;
 mp_obj_t android_help() {
     return mp_obj_new_str(android_help_text, strlen(android_help_text));
@@ -59,7 +57,6 @@ const mp_rom_map_elem_t android_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_settings), MP_ROM_PTR(&android_settings_obj)},
     {MP_ROM_QSTR(MP_QSTR_mediastore), MP_ROM_PTR(&mediastore_module)},
     {MP_ROM_QSTR(MP_QSTR_fileprovider), MP_ROM_PTR(&fileprovider_module)},
-    {MP_ROM_QSTR(MP_QSTR_location), MP_ROM_PTR(&location_module)},
 };
 MP_DEFINE_CONST_DICT(android_module_globals, android_module_globals_table);
 
