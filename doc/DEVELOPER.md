@@ -74,7 +74,7 @@ adb exec is remote code execution by design. Anyone with ADB access to the devic
 
 To enable adb exec:
 - **USB debugging.** Needed for adb. Open **Settings > About phone** and tap **Build number** 7 times. Then enable **USB debugging** in **Developer options**.
- in upy-android, open **Settings** and enable **adb exec**. Then start with:
+- In upy-android, open **Settings** and enable **adb exec**. Then start with:
 
 ```bash
 adb exec-out content call --uri content://eu.kdvelectronics.upyandroid.exec --method help
@@ -112,7 +112,7 @@ upy is designed for ai-assisted programming.
 Together, this allows an agent to learn the API from the phone.
 When adding, removing or changing a method, update the module's `help()` text in the same commit.
 
-The modules `camera`, `display`, `android`, `imu`, `tflite`, `litert`, `umqtt`, `http` and `zipfile` have a `help()` function. For example: `import camera; print(camera.help())`.
+The modules `camera`, `display`, `android`, `android.location`, `imu`, `tflite`, `litert`, `umqtt`, `http` and `zipfile` have a `help()` function. For example: `import camera; print(camera.help())`.
 The modules `image`, `gif`, `mjpeg` and `ulab` have no `help()`; they follow OpenMV's and ulab's own documentation.
 
 The list is repeated in `module_help` of `app/src/main/res/raw/adb_help.yaml`, which the `help` method of `adb exec` shows. Keep both in step.
@@ -128,7 +128,8 @@ The test scripts run over `adb exec` on a phone connected over USB. With more th
 ```
 tools/run-tests.py                 # required and known-failure tests
 tools/run-tests.py --manual        # also manual tests
-tools/run-tests.py --micropython   # also MicroPython's basics tests, about 15 minutes
+tools/run-tests.py --micropython   # also MicroPython's basics tests, 15 to 30 minutes
+tools/run-tests.py --openmv        # also OpenMV's own unit tests
 tools/run-tests.py --only litert   # one test
 tools/run-tests.py --list          # tests and their tier
 ```
@@ -149,7 +150,7 @@ Markers are comment lines at the top of a test script. The first line that is no
 - `# test: manual <reason>`: not run by default. Run with `--manual`.
 - `# fixture: <local> <device>`: copies a file to the phone before the test. `<local>` is relative to the folder of the test script, `<device>` is an absolute path on the phone.
 - `# runs: host`: the script runs on the PC instead of the phone, and talks to the phone through adb exec. The test passes when the script exits with code 0. A host check has no `.exp` file.
-- `# needs: --micropython`: not run by default. Run with `--micropython`. The time limit is 60 minutes instead of 5.
+- `# needs: --micropython` or `# needs: --openmv`: not run by default. Run with that flag. The time limit is 60 minutes instead of 5.
 
 Each test script needs one `# test:` line.
 
@@ -161,9 +162,10 @@ The `.exp` file holds the expected output. For a known failure, the `.exp` file 
 
 A missing `.exp` file is an error. `--record --only <name>` writes the current output as the `.exp` file; read the file before trusting it.
 
-#### MicroPython's own tests
+#### MicroPython's and OpenMV's own tests
 
 - `tools/run-tests.py --micropython` also runs MicroPython's own `basics` tests (`upy-android/tests/micropython_basics.py`). Tests that fail or cannot run on the phone are in `upy-android/tests/micropython_known_failures.txt`, each with a reason.
+- `tools/run-tests.py --openmv` also runs OpenMV's own unit tests, adapted for the phone (`upy-android/tests/openmv_unittests.py`, the adapted tests are in `upy-android/tests/openmv/`). Each test runs in a fresh interpreter and has to return True.
 - `tools/run-micropython-tests.sh` runs any part of MicroPython's test suite, without the list of known failures, for example `tools/run-micropython-tests.sh -d extmod`.
 
 ## Upstream code and patches

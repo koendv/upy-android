@@ -1,6 +1,6 @@
 # Sample session
 
-An AI coding agent programs upy-android: AprilTag detection on the phone, results sent to an MQTT broker on the PC. See [AI-assisted programming](../README.md#ai-assisted-programming) in the README for the setup.
+An AI coding agent programs upy-android: AprilTag detection on the phone, results sent to an MQTT broker on the PC. See [AI-assisted coding by intent](../README.md#ai-assisted-coding-by-intent) in the README for the setup.
 
 Before starting (not part of the recorded session):
 - The phone is on the same Wi-Fi as the PC, connected by USB, with adb exec enabled in the app settings.
