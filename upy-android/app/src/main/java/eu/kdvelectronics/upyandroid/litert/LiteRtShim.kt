@@ -28,9 +28,17 @@ fun createEnvironment(): Environment {
 
 // acceleratorValue is Accelerator's own .value int (NONE=0, CPU=1,
 // GPU=2, NPU=3), not an enum. An Int is JNI-simple, an enum isn't.
-fun createCompiledModel(env: Environment, path: String, acceleratorValue: Int): CompiledModel {
+// backendValue is GpuOptions.Backend's own .value int (AUTOMATIC=0,
+// OPENCL=1, OPENGL=3); GPU options are set only for a backend other
+// than AUTOMATIC.
+fun createCompiledModel(env: Environment, path: String, acceleratorValue: Int, backendValue: Int): CompiledModel {
     val accelerator = Accelerator.entries.first { it.value == acceleratorValue }
-    return CompiledModel.create(path, CompiledModel.Options(accelerator), env)
+    val options = CompiledModel.Options(accelerator)
+    if (backendValue != 0) {
+        val backend = CompiledModel.GpuOptions.Backend.entries.first { it.value == backendValue }
+        options.gpuOptions = CompiledModel.GpuOptions(backend = backend)
+    }
+    return CompiledModel.create(path, options, env)
 }
 
 fun createInputBuffers(model: CompiledModel): Array<TensorBuffer> =

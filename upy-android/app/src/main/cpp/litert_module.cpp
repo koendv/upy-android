@@ -165,18 +165,29 @@ MP_DEFINE_CONST_DICT(litert_environment_locals_dict, litert_environment_locals_d
 struct litert_options_obj_t {
     mp_obj_base_t base;
     mp_int_t accelerator;  // Accelerator.value: NONE=0, CPU=1, GPU=2, NPU=3
+    mp_int_t backend;      // GpuOptions.Backend.value: AUTOMATIC=0, OPENCL=1, OPENGL=3
 };
 
 mp_obj_t litert_options_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *args) {
-    enum { ARG_accelerator };
+    enum { ARG_accelerator, ARG_backend };
     static const mp_arg_t allowed_args[] = {
         {MP_QSTR_accelerator, MP_ARG_INT, {.u_int = 1 /* Accelerator.CPU */}},
+        {MP_QSTR_backend, MP_ARG_INT, {.u_int = 0 /* Backend.AUTOMATIC */}},
     };
     mp_arg_val_t parsed[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all_kw_array(n_args, n_kw, args, MP_ARRAY_SIZE(allowed_args), allowed_args, parsed);
 
+    mp_int_t backend = parsed[ARG_backend].u_int;
+    if (backend != 0 && backend != 1 && backend != 3) {
+        mp_raise_ValueError(MP_ERROR_TEXT("litert: backend must be litert.Backend.AUTOMATIC, OPENCL or OPENGL"));
+    }
+    if (backend != 0 && parsed[ARG_accelerator].u_int != 2 /* Accelerator.GPU */) {
+        mp_raise_ValueError(MP_ERROR_TEXT("litert: backend applies to Accelerator.GPU only"));
+    }
+
     auto *self = mp_obj_malloc(litert_options_obj_t, type);
     self->accelerator = parsed[ARG_accelerator].u_int;
+    self->backend = backend;
     return MP_OBJ_FROM_PTR(self);
 }
 
@@ -229,18 +240,21 @@ mp_obj_t litert_compiled_model_make_new(const mp_obj_type_t *type, size_t n_args
     }
 
     mp_int_t accelerator_value = 1;  // Accelerator.CPU
+    mp_int_t backend_value = 0;      // Backend.AUTOMATIC
     if (parsed[ARG_options].u_obj != MP_OBJ_NULL) {
         if (!mp_obj_is_type(parsed[ARG_options].u_obj, &litert_options_type)) {
             raise_os_error(MP_EINVAL, "litert: options must be a litert.Options");
         }
-        accelerator_value = ((litert_options_obj_t *) MP_OBJ_TO_PTR(parsed[ARG_options].u_obj))->accelerator;
+        auto *options = (litert_options_obj_t *) MP_OBJ_TO_PTR(parsed[ARG_options].u_obj);
+        accelerator_value = options->accelerator;
+        backend_value = options->backend;
     }
 
     long raw_handle = 0;
     void *global_ref = nullptr;
     char *err = nullptr;
     if (!litert_bridge_create_compiled_model(env_obj->node->global_ref, path,
-                                              (int) accelerator_value, &raw_handle,
+                                              (int) accelerator_value, (int) backend_value, &raw_handle,
                                               &global_ref, &err)) {
         raise_os_error_free(MP_EINVAL, err);
     }
@@ -698,6 +712,21 @@ const mp_obj_module_t litert_accelerator_module = {
     .globals = (mp_obj_dict_t *) &litert_accelerator_globals,
 };
 
+// ---------------- module-level: Backend ----------------
+
+const mp_rom_map_elem_t litert_backend_globals_table[] = {
+    {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_Backend)},
+    {MP_ROM_QSTR(MP_QSTR_AUTOMATIC), MP_ROM_INT(0)},
+    {MP_ROM_QSTR(MP_QSTR_OPENCL), MP_ROM_INT(1)},
+    {MP_ROM_QSTR(MP_QSTR_OPENGL), MP_ROM_INT(3)},
+};
+MP_DEFINE_CONST_DICT(litert_backend_globals, litert_backend_globals_table);
+
+const mp_obj_module_t litert_backend_module = {
+    .base = {&mp_type_module},
+    .globals = (mp_obj_dict_t *) &litert_backend_globals,
+};
+
 // Runtime-queryable usage reference for an AI (or human) driving this
 // module blind over adb, with no repo access -- see
 // AdbExecProvider.kt/adb_help.yaml (help -> help('modules') -> import
@@ -706,7 +735,8 @@ const char litert_help_text[] =
     "module: litert (standalone LiteRT, not the Play-Store-delivered variant)\n"
     "classes:\n"
     "  litert.Environment(): required once per Environment() instance passed to CompiledModel()\n"
-    "  litert.Options(accelerator=litert.Accelerator.CPU): accelerator is litert.Accelerator.{CPU,GPU,NPU}; NONE exists, but CompiledModel() with it raises OSError(EINVAL)\n"
+    "  litert.Options(accelerator=litert.Accelerator.CPU, backend=litert.Backend.AUTOMATIC): accelerator is litert.Accelerator.{CPU,GPU,NPU}; NONE exists, but CompiledModel() with it raises OSError(EINVAL)\n"
+    "    backend is litert.Backend.{AUTOMATIC,OPENCL,OPENGL}, for Accelerator.GPU only (else ValueError): AUTOMATIC leaves the choice to LiteRT; OPENCL and OPENGL select one GPU backend; a backend can give wrong results, check them, e.g. /examples/litert_bench.py\n"
     "  litert.CompiledModel(environment, path, options=None): loads and compiles a .tflite model; path is a VFS path\n"
     "methods (CompiledModel):\n"
     "  run(*inputs): one positional array.array per input tensor, in the model's own order\n"
@@ -716,9 +746,9 @@ const char litert_help_text[] =
     "  close(): frees the model; also called automatically on garbage collection\n"
     "dtypes_supported: float32('f'), int8('b'), int32('i'), int64('q'), bool (as uint8 'B', 0/1) -- the Kotlin litert-api itself has no uint8/int16/uint16 path, unlike tflite\n"
     "errors:\n"
-    "  OSError(EINVAL): construction with a closed/wrong-type Environment or Options, a call on a closed CompiledModel, a bad tensor index, or a dtype outside dtypes_supported\n"
-    "  OSError(EIO): compile, buffer creation, write, run, or read failure (Kotlin/JNI exception text is forwarded)\n"
-    "  ValueError: wrong number of run() arguments, or an input array whose number of elements differs from the tensor's (input_shape(i))\n"
+    "  OSError(EINVAL): construction with a closed/wrong-type Environment or Options, a CompiledModel() that cannot load or compile the model (for example Backend.OPENCL on a phone without OpenCL), a call on a closed CompiledModel, a bad tensor index, or a dtype outside dtypes_supported\n"
+    "  OSError(EIO): buffer creation, write, run, or read failure (Kotlin/JNI exception text is forwarded)\n"
+    "  ValueError: an unknown backend, or a backend given with an accelerator other than GPU; wrong number of run() arguments, or an input array whose number of elements differs from the tensor's (input_shape(i))\n"
     "functions:\n"
     "  version(): \"LITERT,MAKER,MODEL\", e.g. \"2.3.0,QTI,SM8650\"; LiteRT version and chip; they select the NPU runtime, see NPU runtime below\n"
     "accelerators:\n"
@@ -766,6 +796,7 @@ const mp_rom_map_elem_t litert_module_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR_CompiledModel), MP_ROM_PTR(&litert_compiled_model_type)},
     {MP_ROM_QSTR(MP_QSTR_Options), MP_ROM_PTR(&litert_options_type)},
     {MP_ROM_QSTR(MP_QSTR_Accelerator), MP_ROM_PTR(&litert_accelerator_module)},
+    {MP_ROM_QSTR(MP_QSTR_Backend), MP_ROM_PTR(&litert_backend_module)},
 };
 MP_DEFINE_CONST_DICT(litert_module_globals, litert_module_globals_table);
 

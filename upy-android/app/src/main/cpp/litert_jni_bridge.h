@@ -25,7 +25,7 @@ void litert_bridge_init_impl(void *jni_env);
 bool litert_bridge_create_environment(long *out_handle, void **out_global_ref, char **out_err);
 
 bool litert_bridge_create_compiled_model(void *env_global_ref, const char *path,
-                                          int accelerator_value, long *out_handle,
+                                          int accelerator_value, int backend_value, long *out_handle,
                                           void **out_global_ref, char **out_err);
 
 bool litert_bridge_create_input_buffers(void *model_global_ref, long **out_handles,

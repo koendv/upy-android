@@ -98,7 +98,7 @@ extern "C" void litert_bridge_init_impl(void *jni_env) {
         "createEnvironment", "()Lcom/google/ai/edge/litert/Environment;");
     g_mid_create_compiled_model = env->GetStaticMethodID(g_shim_class,
         "createCompiledModel",
-        "(Lcom/google/ai/edge/litert/Environment;Ljava/lang/String;I)"
+        "(Lcom/google/ai/edge/litert/Environment;Ljava/lang/String;II)"
         "Lcom/google/ai/edge/litert/CompiledModel;");
     g_mid_create_input_buffers = env->GetStaticMethodID(g_shim_class,
         "createInputBuffers",
@@ -158,13 +158,13 @@ extern "C" bool litert_bridge_create_environment(long *out_handle, void **out_gl
 }
 
 extern "C" bool litert_bridge_create_compiled_model(void *env_global_ref, const char *path,
-                                                     int accelerator_value, long *out_handle,
+                                                     int accelerator_value, int backend_value, long *out_handle,
                                                      void **out_global_ref, char **out_err) {
     JNIEnv *env = current_env();
     jstring jpath = env->NewStringUTF(path);
     jobject local = env->CallStaticObjectMethod(g_shim_class, g_mid_create_compiled_model,
                                                  (jobject) env_global_ref, jpath,
-                                                 (jint) accelerator_value);
+                                                 (jint) accelerator_value, (jint) backend_value);
     env->DeleteLocalRef(jpath);
     if (env->ExceptionCheck()) {
         *out_err = describe_and_clear_exception(env);

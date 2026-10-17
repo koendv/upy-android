@@ -10,6 +10,9 @@
 # Then, in Files, tap litert_bench.py -> Run
 #
 # Times MobileNet v2 run() on the CPU, GPU and NPU, and checks the result.
+# The GPU is run three times: with the backend LiteRT chooses (default),
+# with the OpenCL backend and with the OpenGL backend. If the default row
+# differs from the OpenCL row, the default is not OpenCL on this phone.
 # The photo goes through every accelerator. The top class and the top three
 # classes must equal those of the first CPU run, else the line ends with
 # WRONG: do not use that accelerator for that model on this phone. The
@@ -58,10 +61,12 @@ DOWNLOADS = {
     ),
 }
 ACCELERATORS = (
-    ("CPU", litert.Accelerator.CPU),
-    ("GPU", litert.Accelerator.GPU),
-    ("NPU", litert.Accelerator.NPU),
-    ("CPU again", litert.Accelerator.CPU),
+    ("CPU", litert.Options(litert.Accelerator.CPU)),
+    ("GPU (default)", litert.Options(litert.Accelerator.GPU)),
+    ("GPU (OpenCL)", litert.Options(litert.Accelerator.GPU, backend=litert.Backend.OPENCL)),
+    ("GPU (OpenGL)", litert.Options(litert.Accelerator.GPU, backend=litert.Backend.OPENGL)),
+    ("NPU", litert.Options(litert.Accelerator.NPU)),
+    ("CPU again", litert.Options(litert.Accelerator.CPU)),
 )
 RUNS = 20
 
@@ -137,8 +142,8 @@ def top(output, n=3):
 
 
 # (ms per run, top three classes of the first run)
-def run_model(env, path, x, accelerator):
-    model = litert.CompiledModel(env, path, litert.Options(accelerator))
+def run_model(env, path, x, options):
+    model = litert.CompiledModel(env, path, options)
     try:
         classes = top(model.run(x))  # also the warm-up
         t = time.ticks_us()
@@ -156,6 +161,8 @@ if inputs is None:
     print("%s not found: speed only, the results are not checked" % PHOTO)
 env = litert.Environment()
 wrong = []
+not_run = []
+equal = 0
 for label, path, typecode in MODELS:
     if not exists(path):
         print("%s: %s not found, skipped" % (label, path))
@@ -171,11 +178,12 @@ for label, path, typecode in MODELS:
         x = array.array(typecode, (0 for _ in range(size)))
     times = {}
     reference = None
-    for name, accelerator in ACCELERATORS:
+    for name, options in ACCELERATORS:
         try:
-            ms, classes = run_model(env, path, x, accelerator)
+            ms, classes = run_model(env, path, x, options)
         except OSError as e:
-            print("%s %s: failed, %s" % (label, name, e))
+            not_run.append("%s %s" % (label, name))
+            print("%s %s: did not run, %s" % (label, name, e))
             continue
         times[name] = ms
         if inputs is None:
@@ -184,6 +192,7 @@ for label, path, typecode in MODELS:
             reference = classes
             print("%s %s: %.1f ms, reference, top class %d" % (label, name, ms, classes[0]))
         elif classes[0] == reference[0] and set(classes) == set(reference):
+            equal += 1
             print("%s %s: %.1f ms, ok" % (label, name, ms))
         else:
             wrong.append("%s %s" % (label, name))
@@ -193,7 +202,8 @@ for label, path, typecode in MODELS:
         print("%s NPU: not faster than the faster CPU run, probably runs on the CPU" % label)
 env.close()
 if inputs is not None:
+    print("Checked against the CPU: %d equal, %d WRONG, %d did not run." % (equal, len(wrong), len(not_run)))
     if wrong:
-        print("WRONG results: %s." % ", ".join(wrong))
-    else:
-        print("All results equal the CPU results.")
+        print("WRONG: %s. Do not use these on this phone." % ", ".join(wrong))
+    if not_run:
+        print("Did not run: %s." % ", ".join(not_run))

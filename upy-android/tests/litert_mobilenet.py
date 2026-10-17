@@ -111,9 +111,15 @@ def top(o, n=5):
 print('VERSION', litert.version())
 env = litert.Environment()
 for label, path, x in (('f32', 'mn/f32.tflite', x32), ('i8', 'mn/i8.tflite', x8)):
-    for name in ('CPU', 'GPU', 'NPU'):
+    for name in ('CPU', 'GPU', 'GPU_OPENCL', 'GPU_OPENGL', 'NPU'):
         try:
-            m = litert.CompiledModel(env, path, litert.Options(getattr(litert.Accelerator, name)))
+            if name == 'GPU_OPENCL':
+                opts = litert.Options(litert.Accelerator.GPU, backend=litert.Backend.OPENCL)
+            elif name == 'GPU_OPENGL':
+                opts = litert.Options(litert.Accelerator.GPU, backend=litert.Backend.OPENGL)
+            else:
+                opts = litert.Options(getattr(litert.Accelerator, name))
+            m = litert.CompiledModel(env, path, opts)
             o = m.run(x)
             m.run(x)
             t = time.ticks_us()
@@ -144,6 +150,8 @@ def err(f):
 
 env = litert.Environment()
 opts = litert.Options(litert.Accelerator.CPU)
+print('E litert backend with cpu', err(lambda: litert.Options(litert.Accelerator.CPU, backend=litert.Backend.OPENGL)))
+print('E litert unknown backend', err(lambda: litert.Options(litert.Accelerator.GPU, backend=2)))
 print('E litert missing model', err(lambda: litert.CompiledModel(env, 'mn/missing.tflite', opts)))
 m = litert.CompiledModel(env, 'mn/f32.tflite', opts)
 print('E litert wrong dtype', err(lambda: m.run(array.array('d', [0.0] * (224 * 224 * 3)))))
@@ -194,7 +202,7 @@ try:
     for m in re.finditer(r"^RUN (\w+) (\w+) unavailable (.*)$", out, re.M):
         print("  %s %s unavailable: %s" % (m.group(1), m.group(2), m.group(3)))
     for model in ("f32", "i8"):
-        for accelerator in ("CPU", "GPU", "NPU", "tflite"):
+        for accelerator in ("CPU", "GPU", "GPU_OPENCL", "GPU_OPENGL", "NPU", "tflite"):
             if (model, accelerator) not in results:
                 if accelerator in ("CPU", "tflite"):
                     check("%s %s" % (model, accelerator), False, "no result")
@@ -207,6 +215,8 @@ try:
 
     out = device(ERRORS)
     got = dict(re.findall(r"^E (.*?) (no error|OSError \d+|ValueError)$", out, re.M))
+    check("error: litert backend with cpu", got.get("litert backend with cpu") == "ValueError", out)
+    check("error: litert unknown backend", got.get("litert unknown backend") == "ValueError", out)
     check("error: litert missing model", got.get("litert missing model", "").startswith("OSError"), out)
     check("error: litert too many inputs", got.get("litert too many inputs") == "ValueError", out)
     check("error: litert wrong dtype", got.get("litert wrong dtype") == "OSError 22", out)
