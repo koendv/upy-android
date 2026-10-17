@@ -151,7 +151,7 @@ usb debugging over WiFi or mobile networks is also possible; use with caution.
 
 `litert` does TensorFlow Lite inference on the CPU, the GPU or the NPU. The CPU and the GPU work out of the box, and are sufficient for most work. On some processors, for the highest performance, `litert` can run on the NPU.
 
-Before using the GPU or the NPU, run `litert_bench.py` from `/examples` on the phone. The script times the CPU, the GPU and the NPU, and prints WRONG for an accelerator that gives other results than the CPU.
+Before using the GPU or the NPU, run `litert_bench.py` from `/examples` on the phone. The `litert_bench.py` script tests and times the CPU, the GPU and the NPU.
 
 The NPU needs a runtime library, which depends on the phone's processor. Runtimes with a licence that allows redistribution are included in the APK: MediaTek and Google Tensor. A runtime does not guarantee that the NPU works on every phone with such a processor. The Qualcomm runtime has a restrictive licence, so you download the runtime yourself. For Samsung, no ready-made runtime has been found.
 
@@ -169,7 +169,7 @@ The code was written with AI assistance and has had no independent audit.
 | OpenMV unit tests, adapted (`--openmv`) | 78 | all pass |
 | **Total** | **667** | **635 pass, 32 skipped, 0 failed** |
 
-The app is tested on four phones (Redmi 9, Redmi Note 15, Redmi Note 15 Pro 5G, Xiaomi Pad 6). The test run covers the modules, MicroPython's and OpenMV's own test suite. Depending on phone, LiteRT runs on CPU, GPU or NPU, see [Known results](doc/NPU.md#known-results).
+The test run covers the modules, MicroPython's and OpenMV's own test suite. Depending on phone, LiteRT runs on CPU, GPU or NPU, see [Known results](doc/NPU.md#known-results).
 
 ### Development
 
