@@ -165,11 +165,15 @@ Each cell holds the float32 and the int8 result: milliseconds per `run()` and `o
 |---|---|---|---|---|---|---|---|---|---|
 | REDMI Note 15 5G | HyperOS, Android 16 | `2.3.0,QTI,SM6475` | 1.0 | 2026-10-17 | 25.7 / 14.5 | 9.4 ok / 12.3 **WRONG** | 11.1 ok / 12.1 **WRONG** | 22.8 ok / 20.5 ok | no runtime: probably runs on the CPU |
 | Redmi 9 | LineageOS, Android 16 | `2.3.0,Mediatek,MT6769T` | 1.0 | 2026-10-17 | 59.9 / 59.6 | 56.6 ok / 68.3 ok | - | 47.0 ok / 62.1 ok | probably runs on the CPU |
+| Redmi Note 15 Pro 5G | HyperOS 3.0 (OS3.0.302.0.WPPEUXM), Android 16 | `2.3.0,Mediatek,MT6878` | 1.0 | 2026-10-17 | 23.9 / 12.4 | 10.6 ok / 19.8 **WRONG** | 11.2 ok / 20.7 **WRONG** | 22.0 ok / 23.8 ok | 13.9 ok / 7.8 ok |
+| Xiaomi Pad 6 | HyperOS 2.0 (OS2.0.14.0.UMZEUXM), Android 14 | `2.3.0,QTI,SM8250` | 1.0 | 2026-10-17 | 19.9 / 12.2 | 5.6 ok / 9.3 **WRONG** | 6.7 ok / 11.5 **WRONG** | 14.0 ok / 16.9 ok | 19.8 ok / 12.1 ok, probably runs on the CPU |
 
 Notes on a row, such as errors of the NPU runtime, go below the table, under the phone's name. The CPU cell holds the milliseconds of the reference run.
 
 - **REDMI Note 15 5G.** Two runs gave the same verdicts, and so did `tests/litert_mobilenet.py`. The wrong int8 classes differ from run to run: the default GPU gave 12, 968, 428 in the first run and 996, 936, 992 in the second, where the CPU gives 653, 835, 907. The OpenGL speed varies (int8 20.5 and 28.6 ms). The default GPU and the OpenCL GPU behave alike: the default is OpenCL here.
 - **Redmi 9, LineageOS.** The OpenCL row does not run: `EINVAL … Failed to compile model`. The default GPU works and is about as fast as OpenGL, so the default is not OpenCL on this phone. CPU times vary a lot: the float32 CPU took 59.9 ms in the first run and 163 ms in the repeat.
+- **Redmi Note 15 Pro 5G.** The default GPU and the OpenCL GPU give the same wrong int8 classes (988, 972, 676; the CPU gives 653, 835, 907); `tests/litert_mobilenet.py` agrees in two runs. The NPU is faster than the CPU, so `litert_bench.py` does not flag a CPU fallback; the timing alone does not show which hardware ran.
+- **Xiaomi Pad 6.** The wrong int8 classes differ from run to run and between the default GPU and the OpenCL GPU: in `tests/litert_mobilenet.py` the default gave 12, 968, 984 and then 12, 1000, 428, the OpenCL GPU 999, 983, 980 both times; the CPU gives 653, 835, 907. The OpenGL speed varies (float32 11.9 to 25.8 ms).
 
 ## Improving this document
 
