@@ -147,6 +147,8 @@ usb debugging over WiFi or mobile networks is also possible; use with caution.
 | `http` | Web requests with HTTPS and HTTP. |
 | `zipfile` | Zip archives. |
 
+The API of each module is in [API.md](doc/API.md). On the phone, `help()` gives the same text, for example `import camera; print(camera.help())`.
+
 ### NPU
 
 `litert` does TensorFlow Lite inference on the CPU, the GPU or the NPU. The CPU and the GPU work out of the box, and are sufficient for most work. On some processors, for the highest performance, `litert` can run on the NPU.
