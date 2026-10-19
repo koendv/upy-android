@@ -1,9 +1,8 @@
 # litert_bench.py
 #
-# MobileNet v2 models and a photo in / on the phone: float32 and int8 models,
-# 14 MB and 4 MB, and a photo of 1 MB. This script offers to download the
-# ones that are missing, from GitHub, and asks first. Or copy them yourself,
-# e.g. over SFTP:
+# MobileNet v2 models and a photo in /rom on the phone: float32 and int8 models,
+# 14 MB and 4 MB, and a photo of 1 MB. This script downloads the ones that
+# are missing, from GitHub. Or copy them yourself, e.g. over SFTP:
 #     float32: https://raw.githubusercontent.com/google-ai-edge/LiteRT/v2.3.0/litert/test/testdata/mobilenet_v2_1.0_224.tflite
 #     int8:    https://media.githubusercontent.com/media/Arm-Examples/ML-zoo/fec0bb5bcd486eb2839cdb7d437d466067402a6a/models/image_classification/mobilenet_v2_1.0_224/tflite_int8/mobilenet_v2_1.0_224_INT8.tflite
 #     photo:   https://raw.githubusercontent.com/tensorflow/tensorflow/v2.16.1/tensorflow/lite/examples/label_image/testdata/grace_hopper.bmp
@@ -34,22 +33,19 @@ import http
 import image
 import litert
 
-# False: download the missing models without asking.
-ASK = True
-
-PHOTO = "/grace_hopper.bmp"
+PHOTO = "/rom/grace_hopper.bmp"
 MODELS = (
-    ("float32", "/mobilenet_v2_1.0_224.tflite", "f"),
-    ("int8", "/mobilenet_v2_1.0_224_INT8.tflite", "b"),
+    ("float32", "/rom/mobilenet_v2_1.0_224.tflite", "f"),
+    ("int8", "/rom/mobilenet_v2_1.0_224_INT8.tflite", "b"),
 )
 # path: (URL pinned to a tag or commit, size, SHA-256)
 DOWNLOADS = {
-    "/mobilenet_v2_1.0_224.tflite": (
+    "/rom/mobilenet_v2_1.0_224.tflite": (
         "https://raw.githubusercontent.com/google-ai-edge/LiteRT/v2.3.0/litert/test/testdata/mobilenet_v2_1.0_224.tflite",
         "14 MB",
         "9f3bc29e38e90842a852bfed957dbf5e36f2d97a91dd17736b1e5c0aca8d3303",
     ),
-    "/mobilenet_v2_1.0_224_INT8.tflite": (
+    "/rom/mobilenet_v2_1.0_224_INT8.tflite": (
         "https://media.githubusercontent.com/media/Arm-Examples/ML-zoo/fec0bb5bcd486eb2839cdb7d437d466067402a6a/models/image_classification/mobilenet_v2_1.0_224/tflite_int8/mobilenet_v2_1.0_224_INT8.tflite",
         "4 MB",
         "bd8d56b80557a5fca7acf14f61e5339285c02810f7d7afa714b9763fc4b86e95",
@@ -90,16 +86,13 @@ def sha256(path):
     return binascii.hexlify(h.digest()).decode()
 
 
-# Downloads the missing models and photo, after asking when ASK is set. A download whose
-# SHA-256 differs is deleted.
+# Downloads the missing models and photo. A download whose SHA-256 differs is deleted.
 def download_missing():
     missing = [path for path in [m[1] for m in MODELS] + [PHOTO] if not exists(path)]
     if not missing:
         return
     for path in missing:
-        print("missing: %s (%s), %s" % (path, DOWNLOADS[path][1], DOWNLOADS[path][0]))
-    if ASK and input("Download from GitHub? [y/N] ").strip().lower() not in ("y", "yes"):
-        return
+        print("downloading %s (%s), %s" % (path, DOWNLOADS[path][1], DOWNLOADS[path][0]))
     for path in missing:
         url, _, want = DOWNLOADS[path]
         try:

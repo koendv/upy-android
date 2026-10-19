@@ -22,6 +22,6 @@ Copy the runtime to the phone:
    sftp> put litert/*.so /litert/
    ```
 3. In **Settings**, enable **Load accelerators from /litert/** and press **Restart**.
-4. Run `/examples/litert_bench.py` in the app, or ask the AI assistant to run `litert_bench.py`. The script asks permission to download MobileNet models from github. If the NPU is not faster than the CPU, the runtime did not load and LiteRT runs on the CPU.
+4. Run `/examples/litert_bench.py` in the app, or ask the AI assistant to run `litert_bench.py`. If the MobileNet models are missing, the script downloads the MobileNet models from github into `/rom`. If the NPU is not faster than the CPU, the runtime did not load and LiteRT runs on the CPU.
 
 For details, see [NPU](NPU.md).

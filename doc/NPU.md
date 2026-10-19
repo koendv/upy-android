@@ -116,7 +116,7 @@ After any later change to the files in `/litert/`, press **Restart** again. Lite
 
 ### 6. Check
 
-Run `/examples/litert_bench.py` on the phone. `litert_bench.py` needs MobileNet v2 in `/`. If the models are missing, the script offers to download them from GitHub (18 MB, SHA-256 checked) and asks first: answer `y`. A run from adb answers with the adb `input` method (see `--method help`). `litert_bench.py` times `run()` on the CPU, GPU and NPU.
+Run `/examples/litert_bench.py` on the phone. `litert_bench.py` needs MobileNet v2 in `/rom`. If the models are missing, the script downloads them from GitHub (19 MB, SHA-256 checked). `litert_bench.py` times `run()` on the CPU, GPU and NPU.
 
 If the NPU is not faster than the CPU, the model ran on the CPU. `adb logcat | grep -E 'litert|tflite'` shows which. On the NPU:
 
@@ -137,7 +137,7 @@ Run `tests/litert_mobilenet.py` from the repository, on the PC, with the phone c
 tools/run-tests.py --only litert_mobilenet
 ```
 
-The phone downloads MobileNet v2, float32 and int8, and a photo of Grace Hopper, and checks their SHA-256. Every accelerator must give the same top classes as the CPU: 653 military uniform, 835 suit, 907 Windsor tie (the 1001 labels of TensorFlow's `ImageNetLabels.txt`, `background` first). The test fails on a wrong result and prints SKIP when the phone is offline. An accelerator that fails the test is not usable on this phone with this LiteRT version: use the CPU, or another accelerator that passes. Add the outcome as a row of the [Known results](#known-results) table.
+The phone downloads MobileNet v2, float32 and int8, and a photo of Grace Hopper into `/rom`, and checks their SHA-256. A file that is already there with the right SHA-256 is kept. The files stay on the phone after the test. Every accelerator must give the same top classes as the CPU: 653 military uniform, 835 suit, 907 Windsor tie (the 1001 labels of TensorFlow's `ImageNetLabels.txt`, `background` first). The test fails on a wrong result and prints SKIP when the phone is offline. An accelerator that fails the test is not usable on this phone with this LiteRT version: use the CPU, or another accelerator that passes. Add the outcome as a row of the [Known results](#known-results) table.
 
 ### The GPU backend
 
