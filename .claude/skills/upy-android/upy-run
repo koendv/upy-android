@@ -1,0 +1,72 @@
+#!/bin/bash
+# Drive the upy-android app (MicroPython on an Android phone) over adb.
+# usage: upy-run run [-t SECONDS] [--reset] <script.py|->   (default timeout 30 s)
+#        upy-run modules             list modules and print every module's help()
+#        upy-run status | help | reset | interrupt
+#        upy-run input <text>        answer input()/sys.stdin (a newline is appended)
+# Set ANDROID_SERIAL to pick a device when several are attached.
+URI=content://eu.kdvelectronics.upyandroid.exec
+TESTED_PROTOCOL=4
+usage() { sed -n '2,8p' "$0" >&2; exit 2; }
+call() { adb exec-out content call --uri "$URI" --method "$@"; }
+
+check_protocol() {
+  local p
+  p=$(call status | sed -n 's/.*protocol: *\([0-9][0-9]*\).*/\1/p' | head -1)
+  [ -z "$p" ] && echo "warning: no protocol in status (adb exec disabled or app not running?)" >&2
+  [ -n "$p" ] && [ "$p" != "$TESTED_PROTOCOL" ] &&
+    echo "warning: app protocol is $p, this helper was written for $TESTED_PROTOCOL; read '$0 help'" >&2
+  return 0
+}
+
+run_script() {  # run_script <file|-> <timeout> <reset:0|1>
+  local src extra=(--extra "timeout:i:$2")
+  [ "$3" = 1 ] && extra+=(--extra reset:b:true)
+  if [ "$1" = "-" ]; then src=$(base64 -w0); else src=$(base64 -w0 "$1") || exit 1; fi
+  [ ${#src} -gt 60000 ] && { echo "script too large (~48 KB source limit); send it in chunks" >&2; exit 1; }
+  call run --arg "$src" "${extra[@]}"
+}
+
+cmd=$1; shift
+case "$cmd" in
+  status|help|reset|interrupt) call "$cmd" ;;
+  input) [ $# -ge 1 ] || usage; call input --arg "$(printf '%s\n' "$1" | base64 -w0)" ;;
+  run)
+    t=30 reset=0 file=
+    while [ $# -gt 0 ]; do
+      case "$1" in
+        -t) [ $# -ge 2 ] || usage; t=$2; shift ;;
+        --reset) reset=1 ;;
+        -h|--help) usage ;;
+        *) [ -z "$file" ] || usage; file=$1 ;;
+      esac
+      shift
+    done
+    [ -n "$file" ] || usage
+    check_protocol
+    run_script "$file" "$t" "$reset" ;;
+  modules)
+    check_protocol
+    # 1) module names the phone has now; 2) import each and print its help() if it has one
+    names=$(echo "help('modules')" | run_script - 20 0 |
+      sed 's/^Result: Bundle\[{output=//; s/, status=ok}\]$//' |
+      tr -s ' \t' '\n\n' | grep -E '^[A-Za-z][A-Za-z0-9_]*$' | grep -vE '^(Plus|any|modules|on|the|filesystem|builtins)$' | sort -u)
+    [ -n "$names" ] || { echo "could not list modules" >&2; exit 1; }
+    echo "modules: $(echo $names | tr '\n' ' ')"
+    {
+      echo "for m in ($(for n in $names; do printf "'%s'," "$n"; done)):"
+      cat <<'PY'
+    try:
+        mod = __import__(m)
+        h = getattr(mod, 'help', None)
+        if callable(h):
+            print('=====', m)
+            r = h()
+            if r:
+                print(r)
+    except Exception as e:
+        print('=====', m, 'ERR', e)
+PY
+    } | run_script - 60 0 ;;
+  *) usage ;;
+esac
