@@ -35,6 +35,10 @@ limits:
   script: ~48 KB source, as adb closes a command over 64 KB (the script travels base64 in --arg); send large data in chunks
 env:
   fs: / is app private storage; /examples has samples
+  files:
+    to_phone: "http.download(url, path) from a server on the PC, e.g. python3 -m http.server; zipfile.read unpacks a zip, zipfile.write packs a folder into one file"
+    from_phone: "http.put(url, data) or http.post(url, data) to a server on the PC; or sftp"
+    sftp: "the user switches SSH on and sets an ssh password in the app settings (ssh does not work without one); then sftp -P 2222 user@<phone-ip>, both directions; / is the files folder"
   modules: "help('modules')"
   module_help: "camera, display, android, location, imu, tflite, litert, umqtt, http and zipfile are upy-android-specific and have a help() function, e.g. import camera; print(camera.help()); image, gif, mjpeg, crc and ulab are OpenMV's and ulab's modules and their help() lists only what differs; android.mediastore and android.fileprovider are described in android.help()"
   examples: "os.listdir('/examples') lists scripts: find_*.py and face_*.py show the image module; gif, mjpeg and ulab have no example, see their help()"
