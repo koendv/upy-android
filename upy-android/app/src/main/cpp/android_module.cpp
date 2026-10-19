@@ -41,6 +41,7 @@ const char android_help_text[] =
     "  android.fileprovider: share(path, mime_type=\"application/octet-stream\") -- open Android's share sheet for a file; fire-and-forget, no return value, silently does nothing if no app window is focused\n"
     "functions:\n"
     "  android.settings() -- dict snapshot of app settings (heap_size_mb, ssh_enabled, adb_exec_enabled); read-only here, set from the app UI\n"
+    "not in this MicroPython: socket, ssl, machine, network, requests, _thread (http does HTTP and HTTPS, umqtt does MQTT)\n"
     "see_also: camera.help(), display.help(), location.help() (GPS/network location); accelerometer and gyroscope: module imu (OpenMV style: imu.acceleration_mg(), imu.angular_rate_mdps(), imu.roll(), imu.pitch())\n"
 ;
 mp_obj_t android_help() {

@@ -112,8 +112,8 @@ upy is designed for ai-assisted programming.
 Together, this allows an agent to learn the API from the phone.
 When adding, removing or changing a method, update the module's `help()` text in the same commit.
 
-The modules `camera`, `display`, `android`, `location`, `imu`, `tflite`, `litert`, `umqtt`, `http` and `zipfile` have a `help()` function. For example: `import camera; print(camera.help())`.
-The modules `image`, `gif`, `mjpeg` and `ulab` have no `help()`; they follow OpenMV's and ulab's own documentation.
+The modules `camera`, `display`, `android`, `location`, `imu`, `image`, `gif`, `mjpeg`, `crc`, `ulab`, `tflite`, `litert`, `umqtt`, `http` and `zipfile` have a `help()` function. For example: `import camera; print(camera.help())`.
+The `help()` of `image`, `gif`, `mjpeg`, `crc` and `ulab` lists only what differs from OpenMV's and ulab's own documentation.
 
 The list is repeated in `module_help` of `app/src/main/res/raw/adb_help.yaml`, which the `help` method of `adb exec` shows. Keep both in step.
 
@@ -172,6 +172,7 @@ A missing `.exp` file is an error. `--record --only <name>` writes the current o
 
 - The versions of MicroPython, OpenMV, AprilTag, ulab and LiteRT are pinned in [`upy-android/upstream.properties`](../upy-android/upstream.properties).
 - `upy-android/native-bringup/vendor/` has unmodified upstream files. `upy-android/native-bringup/my-overrides/` has this project's own files and patched copies of upstream files. A patched copy has a comment "upy-android PATCH" that explains the change.
+- `upy-android/native-bringup/patches/openmv/` and `patches/ulab/` have patches for upstream files. A patch changes a few lines, where a patched copy would not follow upstream. `apply-overrides.sh` applies the patches with `patch --fuzz=0`. If upstream changes the patched lines, the patch does not apply and the build fails: update the patch. A file is either overridden or patched, not both. The qstr scan reads the unpatched `vendor/` files, so a patch cannot add a new `MP_QSTR_*`.
 - The build generates `micropython_embed/` from these two directories. Do not edit `micropython_embed/` by hand: the next build overwrites it.
 
 ## Networking

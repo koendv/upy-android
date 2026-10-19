@@ -43,6 +43,7 @@ cp my-overrides/shared-timeutils/timeutils.h micropython_embed/shared/timeutils/
 rm -rf micropython_embed/ulab
 cp -r vendor/ulab micropython_embed/ulab
 cp my-overrides/ulab/ulab_config.h micropython_embed/ulab/ulab_config.h
+cp my-overrides/ulab/ulab_help.c micropython_embed/ulab/ulab_help.c
 # OpenMV imlib/py_image, same reasoning and placement as ulab above.
 # Flat, not deeply nested like ulab, but still copied wholesale with -r
 # for the one nested exception: ulab-shim/ulab/code/ndarray.h (a shim
@@ -67,7 +68,7 @@ cp -r my-overrides/openmv/. micropython_embed/openmv/
 # micropython_embed/<tree>/. With --fuzz=0 a patch fails when upstream changed the lines
 # around its change. The qstr scan reads the unpatched vendor/ files, so a patch cannot
 # add a new MP_QSTR_*.
-for tree in openmv; do
+for tree in openmv ulab; do
     for p in patches/$tree/*.patch; do
         patch -p1 --fuzz=0 --forward --no-backup-if-mismatch -d micropython_embed/$tree -i "$PWD/$p"
     done

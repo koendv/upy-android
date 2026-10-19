@@ -1,0 +1,9 @@
+help: True
+empty data: True
+crc32 is not binascii.crc32: True
+crc16 of 123456789: True
+bytearray works: True
+value continues crc16: True
+value continues crc32: True
+results are int: True
+data is required: True

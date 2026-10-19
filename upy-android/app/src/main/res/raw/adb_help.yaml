@@ -36,7 +36,7 @@ limits:
 env:
   fs: / is app private storage; /examples has samples
   modules: "help('modules')"
-  module_help: "camera, display, android, location, imu, tflite, litert, umqtt, http and zipfile are upy-android-specific and have a help() function, e.g. import camera; print(camera.help()); android.mediastore and android.fileprovider are described in android.help()"
-  examples: "os.listdir('/examples') lists scripts: find_*.py and face_*.py show the image module, which has no help(); gif, mjpeg and ulab have neither help() nor an example, see OpenMV's and ulab's own documentation"
+  module_help: "camera, display, android, location, imu, tflite, litert, umqtt, http and zipfile are upy-android-specific and have a help() function, e.g. import camera; print(camera.help()); image, gif, mjpeg, crc and ulab are OpenMV's and ulab's modules and their help() lists only what differs; android.mediastore and android.fileprovider are described in android.help()"
+  examples: "os.listdir('/examples') lists scripts: find_*.py and face_*.py show the image module; gif, mjpeg and ulab have no example, see their help()"
   phone: "import android (proximity sensor, save to gallery, share); import location (GPS/network location); import imu (accelerometer, gyroscope)"
   npu_runtime: "recipe: https://raw.githubusercontent.com/koendv/upy-android/main/doc/NPU.md"

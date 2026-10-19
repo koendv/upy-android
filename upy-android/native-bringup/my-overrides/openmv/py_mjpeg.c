@@ -246,8 +246,28 @@ static MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &py_mjpeg_locals_dict
     );
 
+static const char mjpeg_help_text[] =
+    "module: mjpeg (OpenMV's mjpeg module: write a Motion JPEG video file)\n"
+    "documentation: https://docs.openmv.io/v5.0.1/library/omv.mjpeg.html\n"
+    "  functions and arguments are OpenMV's. This text lists what differs; that page is for v5.0.1, so details can differ.\n"
+    "class: mjpeg.Mjpeg(path, width, height)\n"
+    "  width and height left out: taken from the open camera (camera.Camera), else 320x240 (OpenMV: from the frame buffer)\n"
+    "methods:\n"
+    "  add_frame(image, *, roi, rgb_channel, alpha, color_palette, alpha_palette, hint, quality=90): write() is the same\n"
+    "    quality 0..100, alpha 0..255, rgb_channel -1..2, else ValueError\n"
+    "  width(), height(), count(): frames written, size(): bytes written so far, is_closed(): 1 or 0\n"
+    "  sync(): write the frame count, size and frame rate into the file header; close() does this and closes the file\n"
+    "  add_frame() and sync() after close() raise OSError\n"
+    "see_also: image.help(), camera.help()\n"
+;
+static mp_obj_t py_mjpeg_help(void) {
+    return mp_obj_new_str(mjpeg_help_text, strlen(mjpeg_help_text));
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(py_mjpeg_help_obj, py_mjpeg_help);
+
 static const mp_rom_map_elem_t globals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___name__),    MP_ROM_QSTR(MP_QSTR_mjpeg)      },
+    { MP_ROM_QSTR(MP_QSTR_help),        MP_ROM_PTR(&py_mjpeg_help_obj)  },
     { MP_ROM_QSTR(MP_QSTR_Mjpeg),       MP_ROM_PTR(&py_mjpeg_open_obj)  },
 };
 

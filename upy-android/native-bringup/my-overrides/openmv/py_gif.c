@@ -191,8 +191,27 @@ static MP_DEFINE_CONST_OBJ_TYPE(
     locals_dict, &py_gif_locals_dict
     );
 
+static const char gif_help_text[] =
+    "module: gif (OpenMV's gif module: write an animated GIF file)\n"
+    "documentation: https://docs.openmv.io/v5.0.1/library/omv.gif.html\n"
+    "  functions and arguments are OpenMV's. This text lists what differs; that page is for v5.0.1, so details can differ.\n"
+    "class: gif.Gif(path, *, width, height, color, loop=True)\n"
+    "  width, height and color left out: taken from the open camera (camera.Camera), else 320x240 grayscale (OpenMV: from the frame buffer)\n"
+    "  color=True: RGB565 frames, color=False: grayscale frames\n"
+    "methods:\n"
+    "  add_frame(image, *, delay=10): delay in units of 10 ms, so 10 is 100 ms; the image must have the width and height of the gif, and not be JPEG or BINARY, else OSError\n"
+    "  width(), height(), format(): image.RGB565 or image.GRAYSCALE, loop(): 1 or 0, size(): bytes written so far\n"
+    "  close(): finish the file\n"
+    "see_also: image.help(), camera.help()\n"
+;
+static mp_obj_t py_gif_help(void) {
+    return mp_obj_new_str(gif_help_text, strlen(gif_help_text));
+}
+static MP_DEFINE_CONST_FUN_OBJ_0(py_gif_help_obj, py_gif_help);
+
 static const mp_rom_map_elem_t globals_dict_table[] = {
     { MP_OBJ_NEW_QSTR(MP_QSTR___name__),    MP_OBJ_NEW_QSTR(MP_QSTR_gif) },
+    { MP_OBJ_NEW_QSTR(MP_QSTR_help),        MP_ROM_PTR(&py_gif_help_obj) },
     { MP_OBJ_NEW_QSTR(MP_QSTR_Gif),         MP_ROM_PTR(&py_gif_open_obj) },
     { NULL, NULL },
 };

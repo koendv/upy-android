@@ -1,0 +1,12 @@
+help: True
+help names the documentation: True
+size without a camera is 320x240: True
+add_frame and write count frames: True
+quality out of range raises ValueError: True
+alpha out of range raises ValueError: True
+rgb_channel out of range raises ValueError: True
+is_closed is 0 before close: True
+is_closed is 1 after close: True
+add_frame after close raises OSError: True
+sync after close raises OSError: True
+explicit size: True

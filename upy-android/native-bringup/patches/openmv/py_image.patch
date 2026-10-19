@@ -1,0 +1,14 @@
+--- a/py_image.c
++++ b/py_image.c
+@@ -4938,8 +4938,11 @@
+ }
+ static MP_DEFINE_CONST_FUN_OBJ_1(py_image_get_enclosed_ellipse_obj, py_image_get_enclosed_ellipse);
+ 
++extern const mp_obj_fun_builtin_fixed_t image_help_obj;
++
+ static const mp_rom_map_elem_t globals_dict_table[] = {
+     {MP_ROM_QSTR(MP_QSTR___name__),            MP_OBJ_NEW_QSTR(MP_QSTR_image)},
++    {MP_ROM_QSTR(MP_QSTR_help),                MP_ROM_PTR(&image_help_obj)},
+     // Pixel formats
+     {MP_ROM_QSTR(MP_QSTR_BINARY),              MP_ROM_INT(PIXFORMAT_BINARY)},   /* 1BPP/BINARY*/
+     {MP_ROM_QSTR(MP_QSTR_GRAYSCALE),           MP_ROM_INT(PIXFORMAT_GRAYSCALE)},/* 1BPP/GRAYSCALE*/

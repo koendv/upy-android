@@ -1,0 +1,8 @@
+help: True
+help names the documentation: True
+size without a camera is 320x240 grayscale: True
+loop is 1 by default: True
+wrong geometry raises OSError: True
+BINARY raises OSError: True
+explicit size: True
+size grows: True

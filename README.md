@@ -167,10 +167,10 @@ The code was written with AI assistance and has had no independent audit.
 
 | Group | Tests | Result on the Redmi 9 |
 |---|---|---|
-| Project tests (`tools/run-tests.py`) | 15 | all pass, no known failure |
-| MicroPython `basics` (`--micropython`) | 574 | 542 pass, 32 skipped, 0 failed |
-| OpenMV unit tests, adapted (`--openmv`) | 78 | all pass |
-| **Total** | **667** | **635 pass, 32 skipped, 0 failed** |
+| Project tests (`tools/run-tests.py`) | 24 | all pass, no known failure |
+| MicroPython `basics` (`--micropython`) | 575 | 545 pass, 30 skipped, 0 failed |
+| OpenMV unit tests, adapted (`--openmv`) | 82 | all pass |
+| **Total** | **681** | **651 pass, 30 skipped, 0 failed** |
 
 The test run covers the modules, MicroPython's and OpenMV's own test suite. Depending on phone, LiteRT runs on CPU, GPU or NPU, see [Known results](doc/NPU.md#known-results).
 

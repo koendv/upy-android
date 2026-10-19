@@ -1,0 +1,15 @@
+--- a/ulab.c
++++ b/ulab.c
+@@ -192,9 +192,12 @@
+ #endif
+ #endif
+ 
++extern const mp_obj_fun_builtin_fixed_t ulab_help_obj;
++
+ static const mp_rom_map_elem_t ulab_globals_table[] = {
+     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_ulab) },
+     { MP_ROM_QSTR(MP_QSTR___version__), MP_ROM_PTR(&ulab_version_obj) },
++    { MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&ulab_help_obj) },
+     #ifdef ULAB_HASH
+     { MP_ROM_QSTR(MP_QSTR___sha__), MP_ROM_PTR(&ulab_sha_obj) },
+     #endif

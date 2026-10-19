@@ -1,0 +1,15 @@
+--- a/py_crc.c
++++ b/py_crc.c
+@@ -77,9 +77,12 @@
+ }
+ static MP_DEFINE_CONST_FUN_OBJ_KW(py_crc32_obj, 1, py_crc32);
+ 
++extern const mp_obj_fun_builtin_fixed_t crc_help_obj;
++
+ // Module globals table
+ static const mp_rom_map_elem_t crc_module_globals_table[] = {
+     { MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_crc) },
++    { MP_ROM_QSTR(MP_QSTR_help), MP_ROM_PTR(&crc_help_obj) },
+     { MP_ROM_QSTR(MP_QSTR_crc16), MP_ROM_PTR(&py_crc16_obj) },
+     { MP_ROM_QSTR(MP_QSTR_crc32), MP_ROM_PTR(&py_crc32_obj) },
+ };

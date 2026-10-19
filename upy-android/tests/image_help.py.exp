@@ -1,0 +1,16 @@
+help: True
+help names the documentation: True
+methods listed by dir: True
+copy_to_fb=True raises OSError: True
+flush does nothing: True
+find_keypoints default returns None: True
+find_keypoints with CORNER_FAST: True
+AprilTag families: True
+other AprilTag families absent: True
+hardware functions absent: True
+hardware constants absent: True
+csi, sensor, omv, ml absent: True
+haar cascades load from /rom: True
+awb leaves grayscale alone: True
+stereo_disparity needs grayscale: True
+stereo_disparity needs even width: True

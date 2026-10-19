@@ -1,0 +1,12 @@
+help: True
+help names the documentation: True
+help has no version number: True
+version looks like <release>-(<dims>)D: True
+version tells the dimensions: True
+more dimensions raise TypeError: True
+complex numbers: True
+numpy submodules: True
+scipy submodules: True
+utils: True
+import numpy does not work: True
+import ulab.numpy does not work: True

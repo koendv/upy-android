@@ -1,0 +1,8 @@
+help: True
+socket listed and absent: True
+ssl listed and absent: True
+machine listed and absent: True
+network listed and absent: True
+requests listed and absent: True
+_thread listed and absent: True
+http and umqtt exist: True
