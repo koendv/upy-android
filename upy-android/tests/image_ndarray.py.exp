@@ -1,0 +1,13 @@
+grayscale shape: True
+grayscale B values: True
+grayscale f values: True
+grayscale b values: True
+RGB565 shape: True
+RGB565 values: True
+grayscale round trip: True
+RGB565 round trip: True
+buffer is filled: True
+buffer too small: True
+dtype not supported: True
+Image needs a float array: True
+Image needs 2 or 3 dimensions: True

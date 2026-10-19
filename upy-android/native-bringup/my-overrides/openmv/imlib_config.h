@@ -96,6 +96,15 @@
 // PNG load/save: png.c plus lodepng.c (zlib license), already vendored.
 #define IMLIB_ENABLE_PNG_DECODER
 #define IMLIB_ENABLE_PNG_ENCODER
+// gamma_corr(), gamma(), awb(), ccm(): isp.c (MIT), uses fast_powf() from fmath.c.
+#define IMLIB_ENABLE_ISP_OPS
+// selective_search(): selective_search.c (MIT).
+#define IMLIB_ENABLE_SELECTIVE_SEARCH
+// stereo_disparity(): stereo.c (MIT). Takes a side-by-side pair in one image.
+#define IMLIB_ENABLE_STEREO_DISPARITY
+// image.ImageIO: py_imageio.c (MIT). File streams need IMLIB_ENABLE_IMAGE_FILE_IO above.
+// patches/openmv/py_imageio.patch makes read() default to copy_to_fb=False.
+#define IMLIB_ENABLE_IMAGE_IO
 // RGB565 to LAB by table lookup (lab_tab.c, ~96 KB) instead of math.
 // Not IMLIB_ENABLE_GAMMA_LUT: only used by the Bayer debayer path.
 #define IMLIB_ENABLE_LAB_LUT

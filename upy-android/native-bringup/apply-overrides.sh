@@ -51,9 +51,9 @@ cp my-overrides/ulab/ulab_config.h micropython_embed/ulab/ulab_config.h
 # upstream files, my-overrides/openmv/ holds this project's own
 # replacement headers/glue (board_config.h, arm_math.h, ulab-shim/,
 # py_gif.c, etc.), merged flat into one directory, as the build
-# expects. py_gif.c is a patched override of a same-named vendor file
-# (see its own header comment for why), not a from-scratch replacement
-# like board_config.h. The cp -r below intentionally lets py_gif.c win.
+# expects. py_gif.c and py_mjpeg.c are patched overrides of same-named vendor files
+# (see their own header comments for why), not from-scratch replacements
+# like board_config.h. The cp -r below intentionally lets them win.
 # framebuffer.h/.c and queue.h/.c and mutex.h/.c are in the same
 # category as board_config.h/arm_math.h -- vendor/openmv/ never had them at all
 # (they come from OpenMV's lib/imlib/ and common/ trees, not the
@@ -63,6 +63,15 @@ cp my-overrides/ulab/ulab_config.h micropython_embed/ulab/ulab_config.h
 rm -rf micropython_embed/openmv
 cp -r vendor/openmv micropython_embed/openmv
 cp -r my-overrides/openmv/. micropython_embed/openmv/
+# patches/<tree>/*.patch change a few lines of an upstream file, relative to
+# micropython_embed/<tree>/. With --fuzz=0 a patch fails when upstream changed the lines
+# around its change. The qstr scan reads the unpatched vendor/ files, so a patch cannot
+# add a new MP_QSTR_*.
+for tree in openmv; do
+    for p in patches/$tree/*.patch; do
+        patch -p1 --fuzz=0 --forward --no-backup-if-mismatch -d micropython_embed/$tree -i "$PWD/$p"
+    done
+done
 # AprilTag library (lib/apriltag submodule of OpenMV), used by OpenMV's
 # imlib apriltag.c for find_apriltags()/find_rects(). Config header:
 # my-overrides/openmv/apriltag_config.h.

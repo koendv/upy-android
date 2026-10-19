@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.22.1)
 project(upy_engine)
 
-file(GLOB MPY_PY_SOURCES micropython_embed/py/*.c)
-file(GLOB MPY_PORT_SOURCES micropython_embed/port/*.c)
-file(GLOB MPY_SHARED_SOURCES micropython_embed/shared/runtime/*.c)
+file(GLOB MPY_PY_SOURCES CONFIGURE_DEPENDS micropython_embed/py/*.c)
+file(GLOB MPY_PORT_SOURCES CONFIGURE_DEPENDS micropython_embed/port/*.c)
+file(GLOB MPY_SHARED_SOURCES CONFIGURE_DEPENDS micropython_embed/shared/runtime/*.c)
 
 # Explicit list, not a glob: generated alongside the extmod files
 # themselves by native-bringup's embed-android.mk, so a missing or
@@ -14,14 +14,14 @@ include(micropython_embed/extmod/sources.cmake)
 # ulab's tree is nested up to 4 levels deep (e.g. ulab/numpy/fft/fft.c),
 # unlike the other globs here. GLOB_RECURSE is safe: nothing under it
 # is #include'd into a sibling file the way some other globbed trees are.
-file(GLOB_RECURSE MPY_ULAB_SOURCES micropython_embed/ulab/*.c)
+file(GLOB_RECURSE MPY_ULAB_SOURCES CONFIGURE_DEPENDS micropython_embed/ulab/*.c)
 
 # OpenMV imlib/py_image is flat, so a plain non-recursive glob is enough.
-file(GLOB MPY_OPENMV_SOURCES micropython_embed/openmv/*.c)
+file(GLOB MPY_OPENMV_SOURCES CONFIGURE_DEPENDS micropython_embed/openmv/*.c)
 
 # AprilTag library (OpenMV's lib/apriltag submodule). Only the sources its
 # own apriltag.mk lists are copied in, see native-bringup/populate-vendor.sh.
-file(GLOB MPY_APRILTAG_SOURCES micropython_embed/apriltag/*.c micropython_embed/apriltag/common/*.c)
+file(GLOB MPY_APRILTAG_SOURCES CONFIGURE_DEPENDS micropython_embed/apriltag/*.c micropython_embed/apriltag/common/*.c)
 
 # micropython android port only, not vendored OpenMV source.
 add_library(upy_engine SHARED
@@ -76,6 +76,7 @@ target_include_directories(upy_engine PRIVATE
 target_compile_definitions(upy_engine PRIVATE
     CMSIS_MCU_H="cmsis_mcu_stub.h"
     ULAB_CONFIG_FILE="ulab_config.h"
+    MODULE_ULAB_ENABLED=1
 )
 
 # For litert.version(). Gradle checks it against upstream.properties.

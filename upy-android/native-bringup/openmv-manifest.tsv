@@ -32,6 +32,7 @@ lib/imlib/imlib.c	imlib.c
 lib/imlib/imlib.h	imlib.h
 lib/imlib/integral.c	integral.c
 lib/imlib/integral_mw.c	integral_mw.c
+lib/imlib/isp.c	isp.c
 lib/imlib/jpegd.c	jpegd.c
 lib/imlib/jpege.c	jpege.c
 lib/imlib/lab_tab.c	lab_tab.c
@@ -74,9 +75,11 @@ lib/imlib/qsort.c	qsort.c
 lib/imlib/rainbow_tab.c	rainbow_tab.c
 lib/imlib/rectangle.c	rectangle.c
 lib/imlib/rotation_corr.c	rotation_corr.c
+lib/imlib/selective_search.c	selective_search.c
 lib/imlib/simd.h	simd.h
 lib/imlib/sincos_tab.c	sincos_tab.c
 lib/imlib/stats.c	stats.c
+lib/imlib/stereo.c	stereo.c
 lib/imlib/template.c	template.c
 common/umalloc.h	umalloc.h
 lib/imlib/xyz_tab.c	xyz_tab.c

@@ -297,7 +297,7 @@ val generateEmbed = tasks.register<Exec>("generateEmbed") {
     inputs.files(upstreamFile)
     inputs.files(fileTree(bringup.resolve("vendor/openmv")), fileTree(bringup.resolve("vendor/ulab")))
     inputs.files(fileTree(bringup.resolve("vendor/apriltag")))
-    inputs.files(fileTree(bringup.resolve("my-overrides")), fileTree(bringup.resolve("qstr-stub")))
+    inputs.files(fileTree(bringup.resolve("my-overrides")), fileTree(bringup.resolve("qstr-stub")), fileTree(bringup.resolve("patches")))
     inputs.files(fileTree(bringup) { include("*.mk", "*.sh", "*.py") })
     inputs.files(fileTree(layout.projectDirectory.dir("src/main/cpp")) { include("*.cpp", "*.h") })
     outputs.dir(layout.projectDirectory.dir("src/main/cpp/micropython_embed"))

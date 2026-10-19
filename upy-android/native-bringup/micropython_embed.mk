@@ -119,6 +119,11 @@ CFLAGS += -Ivendor
 # vendored, see CMakeLists.txt's own target_compile_definitions).
 CFLAGS += -Imy-overrides/ulab
 CFLAGS += -Ivendor/ulab
+# OpenMV's py_image.c and py_helper.c compile their ndarray code only with
+# MODULE_ULAB_ENABLED (which MicroPython's user-module build would set) and
+# ULAB_MAX_DIMS == 4 (from ulab_config.h). Both are also in CMakeLists.txt.
+CFLAGS += -DMODULE_ULAB_ENABLED=1
+CFLAGS += -DULAB_CONFIG_FILE='"ulab_config.h"'
 
 # OpenMV imlib/py_image: machine vision extension, same "not a core
 # MicroPython module" tier as ulab above. my-overrides/openmv/ holds
@@ -133,9 +138,11 @@ CFLAGS += -Ivendor/ulab
 # their own, but SRC_QSTR only needs the ones with real usage, same as
 # ulab's own SRC_QSTR list above only listing user-facing files, not
 # every internal .c ulab vendors.
+# The qstr scan reads the unpatched vendor/ file; patches/openmv/py_image.patch adds no MP_QSTR_*.
 SRC_QSTR += vendor/openmv/py_image.c
 SRC_QSTR += vendor/openmv/py_helper.c
 SRC_QSTR += vendor/openmv/py_image_descriptor.c
+# Same for patches/openmv/py_imageio.patch.
 SRC_QSTR += vendor/openmv/py_imageio.c
 SRC_QSTR += vendor/openmv/py_image_stats.c
 # py_clock.c (time.clock(), OpenMV script compatibility). Not imlib/

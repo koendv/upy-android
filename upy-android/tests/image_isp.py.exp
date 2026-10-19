@@ -1,0 +1,18 @@
+gamma_corr returns the image: True
+gamma 0.5 darkens: True
+gamma 2.0 brightens: True
+gamma 1.0 changes at most 1 level: True
+gamma 2.0 brightens RGB565: True
+ccm returns the image: True
+ccm identity: True
+ccm swaps red and blue: True
+ccm doubles and clips: True
+ccm offset raises red only: True
+ccm leaves grayscale alone: True
+ccm bad size raises ValueError: True
+awb gray world returns the image: True
+awb gray world makes a color patch neutral: True
+awb white patch returns the image: True
+awb white patch makes a color patch neutral: True
+memory stream read: True
+file stream read: True

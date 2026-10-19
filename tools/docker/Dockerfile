@@ -55,7 +55,7 @@ RUN apt-get install -y apt-utils
 
 RUN apt-get install -y \
       git wget unzip curl ca-certificates openjdk-21-jdk-headless \
-      build-essential python3
+      build-essential python3 patch
 
 # build runs as non-root user
 ARG USER_UID=1000
